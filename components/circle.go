@@ -2,12 +2,10 @@ package components
 
 import (
 	rl "github.com/gen2brain/raylib-go/raylib"
-
-	glob "qsim/globals"
 )
 
-// Circle is a draggable circle in world space.
 type Circle struct {
+	Component
 	Center   rl.Vector2
 	Radius   float32
 	Color    rl.Color
@@ -23,23 +21,22 @@ func NewCircle(x, y, radius float32, color rl.Color) *Circle {
 	}
 }
 
-func (c *Circle) Update() {
-	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-		if rl.CheckCollisionPointCircle(glob.WorldMouse, c.Center, c.Radius) {
+func (c *Circle) Update(worldMouse rl.Vector2) {
+	// collision check using world coordinates
+	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
+		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
 			c.dragging = true
-			c.offset = rl.Vector2Subtract(c.Center, glob.WorldMouse)
+			c.offset = rl.Vector2Subtract(c.Center, worldMouse)
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
 		c.dragging = false
 	}
 	if c.dragging {
-		c.Center = rl.Vector2Add(glob.WorldMouse, c.offset)
+		c.Center = rl.Vector2Add(worldMouse, c.offset)
 	}
 }
 
 func (c *Circle) Draw() {
 	rl.DrawCircleV(c.Center, c.Radius, c.Color)
-	// optional outline
-	// rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, rl.Black)
 }
