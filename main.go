@@ -19,9 +19,11 @@ func main() {
 	panel := NewWindow(200, 150, 400, 300)
 	panel2 := NewRenderWindow(400, 150, 400, 300)
 
-	blob := comp.NewBlob(0, 0, 50)
+	//blob := comp.NewBlob(0, 0, 50)
 
-	panel2.wComp = append(panel2.wComp, blob)
+	circle := comp.NewCircle(100, 100, 30, rl.Red)
+
+	panel2.wComp = append(panel2.wComp, circle)
 
 	winManager = append(winManager, panel, panel2)
 
