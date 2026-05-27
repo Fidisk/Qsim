@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	comp "qsim/components"
 	glob "qsim/globals"
 
@@ -95,11 +96,8 @@ func (rw *RenderWindow) Draw() {
 }
 
 func (rw *RenderWindow) Update() {
-	// Cursor locking logic (unchanged, but using the window's screen rect)
+	// Cursor locking logic fixed: Check if THIS window is holding it to release it
 	if !glob.CursorAvailable && !rw.holdingCursor {
-		// If cursor is locked globally and we aren't already holding it, skip further updates?
-		// You might still want to update the window geometry (resize/drag) – decide accordingly.
-		// But for simplicity, we return early if we don't have focus and not holding.
 		return
 	}
 
@@ -112,8 +110,10 @@ func (rw *RenderWindow) Update() {
 	if rl.CheckCollisionPointRec(mousePos, windowRect) {
 		rw.holdingCursor = true
 		glob.CursorAvailable = false
-	} else if glob.CursorAvailable {
+	} else if rw.holdingCursor {
+		// FIX: If we were holding it and the mouse left, release the global lock
 		rw.holdingCursor = false
+		glob.CursorAvailable = true
 	}
 
 	if rw.holdingCursor && rl.IsMouseButtonDown(rl.MouseButtonLeft) {
@@ -132,42 +132,52 @@ func (rw *RenderWindow) Update() {
 	// --- Pan and Zoom ---
 	contentRect := rw.GetContentRect()
 	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
-		// Middle‑mouse panning
+
+		// Middle‑mouse panning (FIXED: Using Screen Space to avoid feedback loops)
 		if rl.IsMouseButtonPressed(rl.MouseButtonMiddle) {
 			rw.isPanning = true
-			rw.panStartMouse = rw.GetWorldMouse()
+			rw.panStartMouse = rl.GetMousePosition() // FIX: Store SCREEN position, not world
 			rw.panStartTarget = rw.Camera.Target
 		}
 		if rl.IsMouseButtonReleased(rl.MouseButtonMiddle) {
 			rw.isPanning = false
 		}
 		if rw.isPanning {
-			currentWorldMouse := rw.GetWorldMouse()
-			delta := rl.Vector2Subtract(rw.panStartMouse, currentWorldMouse)
-			rw.Camera.Target = rl.Vector2Add(rw.panStartTarget, delta)
+			currentMouse := rl.GetMousePosition()
+			// Calculate delta in screen pixels
+			deltaScreen := rl.Vector2Subtract(rw.panStartMouse, currentMouse)
+			// FIX: Convert screen delta to world delta by dividing by zoom
+			deltaWorld := rl.Vector2Scale(deltaScreen, 1.0/rw.Camera.Zoom)
+			rw.Camera.Target = rl.Vector2Add(rw.panStartTarget, deltaWorld)
 		}
 
-		// Mouse‑wheel zoom (towards cursor)
+		// Mouse‑wheel zoom (towards cursor) (FIXED: Order of operations)
 		wheel := rl.GetMouseWheelMove()
 		if wheel != 0 {
+			// 1. Get the world position under mouse BEFORE zooming
+			worldBefore := rw.GetWorldMouse()
+
 			oldZoom := rw.Camera.Zoom
-			// Apply zoom, clamp to avoid absurd values
 			newZoom := oldZoom + wheel*0.1
 			if newZoom < 0.1 {
 				newZoom = 0.1
 			} else if newZoom > 5.0 {
 				newZoom = 5.0
 			}
+
+			// 2. Apply the zoom factor
 			rw.Camera.Zoom = newZoom
 
-			// Adjust target so the world point under the cursor stays the same
-			worldBefore := rw.GetWorldMouse()
-			rw.Camera.Zoom = newZoom // already set, but recalc world for clarity
+			// 3. Get the world position under mouse AFTER zooming
 			worldAfter := rw.GetWorldMouse()
+
+			// 4. Adjust target by the true difference to anchor zoom to the cursor
 			rw.Camera.Target = rl.Vector2Add(rw.Camera.Target,
 				rl.Vector2Subtract(worldBefore, worldAfter))
 		}
 	}
+
+	fmt.Println(rw.Camera)
 
 	// Now update components with world mouse (only if mouse in content area)
 	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
