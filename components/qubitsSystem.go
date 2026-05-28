@@ -1,18 +1,26 @@
 package components
 
 import (
+	"fmt"
+	"math"
+	"math/rand/v2"
+	qub "qsim/qubits"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 type QubitsSystem struct {
 	Circle
 	QubitList []*Qubit
+	Origin    *qub.QubitStateManager
+	BitList   []int32 //Overkill
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 	return &QubitsSystem{
 		Circle:    *NewCircle(x, y, radius, color),
 		QubitList: nil,
+		Origin:    nil,
 	}
 }
 
@@ -42,4 +50,47 @@ func (c *QubitsSystem) Draw() {
 	}
 
 	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
+}
+
+func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
+	//This do not defer the Origin
+	c.Origin = p
+
+	//The downfall of OOP
+	c.QubitList = nil
+
+	for i := range p.Representation {
+		rotation := rand.Float32() * 2 * math.Pi
+		angle := rand.Float32() * 2 * math.Pi
+
+		magnitude := rand.Float32()*0.05 + 0.05 // 0.05 … 0.1
+		if rand.IntN(2) == 0 {
+			magnitude = -magnitude
+		}
+		rotationDelta := magnitude
+
+		magnitude = rand.Float32()*0.05 + 0.05
+		if rand.IntN(2) == 0 {
+			magnitude = -magnitude
+		}
+		angleDelta := magnitude
+
+		ratio := rand.Float32()*2.5 + 0.5 // 0.5 … 10
+		if rand.IntN(2) == 0 {
+			ratio = 1.0 / ratio
+		}
+
+		pathRotation := rand.Float32() * 2 * math.Pi
+		pathRotationDelta := rand.Float32()*0.001 + 0.001
+
+		size := p.Amptitude[i] / 4.0
+		radius := 0.95 - size
+
+		fmt.Println(ratio)
+
+		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio)
+
+		// Use q (e.g., append to QubitList)
+		c.QubitList = append(c.QubitList, q)
+	}
 }

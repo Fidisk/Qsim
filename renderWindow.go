@@ -97,13 +97,14 @@ func (rw *RenderWindow) Draw() {
 }
 
 func (rw *RenderWindow) Update() {
-	worldMouse := rw.GetWorldMouse()
-	for _, c := range rw.wComp {
-		c.Update(worldMouse, rw.holdingCursor)
-	}
 
 	// Cursor locking logic fixed: Check if THIS window is holding it to release it
 	if !glob.CursorAvailable && !rw.holdingCursor {
+		worldMouse := rw.GetWorldMouse()
+		for _, c := range rw.wComp {
+			c.Update(worldMouse, rw.holdingCursor)
+		}
+
 		return
 	}
 
@@ -187,4 +188,9 @@ func (rw *RenderWindow) Update() {
 	//if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
 
 	//}
+
+	worldMouse := rw.GetWorldMouse()
+	for _, c := range rw.wComp {
+		c.Update(worldMouse, rw.holdingCursor)
+	}
 }
