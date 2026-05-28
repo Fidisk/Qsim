@@ -4,24 +4,23 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-type Circle struct {
-	Component
-	Center   rl.Vector2
-	Radius   float32
-	Color    rl.Color
-	dragging bool
-	offset   rl.Vector2
+type QubitsSystem struct {
+	Circle
+	QubitList []*Qubit
 }
 
-func NewCircle(x, y, radius float32, color rl.Color) *Circle {
-	return &Circle{
-		Center: rl.NewVector2(x, y),
-		Radius: radius,
-		Color:  color,
+func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
+	return &QubitsSystem{
+		Circle:    *NewCircle(x, y, radius, color),
+		QubitList: nil,
 	}
 }
 
-func (c *Circle) Update(worldMouse rl.Vector2, holdingCursor bool) {
+func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool) {
+	for _, d := range c.QubitList {
+		d.Update()
+	}
+
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor {
@@ -37,6 +36,10 @@ func (c *Circle) Update(worldMouse rl.Vector2, holdingCursor bool) {
 	}
 }
 
-func (c *Circle) Draw() {
-	rl.DrawCircleV(c.Center, c.Radius, c.Color)
+func (c *QubitsSystem) Draw() {
+	for _, d := range c.QubitList {
+		d.Draw(c.Center, c.Radius)
+	}
+
+	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 }

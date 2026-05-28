@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	comp "qsim/components"
 	glob "qsim/globals"
+
+	conf "qsim/config"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -96,6 +97,11 @@ func (rw *RenderWindow) Draw() {
 }
 
 func (rw *RenderWindow) Update() {
+	worldMouse := rw.GetWorldMouse()
+	for _, c := range rw.wComp {
+		c.Update(worldMouse, rw.holdingCursor)
+	}
+
 	// Cursor locking logic fixed: Check if THIS window is holding it to release it
 	if !glob.CursorAvailable && !rw.holdingCursor {
 		return
@@ -110,10 +116,8 @@ func (rw *RenderWindow) Update() {
 	if rl.CheckCollisionPointRec(mousePos, windowRect) {
 		rw.holdingCursor = true
 		glob.CursorAvailable = false
-	} else if rw.holdingCursor {
-		// FIX: If we were holding it and the mouse left, release the global lock
+	} else if glob.CursorAvailable {
 		rw.holdingCursor = false
-		glob.CursorAvailable = true
 	}
 
 	if rw.holdingCursor && rl.IsMouseButtonDown(rl.MouseButtonLeft) {
@@ -159,10 +163,10 @@ func (rw *RenderWindow) Update() {
 
 			oldZoom := rw.Camera.Zoom
 			newZoom := oldZoom + wheel*0.1
-			if newZoom < 0.1 {
-				newZoom = 0.1
-			} else if newZoom > 5.0 {
-				newZoom = 5.0
+			if newZoom < conf.MinZoom {
+				newZoom = conf.MinZoom
+			} else if newZoom > conf.MaxZoom {
+				newZoom = conf.MaxZoom
 			}
 
 			// 2. Apply the zoom factor
@@ -177,13 +181,10 @@ func (rw *RenderWindow) Update() {
 		}
 	}
 
-	fmt.Println(rw.Camera)
+	//fmt.Println(rw.Camera)
 
 	// Now update components with world mouse (only if mouse in content area)
-	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
-		worldMouse := rw.GetWorldMouse()
-		for _, c := range rw.wComp {
-			c.Update(worldMouse)
-		}
-	}
+	//if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
+
+	//}
 }
