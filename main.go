@@ -6,6 +6,8 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	glob "qsim/globals"
+
+	qub "qsim/qubits"
 )
 
 func main() {
@@ -23,9 +25,13 @@ func main() {
 
 	circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
 
-	qubit := comp.NewQubit(0, 0.1, 20, 0, 0.2, 0.3, 1.75)
+	//qubit := comp.NewQubit(0, 0.1, 0.6, 0, 0.2, 0.3, 1.75)
 
-	circle.QubitList = append(circle.QubitList, qubit)
+	//circle.QubitList = append(circle.QubitList, qubit)
+
+	test := qub.NewQubitStateManagerFrom([]float32{0.6, 0.8}, []int32{0, 1})
+
+	circle.Assign(test)
 
 	panel2.wComp = append(panel2.wComp, circle)
 
