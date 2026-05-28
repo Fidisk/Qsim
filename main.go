@@ -21,7 +21,11 @@ func main() {
 
 	//blob := comp.NewBlob(0, 0, 50)
 
-	circle := comp.NewCircle(100, 100, 30, rl.Red)
+	circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
+
+	qubit := comp.NewQubit(0, 0.1, 20, 0, 0.2, 0.3, 1.75)
+
+	circle.QubitList = append(circle.QubitList, qubit)
 
 	panel2.wComp = append(panel2.wComp, circle)
 
