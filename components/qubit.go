@@ -1,9 +1,13 @@
 package components
 
 import (
+	"fmt"
+	"image/color"
 	"math"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	attr "qsim/qubits/attributes"
 )
 
 //Why tf did I want to make a esclipse, a circle work lmao
@@ -21,10 +25,48 @@ type Qubit struct {
 	AngleDelta        float32
 	Size              float32
 	Ratio             float32
+
+	r       int32
+	g       int32
+	b       int32
+	sideCnt int32
 }
 
-func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio float32) *Qubit {
-	return &Qubit{
+func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
+	c.sideCnt = 0
+	c.r, c.b, c.g = 0, 0, 0
+	colCnt := 0
+	for i := int32(0); i < n; i++ {
+		tmp := attr.AttributesManager.Get(modifierID[i])
+		state := (representation >> i) & 1
+
+		fmt.Println(tmp)
+		switch v := tmp.(type) {
+		case *attr.Color:
+			colCnt++
+			c.r += v.R * state
+			c.g += v.G * state
+			c.b += v.B * state
+			//fmt.Println("A", v)
+		case *attr.Side:
+			if state != 0 {
+				c.sideCnt += v.SideCntPositive
+			} else {
+				c.sideCnt += v.SideCntNegative
+			}
+			//fmt.Println("B", v)
+		default:
+			//fmt.Println(v)
+		}
+	}
+	//fmt.Println(c.r, c.g, c.b, c.sideCnt)
+	c.r /= int32(colCnt)
+	c.b /= int32(colCnt)
+	c.g /= int32(colCnt)
+}
+
+func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio float32, representation int32, modifierID []int32, n int32) *Qubit {
+	tmp := Qubit{
 		Rotation:          rotation,
 		RotationDelta:     rotationDelta,
 		PathRotation:      pathRotation,
@@ -35,6 +77,8 @@ func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, 
 		Size:              size,
 		Ratio:             ratio,
 	}
+	tmp.buildAttr(representation, modifierID, n)
+	return &tmp
 }
 
 func (q *Qubit) Update() {
@@ -97,5 +141,12 @@ func (q *Qubit) Draw(center rl.Vector2, radius float32) {
 	//    rotationDeg is q.Rotation in degrees (already matches DrawPoly's unit)
 	rotationDeg := q.Rotation * 180 / float32(math.Pi)
 
-	rl.DrawPoly(pos, 6, circumRadius, rotationDeg, rl.Red)
+	col := color.RGBA{
+		R: uint8(q.r),
+		G: uint8(q.g),
+		B: uint8(q.b),
+		A: 255,
+	}
+
+	rl.DrawPoly(pos, q.sideCnt, circumRadius, rotationDeg, col)
 }
