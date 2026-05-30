@@ -83,12 +83,12 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		pathRotation := rand.Float32() * 2 * math.Pi
 		pathRotationDelta := rand.Float32()*0.001 + 0.001
 
-		size := p.Amptitude[i] / 4.0
+		size := p.Amptitude[i] / 2.0
 		radius := 0.95 - size
 
 		fmt.Println(ratio)
 
-		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio)
+		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, p.Representation[i], p.ModifierID, int32(len(p.ModifierID)))
 
 		// Use q (e.g., append to QubitList)
 		c.QubitList = append(c.QubitList, q)

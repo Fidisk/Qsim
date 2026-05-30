@@ -24,16 +24,21 @@ func main() {
 	//blob := comp.NewBlob(0, 0, 50)
 
 	circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
+	circle2 := comp.NewQubitsSystem(150, 100, 30, rl.Blue)
 
 	//qubit := comp.NewQubit(0, 0.1, 0.6, 0, 0.2, 0.3, 1.75)
 
 	//circle.QubitList = append(circle.QubitList, qubit)
 
-	test := qub.NewQubitStateManagerFrom([]float32{0.6, 0.8}, []int32{0, 1})
+	test := qub.NewQubitStateManagerFrom([]float32{0.5, 0.5, 0.5, 0.5}, []int32{0, 1, 2, 3}, []int32{0, 4})
+
+	test2 := qub.NewQubitStateManagerFrom([]float32{0, 0.6, 0, 0.8}, []int32{0, 1, 2, 3}, []int32{0, 2})
 
 	circle.Assign(test)
+	circle2.Assign(test2)
 
 	panel2.wComp = append(panel2.wComp, circle)
+	panel2.wComp = append(panel2.wComp, circle2)
 
 	winManager = append(winManager, panel, panel2)
 
