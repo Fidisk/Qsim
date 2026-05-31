@@ -200,3 +200,11 @@ func (rw *RenderWindow) Update() {
 		c.Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 }
+
+func (rw *RenderWindow) PostUpdate() {
+	for i := 1; i < len(rw.wComp); i++ {
+		if rw.wComp[i-1].IsHoldingCursor() == true {
+			rw.wComp[i-1], rw.wComp[i] = rw.wComp[i], rw.wComp[i-1]
+		}
+	}
+}
