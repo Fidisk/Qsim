@@ -68,13 +68,6 @@ func (rw *RenderWindow) Draw() {
 	if rw.cursorOnResize {
 		handleColor = rw.ColorResizeHover
 	}
-	rl.DrawTriangle(
-		rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height - 15)},
-		rl.Vector2{X: float32(rw.X + rw.Width - 15), Y: float32(rw.Y + rw.Height)},
-		rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height)},
-		handleColor,
-	)
-	rl.DrawRectangleLines(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBorder)
 
 	// 2. Activate scissor to clip content to the window's content area
 	contentRect := rw.GetContentRect()
@@ -94,6 +87,14 @@ func (rw *RenderWindow) Draw() {
 
 	// 4. Disable scissor
 	rl.EndScissorMode()
+
+	rl.DrawTriangle(
+		rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height - 15)},
+		rl.Vector2{X: float32(rw.X + rw.Width - 15), Y: float32(rw.Y + rw.Height)},
+		rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height)},
+		handleColor,
+	)
+	rl.DrawRectangleLines(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBorder)
 }
 
 func (rw *RenderWindow) Update() {
