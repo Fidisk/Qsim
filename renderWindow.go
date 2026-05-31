@@ -101,8 +101,9 @@ func (rw *RenderWindow) Update() {
 	// Cursor locking logic fixed: Check if THIS window is holding it to release it
 	if !glob.CursorAvailable && !rw.holdingCursor {
 		worldMouse := rw.GetWorldMouse()
+		tmp := false
 		for _, c := range rw.wComp {
-			c.Update(worldMouse, rw.holdingCursor)
+			c.Update(worldMouse, rw.holdingCursor, &tmp)
 		}
 
 		return
@@ -190,7 +191,11 @@ func (rw *RenderWindow) Update() {
 	//}
 
 	worldMouse := rw.GetWorldMouse()
+	isCursorAvailable := false
+	if rw.holdingCursor {
+		isCursorAvailable = true
+	}
 	for _, c := range rw.wComp {
-		c.Update(worldMouse, rw.holdingCursor)
+		c.Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 }
