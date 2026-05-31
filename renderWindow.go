@@ -103,8 +103,8 @@ func (rw *RenderWindow) Update() {
 	if !glob.CursorAvailable && !rw.holdingCursor {
 		worldMouse := rw.GetWorldMouse()
 		tmp := false
-		for _, c := range rw.wComp {
-			c.Update(worldMouse, rw.holdingCursor, &tmp)
+		for i := len(rw.wComp) - 1; i >= 0; i-- {
+			rw.wComp[i].Update(worldMouse, rw.holdingCursor, &tmp)
 		}
 
 		return
@@ -196,9 +196,10 @@ func (rw *RenderWindow) Update() {
 	if rw.holdingCursor {
 		isCursorAvailable = true
 	}
-	for _, c := range rw.wComp {
-		c.Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
+	for i := len(rw.wComp) - 1; i >= 0; i-- {
+		rw.wComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
+
 }
 
 func (rw *RenderWindow) PostUpdate() {
@@ -207,4 +208,9 @@ func (rw *RenderWindow) PostUpdate() {
 			rw.wComp[i-1], rw.wComp[i] = rw.wComp[i], rw.wComp[i-1]
 		}
 	}
+}
+
+func (rw *RenderWindow) GetElement() []comp.Component {
+	//Danger zone
+	return rw.wComp
 }

@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	glob "qsim/globals"
 	qub "qsim/qubits"
+	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -43,6 +44,8 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		c.dragging = false
 		c.holdingCursor = false
 		*isCursorAvailable = true
+
+		c.zipToHook()
 	}
 	if c.dragging {
 		c.Center = rl.Vector2Add(worldMouse, c.offset)
@@ -97,5 +100,19 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 
 		// Use q (e.g., append to QubitList)
 		c.QubitList = append(c.QubitList, q)
+	}
+}
+
+func (c *QubitsSystem) zipToHook() {
+	tmp := c.GetParent()
+	ele := tmp.GetElement()
+	for _, d := range ele {
+		switch v := d.(type) {
+		case *Hook:
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist {
+				c.Center = v.Center
+			}
+		default:
+		}
 	}
 }
