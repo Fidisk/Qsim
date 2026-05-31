@@ -40,6 +40,9 @@ func main() {
 	panel2.wComp = append(panel2.wComp, circle)
 	panel2.wComp = append(panel2.wComp, circle2)
 
+	testHook := comp.NewHook(200, 200, 10, rl.Blue)
+	panel2.wComp = append(panel2.wComp, testHook)
+
 	winManager = append(winManager, panel, panel2)
 
 	for !rl.WindowShouldClose() {

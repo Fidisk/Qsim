@@ -5,7 +5,7 @@ import (
 )
 
 type Circle struct {
-	Component
+	WindowComponent
 	Center   rl.Vector2
 	Radius   float32
 	Color    rl.Color
@@ -21,7 +21,7 @@ func NewCircle(x, y, radius float32, color rl.Color) *Circle {
 	}
 }
 
-func (c *Circle) Update(worldMouse rl.Vector2, holdingCursor bool) {
+func (c *Circle) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	glob "qsim/globals"
 	qub "qsim/qubits"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -24,20 +25,24 @@ func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 	}
 }
 
-func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool) {
+func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	for _, d := range c.QubitList {
 		d.Update()
 	}
 
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
-		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor {
+		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.HoldingCursor || *isCursorAvailable) {
 			c.dragging = true
+			*isCursorAvailable = false
+			c.HoldingCursor = true
 			c.offset = rl.Vector2Subtract(c.Center, worldMouse)
 		}
 	}
-	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
+	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.HoldingCursor {
 		c.dragging = false
+		c.HoldingCursor = true
+		*isCursorAvailable = true
 	}
 	if c.dragging {
 		c.Center = rl.Vector2Add(worldMouse, c.offset)
@@ -45,11 +50,11 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool) {
 }
 
 func (c *QubitsSystem) Draw() {
+	rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
+	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 	for _, d := range c.QubitList {
 		d.Draw(c.Center, c.Radius)
 	}
-
-	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 }
 
 func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
