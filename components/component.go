@@ -6,9 +6,14 @@ type Component interface {
 	Draw()
 	Update(rl.Vector2, bool, *bool)
 	PostUpdate()
+	IsHoldingCursor() bool
 }
 
 type WindowComponent struct {
 	Component
-	HoldingCursor bool
+	holdingCursor bool
+}
+
+func (c *WindowComponent) IsHoldingCursor() bool {
+	return c.holdingCursor
 }

@@ -32,16 +32,16 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
-		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.HoldingCursor || *isCursorAvailable) {
+		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
 			c.dragging = true
 			*isCursorAvailable = false
-			c.HoldingCursor = true
+			c.holdingCursor = true
 			c.offset = rl.Vector2Subtract(c.Center, worldMouse)
 		}
 	}
-	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.HoldingCursor {
+	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
 		c.dragging = false
-		c.HoldingCursor = true
+		c.holdingCursor = false
 		*isCursorAvailable = true
 	}
 	if c.dragging {
