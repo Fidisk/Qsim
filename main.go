@@ -37,6 +37,9 @@ func main() {
 	circle.Assign(test)
 	circle2.Assign(test2)
 
+	circle.SetParent(panel2)
+	circle2.SetParent(panel2)
+
 	panel2.wComp = append(panel2.wComp, circle)
 	panel2.wComp = append(panel2.wComp, circle2)
 

@@ -26,7 +26,7 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
 		c.dragging = false
-		c.holdingCursor = true
+		c.holdingCursor = false
 		*isCursorAvailable = true
 	}
 	if c.dragging {
