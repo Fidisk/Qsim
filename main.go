@@ -44,7 +44,9 @@ func main() {
 	panel2.wComp = append(panel2.wComp, circle2)
 
 	testHook := comp.NewHook(200, 200, 10, rl.Blue)
-	panel2.wComp = append(panel2.wComp, testHook)
+	testGate := comp.NewGate(200, 50, 10, rl.Lime)
+
+	panel2.wComp = append(panel2.wComp, testHook, testGate)
 
 	winManager = append(winManager, panel, panel2)
 
