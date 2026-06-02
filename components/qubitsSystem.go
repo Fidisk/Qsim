@@ -113,11 +113,23 @@ func (c *QubitsSystem) zipToHook() {
 		switch v := d.(type) {
 		case *Hook:
 			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked {
+				c.removeFromHook()
 				c.Center = v.Center
 				v.IsHooked = true
 				v.TargetID = c.ID
 				gotHooked = true
 				c.HookID = v.ID
+			}
+		case *Gate:
+			for _, d2 := range v.HookList {
+				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked {
+					c.removeFromHook()
+					c.Center = d2.Center
+					d2.IsHooked = true
+					d2.TargetID = c.ID
+					gotHooked = true
+					c.HookID = d2.ID
+				}
 			}
 		default:
 		}
@@ -126,13 +138,20 @@ func (c *QubitsSystem) zipToHook() {
 		}
 	}
 	if !gotHooked && c.HookID != 0 {
-		tmp := utils.GetObjectFromID(c.HookID)
-		c.HookID = 0
-		switch t := tmp.(type) {
-		case *Hook:
-			t.IsHooked = false
-			t.TargetID = 0
-		default:
-		}
+		c.removeFromHook()
+	}
+}
+
+func (c *QubitsSystem) removeFromHook() {
+	if c.HookID == 0 {
+		return
+	}
+	tmp := utils.GetObjectFromID(c.HookID)
+	c.HookID = 0
+	switch t := tmp.(type) {
+	case *Hook:
+		t.IsHooked = false
+		t.TargetID = 0
+	default:
 	}
 }

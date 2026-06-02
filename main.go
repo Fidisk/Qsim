@@ -43,10 +43,13 @@ func main() {
 	panel2.wComp = append(panel2.wComp, circle)
 	panel2.wComp = append(panel2.wComp, circle2)
 
-	testHook := comp.NewHook(200, 200, 10, rl.Blue)
-	testGate := comp.NewGate(200, 50, 10, rl.Lime)
+	testHook := comp.NewHook(200, 200, 30, rl.Blue)
+	testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
+	testGate := comp.NewGate(200, 50, 30, rl.Lime, "XOR")
 
-	panel2.wComp = append(panel2.wComp, testHook, testGate)
+	testGate.HookList = append(testGate.HookList, testHook, testHook2)
+
+	panel2.wComp = append(panel2.wComp, testGate)
 
 	winManager = append(winManager, panel, panel2)
 
