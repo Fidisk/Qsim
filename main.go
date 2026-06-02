@@ -45,7 +45,7 @@ func main() {
 
 	testHook := comp.NewHook(200, 200, 30, rl.Blue)
 	testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
-	testGate := comp.NewGate(200, 50, 30, rl.Lime, "XOR")
+	testGate := comp.NewGate(200, 60, 30, rl.Lime, "XOR")
 
 	testGate.HookList = append(testGate.HookList, testHook, testHook2)
 
