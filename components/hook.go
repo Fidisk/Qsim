@@ -22,6 +22,13 @@ func NewHook(x, y, radius float32, color rl.Color) *Hook {
 }
 
 func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.IsHooked {
+		tmp := utils.GetObjectFromID(c.TargetID)
+		t := tmp.(*QubitsSystem)
+		c.Center = t.Center
+		return
+	}
+
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
@@ -42,5 +49,8 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 }
 
 func (c *Hook) Draw() {
+	if c.IsHooked {
+		return
+	}
 	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 }
