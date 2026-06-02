@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	comp "qsim/components"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -12,6 +13,8 @@ import (
 
 func main() {
 	InitMainWindow(800, 600, "Floating Panels")
+
+	fmt.Println("Hey there")
 
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
