@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  no-fmt-print:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Block fmt.Println
+        run: |
+          if git grep -n -E '(fmt|log)\.(Print|Printf|Println)\(' -- '*.go'; then
+            echo "Delete your debug, damm it"
+            exit 1
+          fi
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
