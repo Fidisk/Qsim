@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"math"
 	"math/rand/v2"
 	glob "qsim/globals"
@@ -16,14 +15,19 @@ type QubitsSystem struct {
 	QubitList []*Qubit
 	Origin    *qub.QubitStateManager
 	BitList   []int32 //Overkill
+	ID        int32
+	HookID    int32
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
-	return &QubitsSystem{
+	tmp := QubitsSystem{
 		Circle:    *NewCircle(x, y, radius, color),
 		QubitList: nil,
 		Origin:    nil,
+		HookID:    0,
 	}
+	tmp.ID = utils.GenerateID(&tmp)
+	return &tmp
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
@@ -94,8 +98,6 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		size := p.Amptitude[i] / 2.0
 		radius := 0.95 - size
 
-		fmt.Println(ratio)
-
 		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, p.Representation[i], p.ModifierID, int32(len(p.ModifierID)))
 
 		// Use q (e.g., append to QubitList)
@@ -106,12 +108,30 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 func (c *QubitsSystem) zipToHook() {
 	tmp := c.GetParent()
 	ele := tmp.GetElement()
+	gotHooked := false
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			if utils.Dist(v.Center, c.Center) <= glob.HookDist {
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked {
 				c.Center = v.Center
+				v.IsHooked = true
+				v.TargetID = c.ID
+				gotHooked = true
+				c.HookID = v.ID
 			}
+		default:
+		}
+		if gotHooked {
+			break
+		}
+	}
+	if !gotHooked && c.HookID != 0 {
+		tmp := utils.GetObjectFromID(c.HookID)
+		c.HookID = 0
+		switch t := tmp.(type) {
+		case *Hook:
+			t.IsHooked = false
+			t.TargetID = 0
 		default:
 		}
 	}

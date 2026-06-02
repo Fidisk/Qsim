@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"image/color"
 	"math"
 
@@ -40,26 +39,21 @@ func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
 		tmp := attr.AttributesManager.Get(modifierID[i])
 		state := (representation >> i) & 1
 
-		fmt.Println(tmp)
 		switch v := tmp.(type) {
 		case *attr.Color:
 			colCnt++
 			c.r += v.R * state
 			c.g += v.G * state
 			c.b += v.B * state
-			//fmt.Println("A", v)
 		case *attr.Side:
 			if state != 0 {
 				c.sideCnt += v.SideCntPositive
 			} else {
 				c.sideCnt += v.SideCntNegative
 			}
-			//fmt.Println("B", v)
 		default:
-			//fmt.Println(v)
 		}
 	}
-	//fmt.Println(c.r, c.g, c.b, c.sideCnt)
 	c.r /= int32(colCnt)
 	c.b /= int32(colCnt)
 	c.g /= int32(colCnt)

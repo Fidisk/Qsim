@@ -8,7 +8,7 @@ var CursorAvailable bool
 var MainWindowHeight int
 var MainWindowWidth int
 var WorldMouse rl.Vector2
-var AlwaysFalse bool = true
+var AlwaysFalse bool = false
 var AlwaysTrue bool = true //An absolute offend to the field of Computer Science
 
 func Refresh() {
