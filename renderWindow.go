@@ -184,8 +184,6 @@ func (rw *RenderWindow) Update() {
 		}
 	}
 
-	//fmt.Println(rw.Camera)
-
 	// Now update components with world mouse (only if mouse in content area)
 	//if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
 
