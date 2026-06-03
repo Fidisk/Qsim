@@ -10,121 +10,33 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-const (
-	StateNormal   = 0
-	StateExpanded = 1
-	StateEjected  = 2
-)
-
 type QubitsSystem struct {
 	Circle
 	QubitList []*Qubit
 	Origin    *qub.QubitStateManager
-	BitList   []int32 
+	BitList   []int32 //Overkill
 	ID        int32
 	HookID    int32
-
-	ViewState     int    
-	EjectedIndex  int    
-	BaseRadius    float32 // Remembers the unexpanded layout dimension size
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 	tmp := QubitsSystem{
-		Circle:       *NewCircle(x, y, radius, color),
-		QubitList:    nil,
-		Origin:       nil,
-		HookID:       0,
-		ViewState:    StateNormal,
-		EjectedIndex: -1,
-		BaseRadius:   radius,
+		Circle:    *NewCircle(x, y, radius, color),
+		QubitList: nil,
+		Origin:    nil,
+		HookID:    0,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	return &tmp
 }
 
-// Dynamically calculates a system container radius that completely encloses all inner circles
-func (c *QubitsSystem) GetCurrentRadius() float32 {
-	if c.ViewState == StateExpanded {
-		// spreadRadius is BaseRadius * 1.1. Sub-circles are 45.0. 
-		// We add them together plus a 15px safe inner boundary padding.
-		return (c.BaseRadius * 1.1) + 45.0 + 15.0
-	}
-	// If a qubit is ejected, the main cluster goes back to containing just the remaining qubits
-	if c.ViewState == StateEjected {
-		return (c.BaseRadius * 1.1) + 45.0 + 15.0
-	}
-	return c.BaseRadius
-}
-
-func (c *QubitsSystem) getSubCircleCenter(index int) rl.Vector2 {
-	q := c.QubitList[index]
-	currentRadius := c.GetCurrentRadius()
-	if c.ViewState == StateEjected && c.EjectedIndex == index {
-		// Positions the single inspected target safely out to the right of the expanded main container wall
-		return rl.Vector2{
-			X: c.Center.X + currentRadius + q.RenderRadius + 25,
-			Y: c.Center.Y,
-		}
-	}
-	return rl.Vector2Add(c.Center, q.ExpandedOffset)
-}
-
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
-	currentRadius := c.GetCurrentRadius()
-
-	for i, d := range c.QubitList {
+	for _, d := range c.QubitList {
 		d.Update()
-		isThisQubitEjected := (c.ViewState == StateEjected && c.EjectedIndex == i)
-		d.CalculateCenter(c.Center, c.BaseRadius, c.ViewState, isThisQubitEjected, currentRadius)
 	}
 
-	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-		clickedInsideSystem := rl.CheckCollisionPointCircle(worldMouse, c.Center, currentRadius)
-
-		switch c.ViewState {
-		case StateNormal:
-			if clickedInsideSystem && !c.dragging {
-				c.ViewState = StateExpanded
-				return 
-			}
-
-		case StateExpanded:
-			clickedAQubit := false
-			for i, d := range c.QubitList {
-				subCenter := c.getSubCircleCenter(i)
-				if rl.CheckCollisionPointCircle(worldMouse, subCenter, d.RenderRadius) {
-					c.ViewState = StateEjected
-					c.EjectedIndex = i
-					clickedAQubit = true
-					break
-				}
-			}
-
-			if !clickedInsideSystem && !clickedAQubit {
-				c.ViewState = StateNormal
-				return
-			}
-
-		case StateEjected:
-			clickedTarget := false
-			if c.EjectedIndex >= 0 && c.EjectedIndex < len(c.QubitList) {
-				subCenter := c.getSubCircleCenter(c.EjectedIndex)
-				d := c.QubitList[c.EjectedIndex]
-				if rl.CheckCollisionPointCircle(worldMouse, subCenter, d.RenderRadius) {
-					clickedTarget = true
-				}
-			}
-
-			if !clickedTarget {
-				c.ViewState = StateExpanded
-				c.EjectedIndex = -1
-				return
-			}
-		}
-	}
-
-	if rl.CheckCollisionPointCircle(worldMouse, c.Center, currentRadius) {
+	// collision check using world coordinates
+	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
 			c.dragging = true
 			*isCursorAvailable = false
@@ -136,6 +48,7 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		c.dragging = false
 		c.holdingCursor = false
 		*isCursorAvailable = true
+
 		c.zipToHook()
 	}
 	if c.dragging {
@@ -144,47 +57,25 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 }
 
 func (c *QubitsSystem) Draw() {
-	currentRadius := c.GetCurrentRadius()
-
-	// Draw the expanded container circle bounds background
-	rl.DrawCircleV(c.Center, currentRadius, glob.ColorBg)
-	rl.DrawCircleLinesV(c.Center, currentRadius, c.Color)
-	
-	if c.ViewState > StateNormal {
-		for i, d := range c.QubitList {
-			// If a qubit is ejected out, do not render its tracking ring inside the container
-			if c.ViewState == StateEjected && c.EjectedIndex == i {
-				continue
-			}
-			subCenter := c.getSubCircleCenter(i)
-			rl.DrawCircleLinesV(subCenter, d.RenderRadius, rl.LightGray)
-		}
-
-		// Draw the single ejected focus ring cleanly outside the system
-		if c.ViewState == StateEjected && c.EjectedIndex >= 0 && c.EjectedIndex < len(c.QubitList) {
-			subCenter := c.getSubCircleCenter(c.EjectedIndex)
-			d := c.QubitList[c.EjectedIndex]
-			rl.DrawCircleLinesV(subCenter, d.RenderRadius, rl.Gold)
-		}
-	}
-
-	// Render moving orbital particles
+	rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
+	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 	for _, d := range c.QubitList {
-		d.Draw()
+		d.Draw(c.Center, c.Radius)
 	}
 }
 
 func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
+	//This do not defer the Origin
 	c.Origin = p
-	c.QubitList = nil
 
-	totalQubits := len(p.Representation)
+	//The downfall of OOP
+	c.QubitList = nil
 
 	for i := range p.Representation {
 		rotation := rand.Float32() * 2 * math.Pi
 		angle := rand.Float32() * 2 * math.Pi
 
-		magnitude := rand.Float32()*0.05 + 0.05
+		magnitude := rand.Float32()*0.05 + 0.05 // 0.05 … 0.1
 		if rand.IntN(2) == 0 {
 			magnitude = -magnitude
 		}
@@ -196,7 +87,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		}
 		angleDelta := magnitude
 
-		ratio := rand.Float32()*2.5 + 0.5
+		ratio := rand.Float32()*2.5 + 0.5 // 0.5 … 10
 		if rand.IntN(2) == 0 {
 			ratio = 1.0 / ratio
 		}
@@ -209,18 +100,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 
 		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, p.Representation[i], p.ModifierID, int32(len(p.ModifierID)))
 
-		if totalQubits > 1 {
-			distributionAngle := (float64(i) * 2 * math.Pi) / float64(totalQubits)
-			// Spread centers out using BaseRadius as a reference scalar
-			spreadRadius := c.BaseRadius * 1.1
-			q.ExpandedOffset = rl.Vector2{
-				X: spreadRadius * float32(math.Cos(distributionAngle)),
-				Y: spreadRadius * float32(math.Sin(distributionAngle)),
-			}
-		} else {
-			q.ExpandedOffset = rl.Vector2{X: 0, Y: 0}
-		}
-
+		// Use q (e.g., append to QubitList)
 		c.QubitList = append(c.QubitList, q)
 	}
 }
