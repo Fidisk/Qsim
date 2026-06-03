@@ -9,11 +9,6 @@ import (
 	attr "qsim/qubits/attributes"
 )
 
-//Why tf did I want to make a esclipse, a circle work lmao
-//Greed doomed us all
-
-// Lmao this is even dumber, basically I draw a circle and squeeze it to make a eclipse
-// Sound chopped af
 type Qubit struct {
 	Rotation          float32
 	RotationDelta     float32
@@ -29,6 +24,11 @@ type Qubit struct {
 	g       int32
 	b       int32
 	sideCnt int32
+
+	// --- FIELDS FOR SPLITTING MECHANIC ---
+	ExpandedOffset rl.Vector2 // Center point of this sub-circle relative to system center
+	CurrentPos     rl.Vector2 // Calculated visual center frame-by-frame
+	RenderRadius   float32    // Calculated visual inspection radius (sub-circle radius)
 }
 
 func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
@@ -54,9 +54,11 @@ func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
 		default:
 		}
 	}
-	c.r /= int32(colCnt)
-	c.b /= int32(colCnt)
-	c.g /= int32(colCnt)
+	if colCnt > 0 {
+		c.r /= int32(colCnt)
+		c.b /= int32(colCnt)
+		c.g /= int32(colCnt)
+	}
 }
 
 func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio float32, representation int32, modifierID []int32, n int32) *Qubit {
@@ -76,7 +78,7 @@ func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, 
 }
 
 func (q *Qubit) Update() {
-	// Rotation
+	// Rotation on self
 	q.Rotation += q.RotationDelta
 	if q.Rotation < 0 {
 		q.Rotation += 2 * math.Pi
@@ -85,7 +87,7 @@ func (q *Qubit) Update() {
 		q.Rotation -= 2 * math.Pi
 	}
 
-	// Angle
+	// Orbital Angle speed loops
 	q.Angle += q.AngleDelta
 	if q.Angle < 0 {
 		q.Angle += 2 * math.Pi
@@ -103,38 +105,55 @@ func (q *Qubit) Update() {
 	}
 }
 
-func (q *Qubit) Draw(center rl.Vector2, radius float32) {
-	// 1. Position on the circular path (center of the square)
-	pathRadius := q.Radius * radius
-	xOffset := pathRadius * float32(math.Cos(float64(q.Angle)))
-	yOffset := pathRadius * float32(math.Sin(float64(q.Angle)))
+// CalculateCenter updates coordinate trajectories cleanly
+func (q *Qubit) CalculateCenter(systemCenter rl.Vector2, baseSystemRadius float32, state int, isEjected bool, dynamicSystemRadius float32) {
+	if state == 0 { // StateNormal
+		q.RenderRadius = q.Size * baseSystemRadius
+		
+		pathRadius := q.Radius * baseSystemRadius
+		xOffset := pathRadius * float32(math.Cos(float64(q.Angle)))
+		yOffset := pathRadius * float32(math.Sin(float64(q.Angle)))
 
-	if q.Ratio < 1 {
-		xOffset *= q.Ratio
+		if q.Ratio < 1 {
+			xOffset *= q.Ratio
+		} else {
+			yOffset /= q.Ratio
+		}
+
+		rot := float64(q.PathRotation)
+		cosRot := float32(math.Cos(rot))
+		sinRot := float32(math.Sin(rot))
+
+		newX := xOffset*cosRot - yOffset*sinRot
+		newY := xOffset*sinRot + yOffset*cosRot
+
+		q.CurrentPos = rl.Vector2{X: systemCenter.X + newX, Y: systemCenter.Y + newY}
 	} else {
-		yOffset /= q.Ratio
+		// Fixed tracking circle radius when split open
+		q.RenderRadius = 45.0
+
+		var subCircleCenter rl.Vector2
+		if state == 2 && isEjected {
+			// Position exactly outside the dynamic boundary ring of the system container
+			subCircleCenter = rl.Vector2{
+				X: systemCenter.X + dynamicSystemRadius + q.RenderRadius + 25,
+				Y: systemCenter.Y,
+			}
+		} else {
+			subCircleCenter = rl.Vector2Add(systemCenter, q.ExpandedOffset)
+		}
+
+		// FORCED ROUND ORBIT: No distortion ratio vectors applied
+		orbitRadius := q.RenderRadius * 0.55
+		newX := orbitRadius * float32(math.Cos(float64(q.Angle)))
+		newY := orbitRadius * float32(math.Sin(float64(q.Angle)))
+
+		q.CurrentPos = rl.Vector2{X: subCircleCenter.X + newX, Y: subCircleCenter.Y + newY}
 	}
+}
 
-	rot := float64(q.PathRotation)
-	cosRot := float32(math.Cos(rot))
-	sinRot := float32(math.Sin(rot))
-
-	newX := xOffset*cosRot - yOffset*sinRot
-	newY := xOffset*sinRot + yOffset*cosRot
-	xOffset, yOffset = newX, newY
-
-	pos := rl.Vector2{
-		X: center.X + xOffset,
-		Y: center.Y + yOffset,
-	}
-
-	// 2. Circumradius = q.Size * radius (the "perfect circle" radius)
-	circumRadius := q.Size * radius
-
-	// 3. Draw a 4‑sided regular polygon (square) centered at pos
-	//    rotationDeg is q.Rotation in degrees (already matches DrawPoly's unit)
+func (q *Qubit) Draw() {
 	rotationDeg := q.Rotation * 180 / float32(math.Pi)
-
 	col := color.RGBA{
 		R: uint8(q.r),
 		G: uint8(q.g),
@@ -142,5 +161,9 @@ func (q *Qubit) Draw(center rl.Vector2, radius float32) {
 		A: 255,
 	}
 
-	rl.DrawPoly(pos, q.sideCnt, circumRadius, rotationDeg, col)
+	particleVisualSize := q.Size * 25.0 
+	if particleVisualSize < 10.0 {
+		particleVisualSize = 10.0
+	}
+	rl.DrawPoly(q.CurrentPos, q.sideCnt, particleVisualSize, rotationDeg, col)
 }
