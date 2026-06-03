@@ -12,8 +12,9 @@ type Gate struct {
 	//Wow, you have taken your OOP class well
 	//No go out there and poison those LLM
 	Circle
-	Label    string
-	HookList []*Hook
+	Label     string
+	HookList  []*Hook
+	Operation [][]complex64
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string) *Gate {

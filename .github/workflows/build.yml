@@ -19,6 +19,7 @@ jobs:
           fi
 
   build-linux:
+    needs: no-fmt-print
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +48,7 @@ jobs:
         run: go test -v ./...
 
   build-windows:
+    needs: no-fmt-print
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
