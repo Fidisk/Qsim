@@ -42,13 +42,15 @@ func main() {
 	circle.SetParent(panel2)
 	circle2.SetParent(panel2)
 
-	testHook := comp.NewHook(200, 200, 30, rl.Blue)
-	testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
-	testGate := comp.NewGate(200, 60, 30, rl.Lime, "XOR")
+	//testHook := comp.NewHook(200, 200, 30, rl.Blue)
+	//testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
+	//testGate := comp.NewGate(200, 60, 30, rl.Lime, "XOR")
 
-	testGate.HookList = append(testGate.HookList, testHook, testHook2)
+	//testGate.HookList = append(testGate.HookList, testHook, testHook2)
 
-	panel2.PushComponent(circle, circle2, testGate)
+	panel2.PushComponent(circle, circle2)
+
+	//panel2.PushComponent(testGate)
 
 	winManager = append(winManager, panel, panel2)
 

@@ -27,10 +27,12 @@ func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 		HookID:    0,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
+	tmp.SetWeight(1)
 	return &tmp
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+
 	for _, d := range c.QubitList {
 		d.Update()
 	}
@@ -53,6 +55,9 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 	if c.dragging {
 		c.Center = rl.Vector2Add(worldMouse, c.offset)
+	} else {
+		c.ApplyForce()
+		c.DecayForce()
 	}
 }
 
@@ -99,7 +104,6 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		radius := 0.95 - size
 
 		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, int32(i), p.ModifierID, int32(len(p.ModifierID)))
-
 		// Use q (e.g., append to QubitList)
 		c.QubitList = append(c.QubitList, q)
 	}

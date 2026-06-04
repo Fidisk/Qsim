@@ -13,6 +13,18 @@ type Component interface {
 	IsHoldingCursor() bool
 	GetParent() PlaceholderWindow
 	SetParent(PlaceholderWindow)
+
+	//Bloat -w-
+	AddForce(rl.Vector2)
+	DecayForce()
+	ApplyForce()
+	AntiGravity(Component)
+	Gravity(Component)
+	GetCenter() rl.Vector2
+	SetCenter(rl.Vector2)
+	GetCircle() *Circle
+	SetWeight(float32)
+	GetWeight() float32
 }
 
 type WindowComponent struct {

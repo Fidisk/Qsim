@@ -206,6 +206,13 @@ func (rw *RenderWindow) PostUpdate() {
 			rw.WComp[i-1], rw.WComp[i] = rw.WComp[i], rw.WComp[i-1]
 		}
 	}
+
+	//Bull shat
+	for i := range rw.WComp {
+		for j := i + 1; j < len(rw.WComp); j++ {
+			rw.WComp[i].GetCircle().AntiGravity(rw.WComp[j].GetCircle())
+		}
+	}
 }
 
 func (rw *RenderWindow) GetElement() []comp.Component {
