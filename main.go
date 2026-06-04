@@ -30,9 +30,9 @@ func main() {
 
 	//circle.QubitList = append(circle.QubitList, qubit)
 
-	test := qub.NewQubitStateManagerFrom([]float32{0.5, 0.5, 0.5, 0.5}, []int32{0, 1, 2, 3}, []int32{0, 4})
+	test := qub.NewQubitStateManagerFrom([]float32{0.5, 0.5, 0.5, 0.5}, []int32{0, 4})
 
-	test2 := qub.NewQubitStateManagerFrom([]float32{0, 0.6, 0, 0.8}, []int32{0, 1, 2, 3}, []int32{0, 2})
+	test2 := qub.NewQubitStateManagerFrom([]float32{0, 0.6, 0, 0.8}, []int32{0, 2})
 
 	circle.Assign(test)
 	circle2.Assign(test2)

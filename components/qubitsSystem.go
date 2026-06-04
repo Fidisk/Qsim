@@ -71,7 +71,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	//The downfall of OOP
 	c.QubitList = nil
 
-	for i := range p.Representation {
+	for i := range p.Amptitude {
 		rotation := rand.Float32() * 2 * math.Pi
 		angle := rand.Float32() * 2 * math.Pi
 
@@ -98,7 +98,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		size := p.Amptitude[i] / 2.0
 		radius := 0.95 - size
 
-		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, p.Representation[i], p.ModifierID, int32(len(p.ModifierID)))
+		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, int32(i), p.ModifierID, int32(len(p.ModifierID)))
 
 		// Use q (e.g., append to QubitList)
 		c.QubitList = append(c.QubitList, q)
