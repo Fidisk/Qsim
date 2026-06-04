@@ -22,6 +22,17 @@ func main() {
 
 	panel := windows.NewWindow(200, 150, 400, 300)
 	panel2 := windows.NewRenderWindow(400, 150, 400, 300)
+	
+	// === MINIMUM CHANGE: Add text panel beside previous panels ===
+	myTextWindow := windows.NewInputWindow(
+		"State Editor Panel", 
+		50, 400, 320, 150, 
+		20, 
+		func(finalText string) {
+			println("Submitted text update:", finalText)
+		},
+	)
+	myTextWindow.TextBuffer = "hello"
 
 	//blob := comp.NewBlob(0, 0, 50)
 
@@ -52,7 +63,7 @@ func main() {
 
 	//panel2.PushComponent(testGate)
 
-	winManager = append(winManager, panel, panel2)
+	winManager = append(winManager, panel, panel2, myTextWindow)
 
 	for !rl.WindowShouldClose() {
 		// Update main window resize
