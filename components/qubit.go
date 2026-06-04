@@ -6,6 +6,7 @@ import (
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/config"
 	attr "qsim/qubits/attributes"
 )
 
@@ -76,6 +77,9 @@ func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, 
 }
 
 func (q *Qubit) Update() {
+	if config.QubitSystemStatePause {
+		return
+	}
 	// Rotation
 	q.Rotation += q.RotationDelta
 	if q.Rotation < 0 {
