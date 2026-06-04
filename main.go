@@ -61,7 +61,7 @@ func main() {
 
 	panel2.PushComponent(circle, circle2, testGate)
 
-	winManager = append(winManager, panel, panel2)
+	winManager = append(winManager, panel, panel2, myTextWindow)
 
 	for !rl.WindowShouldClose() {
 		// Update main window resize
