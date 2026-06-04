@@ -212,3 +212,25 @@ func (rw *RenderWindow) GetElement() []comp.Component {
 	//Danger zone
 	return rw.WComp
 }
+
+func (rw *RenderWindow) PushComponent(val ...comp.Component) {
+	for _, d := range val {
+		rw.WComp = append(rw.WComp, d)
+	}
+}
+
+// No rolling cause I'm lazy
+func (rw *RenderWindow) RemoveComponent(index int) {
+	if index < 0 || index >= len(rw.WComp) {
+		return
+	}
+
+	// 1. Shift elements over
+	copy(rw.WComp[index:], rw.WComp[index+1:])
+
+	// 2. Erase the duplicated pointer at the end to prevent memory leaks
+	rw.WComp[len(rw.WComp)-1] = nil
+
+	// 3. Shrink the slice
+	rw.WComp = rw.WComp[:len(rw.WComp)-1]
+}

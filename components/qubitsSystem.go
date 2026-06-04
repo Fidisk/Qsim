@@ -155,3 +155,7 @@ func (c *QubitsSystem) removeFromHook() {
 	default:
 	}
 }
+
+func (c *QubitsSystem) split() {
+
+}
