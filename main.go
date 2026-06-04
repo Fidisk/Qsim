@@ -13,21 +13,21 @@ import (
 )
 
 func main() {
-	InitMainWindow(800, 600, "Floating Panels")
+	InitMainWindow(1600, 900, "Floating Panels")
 
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
 	// Create one or more draggable inner panels
 
-	panel := windows.NewWindow(200, 150, 400, 300)
-	panel2 := windows.NewRenderWindow(400, 150, 400, 300)
-	
+	//panel := windows.NewWindow(200, 150, 400, 300)
+	panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
+
 	// === MINIMUM CHANGE: Add text panel beside previous panels ===
 	myTextWindow := windows.NewInputWindow(
-		"State Editor Panel", 
-		50, 400, 320, 150, 
-		20, 
+		"State Editor Panel",
+		50, 400, 320, 150,
+		20,
 		func(finalText string) {
 			println("Submitted text update:", finalText)
 		},
@@ -53,17 +53,17 @@ func main() {
 	circle.SetParent(panel2)
 	circle2.SetParent(panel2)
 
-	//testHook := comp.NewHook(200, 200, 30, rl.Blue)
-	//testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
-	//testGate := comp.NewGate(200, 60, 30, rl.Lime, "XOR")
+	testHook := comp.NewHook(200, 200, 30, rl.Blue)
+	testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
+	testGate := comp.NewGate(200, 60, 30, rl.Lime, "XOR")
 
-	//testGate.HookList = append(testGate.HookList, testHook, testHook2)
+	testGate.HookList = append(testGate.HookList, testHook, testHook2)
 
 	panel2.PushComponent(circle, circle2)
 
-	//panel2.PushComponent(testGate)
+	panel2.PushComponent(testGate)
 
-	winManager = append(winManager, panel, panel2, myTextWindow)
+	winManager = append(winManager, panel2)
 
 	for !rl.WindowShouldClose() {
 		// Update main window resize

@@ -201,6 +201,10 @@ func (rw *RenderWindow) Update() {
 }
 
 func (rw *RenderWindow) PostUpdate() {
+	for _, d := range rw.WComp {
+		d.PostUpdate()
+	}
+
 	for i := 1; i < len(rw.WComp); i++ {
 		if rw.WComp[i-1].IsHoldingCursor() == true {
 			rw.WComp[i-1], rw.WComp[i] = rw.WComp[i], rw.WComp[i-1]

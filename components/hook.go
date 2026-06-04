@@ -1,6 +1,7 @@
 package components
 
 import (
+	"qsim/globals"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -18,6 +19,7 @@ func NewHook(x, y, radius float32, color rl.Color) *Hook {
 		Circle: *NewCircle(x, y, radius, color),
 	}
 	tmp.ID = utils.GenerateID(&tmp)
+	tmp.SetWeight((globals.HookWeight))
 	return &tmp
 }
 
@@ -45,6 +47,11 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	}
 	if c.dragging {
 		c.Center = rl.Vector2Add(worldMouse, c.offset)
+		c.ClearForce()
+	} else {
+		c.DecayForce()
+		c.ApplyForce()
+
 	}
 }
 
@@ -52,5 +59,19 @@ func (c *Hook) Draw() {
 	if c.IsHooked {
 		return
 	}
-	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
+
+	// Calculate the bounding lines based on Center and Radius
+	left := rl.Vector2{X: c.Center.X - c.Radius, Y: c.Center.Y}
+	right := rl.Vector2{X: c.Center.X + c.Radius, Y: c.Center.Y}
+	top := rl.Vector2{X: c.Center.X, Y: c.Center.Y - c.Radius}
+	bottom := rl.Vector2{X: c.Center.X, Y: c.Center.Y + c.Radius}
+
+	// Define how bold you want the cross to be (in pixels)
+	thickness := float32(4.0)
+
+	// Draw the horizontal bar
+	rl.DrawLineEx(left, right, thickness, c.Color)
+
+	// Draw the vertical bar
+	rl.DrawLineEx(top, bottom, thickness, c.Color)
 }

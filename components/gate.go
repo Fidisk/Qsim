@@ -1,6 +1,7 @@
 package components
 
 import (
+	"math"
 	glob "qsim/globals"
 	"qsim/utils"
 
@@ -12,16 +13,20 @@ type Gate struct {
 	//Wow, you have taken your OOP class well
 	//No go out there and poison those LLM
 	Circle
+	ID        int32
 	Label     string
 	HookList  []*Hook
 	Operation [][]complex64
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string) *Gate {
-	return &Gate{
+	tmp := Gate{
 		Circle: *NewCircle(x, y, radius, color),
 		Label:  label,
 	}
+	tmp.ID = utils.GenerateID(&tmp)
+	tmp.SetWeight(glob.GateWeight)
+	return &tmp
 }
 
 func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
@@ -41,11 +46,39 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	}
 	if c.dragging {
 		c.Center = rl.Vector2Add(worldMouse, c.offset)
+		c.ClearForce()
+	} else {
+		c.DecayForce()
+		c.ApplyForce()
 	}
 
 	for _, d := range c.HookList {
+		c.pullToHook(d)
+
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
 	}
+}
+
+func (c *Gate) pullToHook(d *Hook) {
+	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist
+
+	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
+		return
+	}
+
+	val = float32(math.Max(float64(val), float64(-100)))
+	val = float32(math.Min(float64(val), float64(100)))
+
+	tmp := c.Center.Subtract(d.Center).Normalize().Scale(val * glob.GateToHookPullCoeff)
+
+	if d.IsHooked {
+		tmp2 := utils.GetObjectFromID(d.TargetID)
+		t := tmp2.(*QubitsSystem)
+		t.AddForce(tmp)
+		return
+	}
+
+	d.AddForce(tmp)
 }
 
 func (c *Gate) Draw() {
@@ -87,5 +120,13 @@ func (c *Gate) Draw() {
 		textY := int32(c.Center.Y) - fontSize/2
 
 		rl.DrawText(c.Label, textX, textY, fontSize, c.Color)
+	}
+}
+
+func (c *Gate) PostUpdate() {
+	for i := range c.HookList {
+		for j := i + 1; j < len(c.HookList); j++ {
+			c.HookList[i].GetCircle().AntiGravity(c.HookList[j].GetCircle())
+		}
 	}
 }

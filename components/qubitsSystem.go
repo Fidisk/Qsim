@@ -27,12 +27,11 @@ func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 		HookID:    0,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
-	tmp.SetWeight(1)
+	tmp.SetWeight(glob.QubitSystemWeight)
 	return &tmp
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
-
 	for _, d := range c.QubitList {
 		d.Update()
 	}
@@ -55,9 +54,10 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 	if c.dragging {
 		c.Center = rl.Vector2Add(worldMouse, c.offset)
+		c.ClearForce()
 	} else {
-		c.ApplyForce()
 		c.DecayForce()
+		c.ApplyForce()
 	}
 }
 
@@ -123,6 +123,7 @@ func (c *QubitsSystem) zipToHook() {
 				v.TargetID = c.ID
 				gotHooked = true
 				c.HookID = v.ID
+				c.SetWeight(0)
 			}
 		case *Gate:
 			for _, d2 := range v.HookList {
@@ -133,6 +134,7 @@ func (c *QubitsSystem) zipToHook() {
 					d2.TargetID = c.ID
 					gotHooked = true
 					c.HookID = d2.ID
+					c.SetWeight(0)
 				}
 			}
 		default:
@@ -152,6 +154,7 @@ func (c *QubitsSystem) removeFromHook() {
 	}
 	tmp := utils.GetObjectFromID(c.HookID)
 	c.HookID = 0
+	c.SetWeight(glob.QubitSystemWeight)
 	switch t := tmp.(type) {
 	case *Hook:
 		t.IsHooked = false
@@ -161,5 +164,9 @@ func (c *QubitsSystem) removeFromHook() {
 }
 
 func (c *QubitsSystem) split() {
+
+}
+
+func (c *QubitsSystem) PostUpdate() {
 
 }
