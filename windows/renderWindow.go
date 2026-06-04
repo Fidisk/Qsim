@@ -1,4 +1,4 @@
-package main
+package windows
 
 import (
 	comp "qsim/components"
@@ -12,7 +12,7 @@ import (
 type RenderWindow struct {
 	Window
 	Camera rl.Camera2D
-	wComp  []comp.Component
+	WComp  []comp.Component
 
 	// Panning state
 	isPanning      bool
@@ -23,7 +23,7 @@ type RenderWindow struct {
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 	rw := &RenderWindow{
 		Window: *NewWindow(x, y, width, height),
-		wComp:  nil,
+		WComp:  nil,
 	}
 	rw.Camera = rl.Camera2D{
 		Offset:   rl.NewVector2(0, 0), // will be set each frame
@@ -80,7 +80,7 @@ func (rw *RenderWindow) Draw() {
 
 	// 3. Draw components in world space (camera transforms, scissor clips)
 	rl.BeginMode2D(rw.Camera)
-	for _, c := range rw.wComp {
+	for _, c := range rw.WComp {
 		c.Draw()
 	}
 	rl.EndMode2D()
@@ -103,8 +103,8 @@ func (rw *RenderWindow) Update() {
 	if !glob.CursorAvailable && !rw.holdingCursor {
 		worldMouse := rw.GetWorldMouse()
 		tmp := false
-		for i := len(rw.wComp) - 1; i >= 0; i-- {
-			rw.wComp[i].Update(worldMouse, rw.holdingCursor, &tmp)
+		for i := len(rw.WComp) - 1; i >= 0; i-- {
+			rw.WComp[i].Update(worldMouse, rw.holdingCursor, &tmp)
 		}
 
 		return
@@ -194,21 +194,21 @@ func (rw *RenderWindow) Update() {
 	if rw.holdingCursor {
 		isCursorAvailable = true
 	}
-	for i := len(rw.wComp) - 1; i >= 0; i-- {
-		rw.wComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
+	for i := len(rw.WComp) - 1; i >= 0; i-- {
+		rw.WComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 
 }
 
 func (rw *RenderWindow) PostUpdate() {
-	for i := 1; i < len(rw.wComp); i++ {
-		if rw.wComp[i-1].IsHoldingCursor() == true {
-			rw.wComp[i-1], rw.wComp[i] = rw.wComp[i], rw.wComp[i-1]
+	for i := 1; i < len(rw.WComp); i++ {
+		if rw.WComp[i-1].IsHoldingCursor() == true {
+			rw.WComp[i-1], rw.WComp[i] = rw.WComp[i], rw.WComp[i-1]
 		}
 	}
 }
 
 func (rw *RenderWindow) GetElement() []comp.Component {
 	//Danger zone
-	return rw.wComp
+	return rw.WComp
 }

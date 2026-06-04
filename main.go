@@ -8,6 +8,8 @@ import (
 	glob "qsim/globals"
 
 	qub "qsim/qubits"
+
+	"qsim/windows"
 )
 
 func main() {
@@ -18,8 +20,8 @@ func main() {
 
 	// Create one or more draggable inner panels
 
-	panel := NewWindow(200, 150, 400, 300)
-	panel2 := NewRenderWindow(400, 150, 400, 300)
+	panel := windows.NewWindow(200, 150, 400, 300)
+	panel2 := windows.NewRenderWindow(400, 150, 400, 300)
 
 	//blob := comp.NewBlob(0, 0, 50)
 
@@ -40,8 +42,8 @@ func main() {
 	circle.SetParent(panel2)
 	circle2.SetParent(panel2)
 
-	panel2.wComp = append(panel2.wComp, circle)
-	panel2.wComp = append(panel2.wComp, circle2)
+	panel2.WComp = append(panel2.WComp, circle)
+	panel2.WComp = append(panel2.WComp, circle2)
 
 	testHook := comp.NewHook(200, 200, 30, rl.Blue)
 	testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
@@ -49,7 +51,7 @@ func main() {
 
 	testGate.HookList = append(testGate.HookList, testHook, testHook2)
 
-	panel2.wComp = append(panel2.wComp, testGate)
+	panel2.WComp = append(panel2.WComp, testGate)
 
 	winManager = append(winManager, panel, panel2)
 
