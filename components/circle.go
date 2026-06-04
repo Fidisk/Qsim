@@ -108,31 +108,12 @@ func (c *Circle) AntiGravity(dtmp Component) {
 func (c *Circle) Gravity(dtmp Component) {
 	d := dtmp.GetCircle()
 
-	//Hi there, Daniel
+	//Another dumb ass way, non Newtonian
 	tmp := d.Center.Subtract(c.Center)
 
-	if tmp.X > 1000 || tmp.Y > 1000 {
-		return
-	}
+	dist := utils.Dist(d.Center, c.Center)
 
-	cmpWeight := c.weight * d.weight
-
-	if tmp.X <= 0 && tmp.X >= -1 {
-		tmp.X = -1
-	}
-
-	if tmp.X >= 0 && tmp.X <= 1 {
-		tmp.X = 1
-	}
-
-	if tmp.Y <= 0 && tmp.Y >= -1 {
-		tmp.Y = -1
-	}
-
-	if tmp.Y >= 0 && tmp.Y <= 1 {
-		tmp.Y = 1
-	}
-
-	c.AddForce(rl.Vector2{X: cmpWeight / tmp.X, Y: cmpWeight / tmp.Y})
-	d.AddForce(rl.Vector2{X: -cmpWeight / tmp.X, Y: -cmpWeight / tmp.Y})
+	//Right so karma got me, need to rewrite this
+	c.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(float32(math.Min(float64(1/dist/dist), float64(10)))))
+	d.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(-float32(math.Min(float64(1/dist/dist), float64(10)))))
 }
