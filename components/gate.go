@@ -13,19 +13,28 @@ type Gate struct {
 	//Wow, you have taken your OOP class well
 	//No go out there and poison those LLM
 	Circle
-	ID        int32
-	Label     string
-	HookList  []*Hook
-	Operation [][]complex64
+	ID          int32
+	Label       string
+	HookList    []*Hook
+	Operation   [][]complex64
+	HookedCount int32
+	InputCount  int32
 }
 
-func NewGate(x, y, radius float32, color rl.Color, label string) *Gate {
+func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
 	tmp := Gate{
-		Circle: *NewCircle(x, y, radius, color),
-		Label:  label,
+		Circle:      *NewCircle(x, y, radius, color),
+		Label:       label,
+		Operation:   operation,
+		HookedCount: 0,
+		InputCount:  inputCount,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
+	for i := 0; i < int(inputCount); i++ {
+		tmp.HookList = append(tmp.HookList, NewHook(x, y, glob.HookRadius, glob.HookColor))
+	}
+	tmp.HookList = append(tmp.HookList, NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor))
 	return &tmp
 }
 
@@ -113,7 +122,7 @@ func (c *Gate) Draw() {
 
 	if c.Label != "" {
 		// Choose a font size (adjust as needed)
-		fontSize := int32(c.Radius) // e.g., match size to radius
+		fontSize := int32(c.Radius / 2) // e.g., match size to radius
 
 		// Measure text with raylib's default font
 		textWidth := rl.MeasureText(c.Label, fontSize)

@@ -22,3 +22,9 @@ var QubitDeterminatorWeight float32 = 100
 var GateToHookDist float32 = 150
 var GateToHookGraceDist float32 = 30
 var GateToHookPullCoeff float32 = 0.1
+
+var HookColor rl.Color = rl.Blue
+var HookRadius float32 = 30
+
+var OutputHookColor rl.Color = rl.Pink
+var OutputHookRadius float32 = 30

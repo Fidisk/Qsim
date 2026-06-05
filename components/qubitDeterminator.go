@@ -85,7 +85,7 @@ func (c *QubitDeterminator) zipToHook() {
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked {
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && !v.IsOutput {
 				c.removeFromHook()
 				c.Center = v.Center
 				v.IsHooked = true
@@ -96,7 +96,7 @@ func (c *QubitDeterminator) zipToHook() {
 			}
 		case *Gate:
 			for _, d2 := range v.HookList {
-				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked {
+				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked && !d2.IsOutput {
 					c.removeFromHook()
 					c.Center = d2.Center
 					d2.IsHooked = true

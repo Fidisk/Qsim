@@ -12,11 +12,22 @@ type Hook struct {
 	IsHooked bool
 	ID       int32
 	TargetID int32
+	IsOutput bool
 }
 
 func NewHook(x, y, radius float32, color rl.Color) *Hook {
 	tmp := Hook{
 		Circle: *NewCircle(x, y, radius, color),
+	}
+	tmp.ID = utils.GenerateID(&tmp)
+	tmp.SetWeight((globals.HookWeight))
+	return &tmp
+}
+
+func NewOutputHook(x, y, radius float32, color rl.Color) *Hook {
+	tmp := Hook{
+		Circle:   *NewCircle(x, y, radius, color),
+		IsOutput: true,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight((globals.HookWeight))
