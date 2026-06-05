@@ -28,3 +28,11 @@ var HookRadius float32 = 30
 
 var OutputHookColor rl.Color = rl.Pink
 var OutputHookRadius float32 = 30
+
+var QubitSystemRadius float32 = 30
+var QubitSystemColor rl.Color = rl.Blue
+
+var GateRadius float32 = 30
+var GateColor rl.Color = rl.Lime
+
+var ForceCap float32 = 20

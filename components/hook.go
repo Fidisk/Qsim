@@ -2,6 +2,7 @@ package components
 
 import (
 	"qsim/globals"
+	glob "qsim/globals"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -13,6 +14,7 @@ type Hook struct {
 	ID       int32
 	TargetID int32
 	IsOutput bool
+	Label    string
 }
 
 func NewHook(x, y, radius float32, color rl.Color) *Hook {
@@ -88,4 +90,50 @@ func (c *Hook) Draw() {
 
 	// Draw the vertical bar
 	rl.DrawLineEx(top, bottom, thickness, c.Color)
+
+	fontSize := int32(14) // adjust as needed
+	offsetX := float32(8) // how far left from the center
+	offsetY := float32(8) // how far up from the center
+	textX := int32(c.Center.X - c.Radius - offsetX)
+	textY := int32(c.Center.Y - c.Radius - offsetY - float32(fontSize))
+
+	rl.DrawText(c.Label, textX, textY, fontSize, c.Color)
+}
+
+func (v *Hook) Connect(val Component) {
+	switch c := val.(type) {
+	case *QubitsSystem:
+		c.removeFromHook()
+		c.Center = v.Center
+		v.IsHooked = true
+		v.TargetID = c.ID
+		c.HookID = v.ID
+		c.SetWeight(0)
+		//fmt.Printf("%T ", val)
+	case *QubitDeterminator:
+		c.removeFromHook()
+		c.Center = v.Center
+		v.IsHooked = true
+		v.TargetID = c.ID
+		c.HookID = v.ID
+		c.SetWeight(0)
+	}
+}
+
+func (v *Hook) Disconnect() {
+	if v.TargetID == 0 {
+		return
+	}
+	tmp := utils.GetObjectFromID(v.TargetID)
+	v.IsHooked = false
+	v.TargetID = 0
+	switch c := tmp.(type) {
+	case *QubitsSystem:
+		c.HookID = 0
+		c.SetWeight(glob.QubitDeterminatorWeight)
+	case *QubitDeterminator:
+		c.HookID = 0
+		c.SetWeight(glob.QubitDeterminatorWeight)
+	default:
+	}
 }

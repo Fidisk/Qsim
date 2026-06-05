@@ -73,6 +73,7 @@ func (c *Circle) GetForce() rl.Vector2 {
 }
 
 func (c *Circle) ApplyForce() {
+	c.curForce = c.curForce.ClampValue(-globals.ForceCap, globals.ForceCap)
 	c.Center = c.Center.Add(c.curForce)
 }
 
@@ -104,7 +105,7 @@ func (c *Circle) AntiGravity(dtmp Component) {
 	tmp := d.Center.Subtract(c.Center)
 
 	if (tmp == rl.Vector2{X: 0, Y: 0}) {
-		tmp = rl.Vector2{X: rand.Float32() - 0.5*0.2, Y: rand.Float32() - 0.5*0.2}
+		tmp = rl.Vector2{X: rand.Float32() - 0.5*2, Y: rand.Float32() - 0.5*2}
 	}
 
 	dist := tmp.Length()

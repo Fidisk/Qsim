@@ -3,7 +3,9 @@ package components
 import (
 	"math"
 	glob "qsim/globals"
+	"qsim/qubits"
 	"qsim/utils"
+	"strconv"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -13,28 +15,32 @@ type Gate struct {
 	//Wow, you have taken your OOP class well
 	//No go out there and poison those LLM
 	Circle
-	ID          int32
-	Label       string
-	HookList    []*Hook
-	Operation   [][]complex64
-	HookedCount int32
-	InputCount  int32
+	ID         int32
+	Label      string
+	HookList   []*Hook
+	Operation  [][]complex64
+	InputCount int32
+	OutPutHook *Hook
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
 	tmp := Gate{
-		Circle:      *NewCircle(x, y, radius, color),
-		Label:       label,
-		Operation:   operation,
-		HookedCount: 0,
-		InputCount:  inputCount,
+		Circle:     *NewCircle(x, y, radius, color),
+		Label:      label,
+		Operation:  operation,
+		InputCount: inputCount,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
 	for i := 0; i < int(inputCount); i++ {
-		tmp.HookList = append(tmp.HookList, NewHook(x, y, glob.HookRadius, glob.HookColor))
+		newHook := NewHook(x, y, glob.HookRadius, glob.HookColor)
+		newHook.Label = "I" + strconv.Itoa(i)
+		tmp.HookList = append(tmp.HookList, newHook)
 	}
-	tmp.HookList = append(tmp.HookList, NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor))
+	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
+	tmp.HookList = append(tmp.HookList, outputHook)
+	tmp.OutPutHook = outputHook
+	tmp.OutPutHook.Label = "O"
 	return &tmp
 }
 
@@ -61,11 +67,118 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		c.ApplyForce()
 	}
 
+	cnt := 0
+
 	for _, d := range c.HookList {
 		c.pullToHook(d)
 
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
+
+		if d.IsHooked && !d.IsOutput {
+			cnt++
+		}
 	}
+
+	if cnt == int(c.InputCount) && !c.OutPutHook.IsHooked {
+		c.CalculateOutPut()
+	} else if c.OutPutHook.IsHooked && cnt != int(c.InputCount) {
+		c.DestroyOutPut()
+	}
+}
+
+func (c *Gate) CalculateOutPut() {
+	QSM := []*qubits.QubitStateManager{}
+	Cnt := []int32{}
+	Idx := [][]int32{}
+	defer func() {
+		QSM = nil
+	}()
+	defer func() {
+		Cnt = nil
+	}()
+	IsIN := func(id int32) bool {
+		for _, d := range QSM {
+			if d.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+	index := int32(0)
+	for _, d := range c.HookList {
+		if !d.IsOutput {
+			QD := utils.GetObjectFromID(d.TargetID).(*QubitDeterminator)
+			qid := QD.GetQubitParent().Origin.ID
+			if IsIN(qid) {
+				for i, d2 := range QSM {
+					if d2.ID == qid {
+						var pos int32 = 0
+						for i := range d2.ModifierID {
+							if d2.ModifierID[i] == QD.ModifierID {
+								pos = int32(i)
+								break
+							}
+						}
+						d2.SwapColumn(Cnt[i], pos)
+						Cnt[i]++
+						Idx[i] = append(Idx[i], index)
+						index++
+					}
+				}
+			} else {
+				tmp := *QD.GetQubitParent().Origin
+				QSM = append(QSM, &tmp)
+				Cnt = append(Cnt, 0)
+				Idx = append(Idx, []int32{index})
+				index++
+			}
+		}
+	}
+	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	var sl int32 = 0
+	for i := range QSM {
+		result.MergeWithPrefix(QSM[i], Cnt[i], sl)
+		sl += Cnt[i]
+	}
+
+	order := []int32{}
+
+	for _, d := range Idx {
+		for _, d2 := range d {
+			order = append(order, d2)
+		}
+	}
+
+	n := len(order)
+
+	for i := 0; i < n; i++ {
+		if order[i] != int32(i) {
+			pos := int32(i)
+			for {
+				if order[pos] == pos {
+					break
+				}
+				result.SwapColumn(pos, order[pos])
+				pos = order[order[pos]]
+			}
+		}
+	}
+
+	result.Multiply(c.Operation, c.InputCount)
+
+	//fmt.Println(result)
+	tmp := NewQubitsSystem(c.Center.X, c.Center.X, glob.QubitSystemRadius, glob.QubitSystemColor)
+	tmp.Assign(result)
+	tmp.SetParent(c.GetParent())
+	tmp.GetParent().PushComponent(tmp)
+
+	c.OutPutHook.Connect(tmp)
+
+	//fmt.Println(c.OutPutHook.IsHooked)
+}
+
+func (c *Gate) DestroyOutPut() {
+	c.OutPutHook.Disconnect()
 }
 
 func (c *Gate) pullToHook(d *Hook) {

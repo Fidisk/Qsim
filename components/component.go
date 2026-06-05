@@ -4,6 +4,7 @@ import rl "github.com/gen2brain/raylib-go/raylib"
 
 type PlaceholderWindow interface {
 	GetElement() []Component
+	PushComponent(...Component)
 }
 
 type Component interface {

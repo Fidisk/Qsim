@@ -226,6 +226,7 @@ func (rw *RenderWindow) GetElement() []comp.Component {
 
 func (rw *RenderWindow) PushComponent(val ...comp.Component) {
 	for _, d := range val {
+		d.SetParent(rw)
 		rw.WComp = append(rw.WComp, d)
 	}
 }

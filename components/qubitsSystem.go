@@ -2,6 +2,7 @@ package components
 
 import (
 	"math"
+	"math/cmplx"
 	"math/rand/v2"
 	glob "qsim/globals"
 	qub "qsim/qubits"
@@ -119,7 +120,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		pathRotation := rand.Float32() * 2 * math.Pi
 		pathRotationDelta := rand.Float32()*0.001 + 0.001
 
-		size := p.Amptitude[i] / 2.0
+		size := float32(cmplx.Abs(complex128(p.Amptitude[i]))) / 2.0
 		radius := 0.95 - size
 
 		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, int32(i), p.ModifierID, int32(len(p.ModifierID)))
@@ -137,24 +138,14 @@ func (c *QubitsSystem) zipToHook() {
 		switch v := d.(type) {
 		case *Hook:
 			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked {
-				c.removeFromHook()
-				c.Center = v.Center
-				v.IsHooked = true
-				v.TargetID = c.ID
 				gotHooked = true
-				c.HookID = v.ID
-				c.SetWeight(0)
+				v.Connect(c)
 			}
 		case *Gate:
 			for _, d2 := range v.HookList {
 				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked {
-					c.removeFromHook()
-					c.Center = d2.Center
-					d2.IsHooked = true
-					d2.TargetID = c.ID
 					gotHooked = true
-					c.HookID = d2.ID
-					c.SetWeight(0)
+					d2.Connect(c)
 				}
 			}
 		default:

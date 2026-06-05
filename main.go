@@ -1,13 +1,13 @@
 package main
 
 import (
-	comp "qsim/components"
+	"math"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/components"
 	glob "qsim/globals"
-
-	qub "qsim/qubits"
+	"qsim/qubits"
 
 	"qsim/windows"
 )
@@ -25,46 +25,72 @@ func main() {
 
 	// === MINIMUM CHANGE: Add text panel beside previous panels ===
 	myTextWindow := windows.NewTextWindow(
-	"State Editor Panel",
-	50, 400, 320, 150,
-	"",                   // Initial text inside the window box
-	true,                 // IsEditable: set to true so you can type into it
-	20,                   // Max characters allowed
-	func(finalText string) {
-		println("Submitted text update:", finalText)
-	},
+		"State Editor Panel",
+		50, 400, 320, 150,
+		"",   // Initial text inside the window box
+		true, // IsEditable: set to true so you can type into it
+		20,   // Max characters allowed
+		func(finalText string) {
+			println("Submitted text update:", finalText)
+		},
 	)
 	myTextWindow.TextBuffer = "hello"
 
+	q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+	q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+	q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+
+	q1State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{0})
+	q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
+	q3State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{2})
+
+	q1.Assign(q1State)
+	q2.Assign(q2State)
+	q3.Assign(q3State)
+
+	panel2.PushComponent(q1, q2, q3)
+
+	t := complex(float32(1/math.Sqrt(2)), 0)
+	H1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+	H2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+	CNOT1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+	CNOT2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+
+	panel2.PushComponent(H1, H2, CNOT1, CNOT2)
+
 	//blob := comp.NewBlob(0, 0, 50)
 
-	circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
-	circle2 := comp.NewQubitsSystem(150, 100, 30, rl.Blue)
+	//circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
+	//circle2 := comp.NewQubitsSystem(150, 100, 30, rl.Blue)
 
 	//qubit := comp.NewQubit(0, 0.1, 0.6, 0, 0.2, 0.3, 1.75)
 
 	//circle.QubitList = append(circle.QubitList, qubit)
 
-	test := qub.NewQubitStateManagerFrom([]float32{0.5, 0.5, 0.5, 0.5}, []int32{0, 4})
+	//test := qub.NewQubitStateManagerFrom([]complex64{0.5, 0.5, 0.5, 0.5}, []int32{0, 4})
 
-	test2 := qub.NewQubitStateManagerFrom([]float32{0, 0.6, 0, 0.8}, []int32{0, 2})
+	//test2 := qub.NewQubitStateManagerFrom([]complex64{0, 0.6, 0, 0.8}, []int32{0, 2})
 
-	circle.Assign(test)
-	circle2.Assign(test2)
+	//test2.SwapColumn(0, 1)
+	//test2.SwapColumn(0, 1)
 
-	circle.SetParent(panel2)
-	circle2.SetParent(panel2)
+	//circle.Assign(test)
+	//circle2.Assign(test2)
+
+	//circle.SetParent(panel2)
+	//circle2.SetParent(panel2)
 
 	//testHook := comp.NewHook(200, 200, 30, rl.Blue)
 	//testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
 
-	testGate := comp.NewGate(200, 60, 30, rl.Lime, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+	//testGate := comp.NewGate(200, 60, 30, rl.Lime, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+	//testGate.SetParent(panel2)
 
 	//testGate.HookList = append(testGate.HookList, testHook, testHook2)
 
-	panel2.PushComponent(circle, circle2)
+	//panel2.PushComponent(circle, circle2)
 
-	panel2.PushComponent(testGate)
+	//panel2.PushComponent(testGate)
 
 	winManager = append(winManager, panel2, myTextWindow)
 
