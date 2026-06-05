@@ -2,6 +2,7 @@ package windows
 
 import (
 	"fmt"
+	glob "qsim/globals"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -34,9 +35,18 @@ func (iw *InputWindow) Update() {
 		Width: float32(iw.Width), Height: float32(iw.Height),
 	}
 
+	// FIX: Check if we are inside bounds and whether cursor state is accessible to us
+	if rl.CheckCollisionPointRec(mousePos, windowRect) && (glob.CursorAvailable || iw.holdingCursor) {
+		iw.holdingCursor = true
+		glob.CursorAvailable = false
+	} else {
+		iw.holdingCursor = false
+	}
+
 	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-		if rl.CheckCollisionPointRec(mousePos, windowRect) {
+		if iw.holdingCursor {
 			iw.Active = true
+			iw.activate = true
 		} else {
 			iw.Active = false
 		}
@@ -90,11 +100,9 @@ func (iw *InputWindow) Draw() {
 		handleColor = iw.ColorResizeHover
 	}
 
-	// === ADJUSTED SPACING FOR A LARGER INTERNAL BOX ===
 	inputFieldX := float32(iw.X) + 12
 	inputFieldY := float32(iw.Y + iw.TitleBarHeight) + 12
 	inputFieldW := float32(iw.Width) - 24
-	// Adjusted height calculations so it utilizes the maximum bottom canvas area
 	inputFieldH := float32(iw.Height - iw.TitleBarHeight) - 30
 
 	inputBox := rl.NewRectangle(inputFieldX, inputFieldY, inputFieldW, inputFieldH)
@@ -128,11 +136,3 @@ func (iw *InputWindow) Draw() {
 }
 
 func (iw *InputWindow) PostUpdate() {}
-
-func (iw *InputWindow) IsActive() bool {
-	return iw.Active
-}
-
-func (iw *InputWindow) SetActive(active bool) {
-	iw.Active = active
-}
