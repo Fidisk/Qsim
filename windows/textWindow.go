@@ -2,6 +2,7 @@ package windows
 
 import (
 	"fmt"
+	glob "qsim/globals"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -34,17 +35,42 @@ func (iw *InputWindow) Update() {
 		Width: float32(iw.Width), Height: float32(iw.Height),
 	}
 
+	// ADVISOR FIX: If cursor is not available and this window isn't already holding it,
+	// do not let it interact or falsely click through from underneath another window.
+	if !glob.CursorAvailable && !iw.holdingCursor {
+		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
+			iw.Active = false
+		}
+		return
+	}
+
+	// Evaluate if the mouse is hovering over this window
+	if rl.CheckCollisionPointRec(mousePos, windowRect) {
+		iw.holdingCursor = true
+		glob.CursorAvailable = false
+	} else if glob.CursorAvailable {
+		iw.holdingCursor = false
+	}
+
 	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-		if rl.CheckCollisionPointRec(mousePos, windowRect) {
+		if iw.holdingCursor {
 			iw.Active = true
+			iw.activate = true
+			glob.CursorLock = true // Lock cursor to prioritize this window
 		} else {
 			iw.Active = false
 		}
 	}
 
+	// Delegate resizing and dragging using parent window logic
 	iw.handleResize(mousePos)
 	if !iw.IsResizing {
 		iw.handleDrag(mousePos)
+	}
+
+	// Release CursorLock if the user stops dragging or resizing
+	if !iw.IsDragging && !iw.IsResizing && glob.CursorLock && !rl.IsMouseButtonDown(rl.MouseButtonLeft) {
+		glob.CursorLock = false
 	}
 
 	if !iw.Active {
@@ -94,7 +120,6 @@ func (iw *InputWindow) Draw() {
 	inputFieldX := float32(iw.X) + 12
 	inputFieldY := float32(iw.Y + iw.TitleBarHeight) + 12
 	inputFieldW := float32(iw.Width) - 24
-	// Adjusted height calculations so it utilizes the maximum bottom canvas area
 	inputFieldH := float32(iw.Height - iw.TitleBarHeight) - 30
 
 	inputBox := rl.NewRectangle(inputFieldX, inputFieldY, inputFieldW, inputFieldH)
@@ -127,7 +152,11 @@ func (iw *InputWindow) Draw() {
 	rl.DrawRectangleLines(iw.X, iw.Y, iw.Width, iw.Height, iw.ColorBorder)
 }
 
-func (iw *InputWindow) PostUpdate() {}
+func (iw *InputWindow) PostUpdate() {
+	if !glob.CursorLock {
+		iw.holdingCursor = false
+	}
+}
 
 func (iw *InputWindow) IsActive() bool {
 	return iw.Active
