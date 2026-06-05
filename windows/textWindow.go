@@ -1,13 +1,11 @@
 package windows
 
 import (
-	"fmt"
 	glob "qsim/globals"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-	TextBuffer   string
 type TextWindow struct {
 	Window
 	TextBuffer string
