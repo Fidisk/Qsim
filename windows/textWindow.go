@@ -3,165 +3,206 @@ package windows
 import (
 	"fmt"
 	glob "qsim/globals"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-type InputWindow struct {
-	Window              
 	TextBuffer   string
-	MaxChars     int
-	Active       bool 
-	OnSubmit     func(string)
-	
+type TextWindow struct {
+	Window
+	TextBuffer string
+	MaxChars   int
+	Active     bool
+	OnSubmit   func(string)
+
+	// Configuration flag: true allows typing/editing, false behaves as read-only text display
+	IsEditable bool
+
 	frameCounter int
 }
 
-func NewInputWindow(title string, x, y, width, height int32, maxChars int, onSubmit func(string)) *InputWindow {
-	iw := &InputWindow{
+func NewTextWindow(title string, x, y, width, height int32, initialText string, isEditable bool, maxChars int, onSubmit func(string)) *TextWindow {
+	tw := &TextWindow{
 		Window:     *NewWindow(x, y, width, height),
 		MaxChars:   maxChars,
-		Active:     true, 
+		Active:     true,
 		OnSubmit:   onSubmit,
-		TextBuffer: "",
+		TextBuffer: initialText,
+		IsEditable: isEditable,
 	}
-	iw.Name = title 
-	return iw
+	tw.Name = title
+	return tw
 }
 
-func (iw *InputWindow) Update() {
+func (tw *TextWindow) Update() {
 	mousePos := rl.GetMousePosition()
 	windowRect := rl.Rectangle{
-		X: float32(iw.X), Y: float32(iw.Y),
-		Width: float32(iw.Width), Height: float32(iw.Height),
+		X: float32(tw.X), Y: float32(tw.Y),
+		Width: float32(tw.Width), Height: float32(tw.Height),
 	}
 
 	// ADVISOR FIX: If cursor is not available and this window isn't already holding it,
 	// do not let it interact or falsely click through from underneath another window.
-	if !glob.CursorAvailable && !iw.holdingCursor {
+	if !glob.CursorAvailable && !tw.holdingCursor {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-			iw.Active = false
+			tw.Active = false
 		}
 		return
 	}
 
 	// Evaluate if the mouse is hovering over this window
 	if rl.CheckCollisionPointRec(mousePos, windowRect) {
-		iw.holdingCursor = true
+		tw.holdingCursor = true
 		glob.CursorAvailable = false
 	} else if glob.CursorAvailable {
-		iw.holdingCursor = false
+		tw.holdingCursor = false
 	}
 
 	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-		if iw.holdingCursor {
-			iw.Active = true
-			iw.activate = true
+		if tw.holdingCursor {
+			tw.Active = true
+			tw.activate = true
 			glob.CursorLock = true // Lock cursor to prioritize this window
 		} else {
-			iw.Active = false
+			tw.Active = false
 		}
 	}
 
 	// Delegate resizing and dragging using parent window logic
-	iw.handleResize(mousePos)
-	if !iw.IsResizing {
-		iw.handleDrag(mousePos)
+	tw.handleResize(mousePos)
+	if !tw.IsResizing {
+		tw.handleDrag(mousePos)
 	}
 
-	// Release CursorLock if the user stops dragging or resizing
-	if !iw.IsDragging && !iw.IsResizing && glob.CursorLock && !rl.IsMouseButtonDown(rl.MouseButtonLeft) {
+	// FIX: Keep the cursor locked and available ONLY to this window as long as dragging/resizing is active
+	if tw.IsDragging || tw.IsResizing {
+		glob.CursorLock = true
+		glob.CursorAvailable = false
+		tw.holdingCursor = true
+	} else if !rl.IsMouseButtonDown(rl.MouseButtonLeft) {
+		// Only unlock when the user has fully released the mouse click
 		glob.CursorLock = false
 	}
 
-	if !iw.Active {
+	// Skip typing evaluation if window isn't focused or if editing behavior is toggled off
+	if !tw.Active || !tw.IsEditable {
 		return
 	}
 
-	iw.frameCounter++
+	tw.frameCounter++
 
 	key := rl.GetCharPressed()
 	for key > 0 {
-		if (key >= 32) && (key <= 125) && (len(iw.TextBuffer) < iw.MaxChars) {
-			iw.TextBuffer += string(rune(key))
+		if (key >= 32) && (key <= 125) && (len(tw.TextBuffer) < tw.MaxChars) {
+			tw.TextBuffer += string(rune(key))
 		}
-		key = rl.GetCharPressed() 
+		key = rl.GetCharPressed()
 	}
 
 	if rl.IsKeyPressed(rl.KeyBackspace) {
-		if len(iw.TextBuffer) > 0 {
-			iw.TextBuffer = iw.TextBuffer[:len(iw.TextBuffer)-1]
+		if len(tw.TextBuffer) > 0 {
+			tw.TextBuffer = tw.TextBuffer[:len(tw.TextBuffer)-1]
 		}
 	} else if rl.IsKeyDown(rl.KeyBackspace) {
-		if iw.frameCounter%6 == 0 { 
-			if len(iw.TextBuffer) > 0 {
-				iw.TextBuffer = iw.TextBuffer[:len(iw.TextBuffer)-1]
+		if tw.frameCounter%6 == 0 {
+			if len(tw.TextBuffer) > 0 {
+				tw.TextBuffer = tw.TextBuffer[:len(tw.TextBuffer)-1]
 			}
 		}
 	}
 
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
-		if iw.OnSubmit != nil {
-			iw.OnSubmit(iw.TextBuffer)
+		if tw.OnSubmit != nil {
+			tw.OnSubmit(tw.TextBuffer)
 		}
 	}
 }
 
-func (iw *InputWindow) Draw() {
-	rl.DrawRectangle(iw.X, iw.Y, iw.Width, iw.Height, iw.ColorBg)
-	rl.DrawRectangle(iw.X, iw.Y, iw.Width, iw.TitleBarHeight, iw.ColorTitleBar)
-	rl.DrawText(iw.Name, iw.X+5, iw.Y+5, 16, iw.ColorText)
+func (tw *TextWindow) Draw() {
+	rl.DrawRectangle(tw.X, tw.Y, tw.Width, tw.Height, tw.ColorBg)
+	rl.DrawRectangle(tw.X, tw.Y, tw.Width, tw.TitleBarHeight, tw.ColorTitleBar)
+	rl.DrawText(tw.Name, tw.X+5, tw.Y+5, 16, tw.ColorText)
 
-	handleColor := iw.ColorResize
-	if iw.cursorOnResize {
-		handleColor = iw.ColorResizeHover
+	handleColor := tw.ColorResize
+	if tw.cursorOnResize {
+		handleColor = tw.ColorResizeHover
 	}
 
-	// === ADJUSTED SPACING FOR A LARGER INTERNAL BOX ===
-	inputFieldX := float32(iw.X) + 12
-	inputFieldY := float32(iw.Y + iw.TitleBarHeight) + 12
-	inputFieldW := float32(iw.Width) - 24
-	inputFieldH := float32(iw.Height - iw.TitleBarHeight) - 30
+	// === MODIFIED: EXPAND BOX TO FILL WHOLE TEXTWINDOW ===
+	inputFieldX := float32(tw.X)
+	inputFieldY := float32(tw.Y + tw.TitleBarHeight)
+	inputFieldW := float32(tw.Width)
+	inputFieldH := float32(tw.Height - tw.TitleBarHeight)
 
 	inputBox := rl.NewRectangle(inputFieldX, inputFieldY, inputFieldW, inputFieldH)
-	rl.DrawRectangleRec(inputBox, rl.NewColor(20, 20, 20, 255))
-	
+
+	if tw.IsEditable {
+		rl.DrawRectangleRec(inputBox, rl.NewColor(20, 20, 20, 255))
+	} else {
+		rl.DrawRectangleRec(inputBox, rl.NewColor(30, 30, 30, 255))
+	}
+
 	borderColor := rl.DarkGray
-	if iw.Active {
-		borderColor = rl.SkyBlue
+	if tw.Active {
+		if tw.IsEditable {
+			borderColor = rl.SkyBlue
+		} else {
+			borderColor = rl.Gray
+		}
 	}
 	rl.DrawRectangleLinesEx(inputBox, 1, borderColor)
 
-	rl.DrawText(iw.TextBuffer, int32(inputBox.X)+10, int32(inputBox.Y)+14, 16, rl.RayWhite)
+	// Fetch Raylib's anti-aliased font baseline configuration mapping
+	fontDefault := rl.GetFontDefault()
+	textSize := float32(24)
+	fontSpacing := float32(2)
 
-	if iw.Active {
-		if (iw.frameCounter/20)%2 == 0 {
-			textWidth := rl.MeasureText(iw.TextBuffer, 16)
-			rl.DrawRectangle(int32(inputBox.X)+10+textWidth+2, int32(inputBox.Y)+14, 2, 16, rl.SkyBlue)
+	// Compute positioning matrices inside the expanded full canvas borders
+	textXPosition := inputBox.X + 12
+	textYPosition := inputBox.Y + ((inputBox.Height - textSize) / 2)
+
+	textColor := rl.RayWhite
+	if !tw.IsEditable {
+		textColor = rl.LightGray
+	}
+
+	// Draw text using DrawTextEx for anti-aliasing rendering behavior
+	rl.DrawTextEx(fontDefault, tw.TextBuffer, rl.Vector2{X: textXPosition, Y: textYPosition}, textSize, fontSpacing, textColor)
+
+	// Render crisp text cursor line if focused and editing is enabled
+	if tw.Active && tw.IsEditable {
+		if (tw.frameCounter/20)%2 == 0 {
+			measuredVec := rl.MeasureTextEx(fontDefault, tw.TextBuffer, textSize, fontSpacing)
+			rl.DrawRectangle(int32(textXPosition+measuredVec.X)+2, int32(textYPosition), 2, int32(textSize), rl.SkyBlue)
 		}
 	}
 
-	charCountStr := fmt.Sprintf("%d/%d", len(iw.TextBuffer), iw.MaxChars)
-	rl.DrawText(charCountStr, int32(inputBox.X+inputBox.Width)-rl.MeasureText(charCountStr, 12)-8, int32(inputBox.Y+inputBox.Height)-18, 12, rl.DarkGray)
-
+	// Keep resize control triangles visible on top layer overlay bounds
 	rl.DrawTriangle(
-		rl.Vector2{X: float32(iw.X + iw.Width), Y: float32(iw.Y + iw.Height - 15)},
-		rl.Vector2{X: float32(iw.X + iw.Width - 15), Y: float32(iw.Y + iw.Height)},
-		rl.Vector2{X: float32(iw.X + iw.Width), Y: float32(iw.Y + iw.Height)},
+		rl.Vector2{X: float32(tw.X + tw.Width), Y: float32(tw.Y + tw.Height - 15)},
+		rl.Vector2{X: float32(tw.X + tw.Width - 15), Y: float32(tw.Y + tw.Height)},
+		rl.Vector2{X: float32(tw.X + tw.Width), Y: float32(tw.Y + tw.Height)},
 		handleColor,
 	)
-	rl.DrawRectangleLines(iw.X, iw.Y, iw.Width, iw.Height, iw.ColorBorder)
+	rl.DrawRectangleLines(tw.X, tw.Y, tw.Width, tw.Height, tw.ColorBorder)
 }
 
-func (iw *InputWindow) PostUpdate() {
+func (tw *TextWindow) PostUpdate() {
+	if tw.IsDragging || tw.IsResizing {
+		tw.holdingCursor = true
+		glob.CursorAvailable = false
+		return
+	}
+
 	if !glob.CursorLock {
-		iw.holdingCursor = false
+		tw.holdingCursor = false
 	}
 }
 
-func (iw *InputWindow) IsActive() bool {
-	return iw.Active
+func (tw *TextWindow) IsActive() bool {
+	return tw.Active
 }
 
-func (iw *InputWindow) SetActive(active bool) {
-	iw.Active = active
+func (tw *TextWindow) SetActive(active bool) {
+	tw.Active = active
 }

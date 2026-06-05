@@ -24,13 +24,15 @@ func main() {
 	panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
 
 	// === MINIMUM CHANGE: Add text panel beside previous panels ===
-	myTextWindow := windows.NewInputWindow(
-		"State Editor Panel",
-		50, 400, 320, 150,
-		20,
-		func(finalText string) {
-			println("Submitted text update:", finalText)
-		},
+	myTextWindow := windows.NewTextWindow(
+	"State Editor Panel",
+	50, 400, 320, 150,
+	"",                   // Initial text inside the window box
+	true,                 // IsEditable: set to true so you can type into it
+	20,                   // Max characters allowed
+	func(finalText string) {
+		println("Submitted text update:", finalText)
+	},
 	)
 	myTextWindow.TextBuffer = "hello"
 
