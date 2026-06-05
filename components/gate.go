@@ -73,20 +73,23 @@ func (c *Gate) pullToHook(d *Hook) {
 
 	if d.IsHooked {
 		tmp2 := utils.GetObjectFromID(d.TargetID)
-		t := tmp2.(*QubitsSystem)
+		t := tmp2.(Component)
 		t.AddForce(tmp)
+		c.AddForce(tmp.Scale(-1))
 		return
 	}
 
 	d.AddForce(tmp)
+	c.AddForce(tmp.Scale(-1))
 }
 
 func (c *Gate) Draw() {
 	for _, d := range c.HookList {
 		if d.IsHooked {
 			tmp := utils.GetObjectFromID(d.TargetID)
-			t := tmp.(*QubitsSystem)
-			r := utils.Dist(c.Center, d.Center) - t.Radius
+			t := tmp.(Component)
+
+			r := utils.Dist(c.Center, d.Center) - t.GetCircle().Radius
 			start := c.Center
 			end := rl.Vector2Add(start, rl.Vector2Scale(
 				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),

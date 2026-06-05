@@ -17,6 +17,7 @@ var FrictionDelta float32 = 1
 var QubitSystemWeight float32 = 100
 var HookWeight float32 = 100
 var GateWeight float32 = 100
+var QubitDeterminatorWeight float32 = 100
 
 var GateToHookDist float32 = 150
 var GateToHookGraceDist float32 = 30

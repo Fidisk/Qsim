@@ -26,8 +26,11 @@ func NewHook(x, y, radius float32, color rl.Color) *Hook {
 func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	if c.IsHooked {
 		tmp := utils.GetObjectFromID(c.TargetID)
-		t := tmp.(*QubitsSystem)
-		c.Center = t.Center
+		t := tmp.(Component)
+		c.Center = t.GetCircle().Center
+		//c.ClearForce()
+		t.AddForce(c.GetCircle().GetForce())
+		c.GetCircle().ClearForce()
 		return
 	}
 

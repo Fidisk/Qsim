@@ -2,7 +2,6 @@ package qubits
 
 type QubitStateManager struct {
 	//It's this shit all over again
-
 	Amptitude []float32
 
 	ModifierID []int32

@@ -12,11 +12,12 @@ import (
 
 type QubitsSystem struct {
 	Circle
-	QubitList []*Qubit
-	Origin    *qub.QubitStateManager
-	BitList   []int32 //Overkill
-	ID        int32
-	HookID    int32
+	QubitList             []*Qubit
+	Origin                *qub.QubitStateManager
+	BitList               []int32 //Overkill
+	ID                    int32
+	HookID                int32
+	QubitDeterminatorList []*QubitDeterminator
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
@@ -59,9 +60,19 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		c.DecayForce()
 		c.ApplyForce()
 	}
+
+	for _, d := range c.QubitDeterminatorList {
+		c.pullToQubitSystem(d)
+
+		d.Update(worldMouse, holdingCursor, isCursorAvailable)
+	}
 }
 
 func (c *QubitsSystem) Draw() {
+	for _, d := range c.QubitDeterminatorList {
+		rl.DrawLineV(c.Center, d.Center, c.Color)
+		d.Draw()
+	}
 	rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
 	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 	for _, d := range c.QubitList {
@@ -75,6 +86,14 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 
 	//The downfall of OOP
 	c.QubitList = nil
+
+	for i := range p.Size {
+		q := NewQubitDeterminator(c.Center.X, c.Center.Y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
+
+		q.QubitSystemID = c.ID
+
+		c.QubitDeterminatorList = append(c.QubitDeterminatorList, q)
+	}
 
 	for i := range p.Amptitude {
 		rotation := rand.Float32() * 2 * math.Pi
@@ -110,6 +129,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 }
 
 func (c *QubitsSystem) zipToHook() {
+	return
 	tmp := c.GetParent()
 	ele := tmp.GetElement()
 	gotHooked := false
@@ -168,5 +188,25 @@ func (c *QubitsSystem) split() {
 }
 
 func (c *QubitsSystem) PostUpdate() {
+	for i := range c.QubitDeterminatorList {
+		for j := i + 1; j < len(c.QubitDeterminatorList); j++ {
+			c.QubitDeterminatorList[i].GetCircle().AntiGravity(c.QubitDeterminatorList[j].GetCircle())
+		}
+	}
+}
 
+func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
+	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist
+
+	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
+		return
+	}
+
+	val = float32(math.Max(float64(val), float64(-100)))
+	val = float32(math.Min(float64(val), float64(100)))
+
+	tmp := c.Center.Subtract(d.Center).Normalize().Scale(val * glob.GateToHookPullCoeff)
+
+	d.AddForce(tmp)
+	c.AddForce(tmp.Scale(-1))
 }

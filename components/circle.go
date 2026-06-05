@@ -2,6 +2,7 @@ package components
 
 import (
 	"math"
+	"math/rand/v2"
 	"qsim/globals"
 	"qsim/utils"
 
@@ -67,6 +68,10 @@ func (c *Circle) Draw() {
 	rl.DrawCircleV(c.Center, c.Radius, c.Color)
 }
 
+func (c *Circle) GetForce() rl.Vector2 {
+	return c.curForce
+}
+
 func (c *Circle) ApplyForce() {
 	c.Center = c.Center.Add(c.curForce)
 }
@@ -98,11 +103,15 @@ func (c *Circle) AntiGravity(dtmp Component) {
 	//Another dumb ass way, non Newtonian
 	tmp := d.Center.Subtract(c.Center)
 
-	dist := utils.Dist(d.Center, c.Center)
+	if (tmp == rl.Vector2{X: 0, Y: 0}) {
+		tmp = rl.Vector2{X: rand.Float32() - 0.5*0.2, Y: rand.Float32() - 0.5*0.2}
+	}
+
+	dist := tmp.Length()
 
 	//Right so karma got me, need to rewrite this
-	c.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(-float32(math.Min(float64(1/dist/dist), float64(10)))))
-	d.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(float32(math.Min(float64(1/dist/dist), float64(10)))))
+	c.AddForce(tmp.Normalize().Scale(c.weight*d.weight).Scale(-float32(math.Min(float64(1/dist/dist), float64(10)))).ClampValue(-100, 100))
+	d.AddForce(tmp.Normalize().Scale(c.weight*d.weight).Scale(float32(math.Min(float64(1/dist/dist), float64(10)))).ClampValue(-100, 100))
 }
 
 func (c *Circle) Gravity(dtmp Component) {
@@ -116,4 +125,8 @@ func (c *Circle) Gravity(dtmp Component) {
 	//Right so karma got me, need to rewrite this
 	c.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(float32(math.Min(float64(1/dist/dist), float64(10)))))
 	d.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(-float32(math.Min(float64(1/dist/dist), float64(10)))))
+}
+
+func (c *Circle) PostUpdate() {
+	//To not cause crash
 }
