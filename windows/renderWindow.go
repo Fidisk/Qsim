@@ -57,7 +57,6 @@ func (rw *RenderWindow) updateCameraOffset() {
 func (rw *RenderWindow) GetWorldMouse() rl.Vector2 {
 	return rl.GetScreenToWorld2D(rl.GetMousePosition(), rw.Camera)
 }
-
 func (rw *RenderWindow) Draw() {
 	// 1. Draw window decorations in screen space (unclipped)
 	rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBg)
@@ -99,17 +98,28 @@ func (rw *RenderWindow) Draw() {
 }
 
 func (rw *RenderWindow) Update() {
+
+	// Cursor locking logic fixed: Check if THIS window is holding it to release it
+	if !glob.CursorAvailable && !rw.holdingCursor {
+		worldMouse := rw.GetWorldMouse()
+		tmp := false
+		for i := len(rw.WComp) - 1; i >= 0; i-- {
+			rw.WComp[i].Update(worldMouse, rw.holdingCursor, &tmp)
+		}
+
+		return
+	}
+
 	mousePos := rl.GetMousePosition()
 	windowRect := rl.Rectangle{
 		X: float32(rw.X), Y: float32(rw.Y),
 		Width: float32(rw.Width), Height: float32(rw.Height),
 	}
 
-	// FIX: Only handle inputs and grab focus if the cursor is actually available to us
-	if rl.CheckCollisionPointRec(mousePos, windowRect) && (glob.CursorAvailable || rw.holdingCursor) {
+	if rl.CheckCollisionPointRec(mousePos, windowRect) {
 		rw.holdingCursor = true
 		glob.CursorAvailable = false
-	} else {
+	} else if glob.CursorAvailable {
 		rw.holdingCursor = false
 	}
 
@@ -130,10 +140,10 @@ func (rw *RenderWindow) Update() {
 	contentRect := rw.GetContentRect()
 	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
 
-		// Middle‑mouse panning
+		// Middle‑mouse panning (FIXED: Using Screen Space to avoid feedback loops)
 		if rl.IsMouseButtonPressed(rl.MouseButtonMiddle) {
 			rw.isPanning = true
-			rw.panStartMouse = rl.GetMousePosition() 
+			rw.panStartMouse = rl.GetMousePosition() // FIX: Store SCREEN position, not world
 			rw.panStartTarget = rw.Camera.Target
 		}
 		if rl.IsMouseButtonReleased(rl.MouseButtonMiddle) {
@@ -141,14 +151,17 @@ func (rw *RenderWindow) Update() {
 		}
 		if rw.isPanning {
 			currentMouse := rl.GetMousePosition()
+			// Calculate delta in screen pixels
 			deltaScreen := rl.Vector2Subtract(rw.panStartMouse, currentMouse)
+			// FIX: Convert screen delta to world delta by dividing by zoom
 			deltaWorld := rl.Vector2Scale(deltaScreen, 1.0/rw.Camera.Zoom)
 			rw.Camera.Target = rl.Vector2Add(rw.panStartTarget, deltaWorld)
 		}
 
-		// Mouse‑wheel zoom
+		// Mouse‑wheel zoom (towards cursor) (FIXED: Order of operations)
 		wheel := rl.GetMouseWheelMove()
 		if wheel != 0 {
+			// 1. Get the world position under mouse BEFORE zooming
 			worldBefore := rw.GetWorldMouse()
 
 			oldZoom := rw.Camera.Zoom
@@ -159,11 +172,22 @@ func (rw *RenderWindow) Update() {
 				newZoom = conf.MaxZoom
 			}
 
+			// 2. Apply the zoom factor
 			rw.Camera.Zoom = newZoom
+
+			// 3. Get the world position under mouse AFTER zooming
 			worldAfter := rw.GetWorldMouse()
-			rw.Camera.Target = rl.Vector2Add(rw.Camera.Target, rl.Vector2Subtract(worldBefore, worldAfter))
+
+			// 4. Adjust target by the true difference to anchor zoom to the cursor
+			rw.Camera.Target = rl.Vector2Add(rw.Camera.Target,
+				rl.Vector2Subtract(worldBefore, worldAfter))
 		}
 	}
+
+	// Now update components with world mouse (only if mouse in content area)
+	//if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
+
+	//}
 
 	worldMouse := rw.GetWorldMouse()
 	isCursorAvailable := false
@@ -173,6 +197,7 @@ func (rw *RenderWindow) Update() {
 	for i := len(rw.WComp) - 1; i >= 0; i-- {
 		rw.WComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
+
 }
 
 func (rw *RenderWindow) PostUpdate() {
@@ -186,6 +211,7 @@ func (rw *RenderWindow) PostUpdate() {
 		}
 	}
 
+	//Bull shat
 	for i := range rw.WComp {
 		for j := i + 1; j < len(rw.WComp); j++ {
 			rw.WComp[i].GetCircle().AntiGravity(rw.WComp[j].GetCircle())
@@ -194,6 +220,7 @@ func (rw *RenderWindow) PostUpdate() {
 }
 
 func (rw *RenderWindow) GetElement() []comp.Component {
+	//Danger zone
 	return rw.WComp
 }
 
@@ -203,11 +230,18 @@ func (rw *RenderWindow) PushComponent(val ...comp.Component) {
 	}
 }
 
+// No rolling cause I'm lazy
 func (rw *RenderWindow) RemoveComponent(index int) {
 	if index < 0 || index >= len(rw.WComp) {
 		return
 	}
+
+	// 1. Shift elements over
 	copy(rw.WComp[index:], rw.WComp[index+1:])
+
+	// 2. Erase the duplicated pointer at the end to prevent memory leaks
 	rw.WComp[len(rw.WComp)-1] = nil
+
+	// 3. Shrink the slice
 	rw.WComp = rw.WComp[:len(rw.WComp)-1]
 }
