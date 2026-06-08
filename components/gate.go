@@ -1,7 +1,10 @@
 package components
 
 import (
+	"fmt"
 	"math"
+	"math/cmplx"
+	"math/rand/v2"
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/utils"
@@ -15,12 +18,14 @@ type Gate struct {
 	//Wow, you have taken your OOP class well
 	//No go out there and poison those LLM
 	Circle
-	ID         int32
-	Label      string
-	HookList   []*Hook
-	Operation  [][]complex64
-	InputCount int32
-	OutPutHook *Hook
+	ID                int32
+	Label             string
+	HookList          []*Hook
+	Operation         [][]complex64
+	InputCount        int32
+	OutPutHook        *Hook
+	IsMeasurementGate bool
+	MeasureResult     int32
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
@@ -35,6 +40,27 @@ func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]c
 	for i := 0; i < int(inputCount); i++ {
 		newHook := NewHook(x, y, glob.HookRadius, glob.HookColor)
 		newHook.Label = "I" + strconv.Itoa(i)
+		tmp.HookList = append(tmp.HookList, newHook)
+	}
+	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
+	tmp.HookList = append(tmp.HookList, outputHook)
+	tmp.OutPutHook = outputHook
+	tmp.OutPutHook.Label = "O"
+	return &tmp
+}
+
+func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gate {
+	tmp := Gate{
+		Circle:            *NewCircle(x, y, radius, color),
+		Label:             label,
+		InputCount:        1,
+		IsMeasurementGate: true,
+	}
+	tmp.ID = utils.GenerateID(&tmp)
+	tmp.SetWeight(glob.GateWeight)
+	for i := 0; i < int(tmp.InputCount); i++ {
+		newHook := NewHook(x, y, glob.HookRadius, glob.HookColor)
+		newHook.Label = "I"
 		tmp.HookList = append(tmp.HookList, newHook)
 	}
 	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
@@ -80,10 +106,80 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	}
 
 	if cnt == int(c.InputCount) && !c.OutPutHook.IsHooked {
-		c.CalculateOutPut()
+		if c.IsMeasurementGate {
+			c.MeasureOutput()
+		} else {
+			c.CalculateOutPut()
+		}
 	} else if c.OutPutHook.IsHooked && cnt != int(c.InputCount) {
 		c.DestroyOutPut()
 	}
+}
+
+func (c *Gate) MeasureOutput() {
+	d := c.HookList[0]
+	QD := utils.GetObjectFromID(d.TargetID).(*QubitDeterminator)
+	QSM := QD.GetQubitParent().Origin
+	result := qubits.NewQubitStateManagerFrom([]complex64{}, QSM.ModifierID)
+
+	var pos int32
+
+	for i, d := range QSM.ModifierID {
+		if QD.ModifierID == d {
+			pos = int32(i)
+		}
+	}
+
+	var l complex64
+
+	n := QSM.Size - 1
+
+	for i, d := range QSM.Amptitude {
+		if ((i >> (n - pos)) & 1) != 0 {
+		} else {
+			l += d * d
+		}
+	}
+
+	hit := 0
+
+	roll := rand.Float64()
+	fmt.Println(roll, cmplx.Abs(complex128(l)))
+
+	if roll > cmplx.Abs(complex128(l)) {
+		hit = 1
+	}
+
+	c.MeasureResult = int32(hit)
+
+	var coeff complex64
+
+	if hit == 0 {
+		coeff = complex64(complex(1/cmplx.Abs(complex128(l)), 0))
+	} else {
+		coeff = complex64(complex(1/cmplx.Abs(complex128(complex(1, 0)-l)), 0))
+	}
+
+	fmt.Println(coeff, l)
+
+	coeff = complex64(cmplx.Sqrt(complex128(coeff)))
+
+	for i, d := range QSM.Amptitude {
+		if ((i >> (n - pos)) & 1) == hit {
+			result.Amptitude = append(result.Amptitude, d*coeff)
+		} else {
+			result.Amptitude = append(result.Amptitude, 0)
+		}
+	}
+
+	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+	tmp.Assign(result)
+	tmp.SetParent(c.GetParent())
+	tmp.GetParent().PushComponent(tmp)
+
+	c.OutPutHook.Connect(tmp)
+
+	fmt.Println(result)
 }
 
 func (c *Gate) CalculateOutPut() {
@@ -119,7 +215,9 @@ func (c *Gate) CalculateOutPut() {
 								break
 							}
 						}
+						fmt.Println("Swap ", Cnt[i], pos)
 						d2.SwapColumn(Cnt[i], pos)
+						d2.ModifierID[Cnt[i]], d2.ModifierID[pos] = d2.ModifierID[pos], d2.ModifierID[Cnt[i]]
 						Cnt[i]++
 						Idx[i] = append(Idx[i], index)
 						index++
@@ -128,7 +226,17 @@ func (c *Gate) CalculateOutPut() {
 			} else {
 				tmp := *QD.GetQubitParent().Origin
 				QSM = append(QSM, &tmp)
-				Cnt = append(Cnt, 0)
+				var pos int32 = 0
+				for i := range tmp.ModifierID {
+					if tmp.ModifierID[i] == QD.ModifierID {
+						pos = int32(i)
+						break
+					}
+				}
+				fmt.Println("Swap ", 0, pos)
+				tmp.SwapColumn(0, pos)
+				tmp.ModifierID[0], tmp.ModifierID[pos] = tmp.ModifierID[pos], tmp.ModifierID[0]
+				Cnt = append(Cnt, 1)
 				Idx = append(Idx, []int32{index})
 				index++
 			}
@@ -137,7 +245,7 @@ func (c *Gate) CalculateOutPut() {
 	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	var sl int32 = 0
 	for i := range QSM {
-		result.MergeWithPrefix(QSM[i], Cnt[i], sl)
+		result.MergeWithPrefix(QSM[i], sl, Cnt[i])
 		sl += Cnt[i]
 	}
 
@@ -149,6 +257,8 @@ func (c *Gate) CalculateOutPut() {
 		}
 	}
 
+	fmt.Print(order)
+
 	n := len(order)
 
 	for i := 0; i < n; i++ {
@@ -159,22 +269,24 @@ func (c *Gate) CalculateOutPut() {
 					break
 				}
 				result.SwapColumn(pos, order[pos])
+				result.ModifierID[pos], result.ModifierID[order[pos]] = result.ModifierID[order[pos]], result.ModifierID[pos]
 				pos = order[order[pos]]
 			}
 		}
 	}
 
+	fmt.Println(result)
+
 	result.Multiply(c.Operation, c.InputCount)
 
-	//fmt.Println(result)
-	tmp := NewQubitsSystem(c.Center.X, c.Center.X, glob.QubitSystemRadius, glob.QubitSystemColor)
+	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 	tmp.Assign(result)
 	tmp.SetParent(c.GetParent())
 	tmp.GetParent().PushComponent(tmp)
 
 	c.OutPutHook.Connect(tmp)
 
-	//fmt.Println(c.OutPutHook.IsHooked)
+	fmt.Println(result)
 }
 
 func (c *Gate) DestroyOutPut() {
@@ -245,6 +357,10 @@ func (c *Gate) Draw() {
 		textY := int32(c.Center.Y) - fontSize/2
 
 		rl.DrawText(c.Label, textX, textY, fontSize, c.Color)
+	}
+
+	if c.MeasureResult != 0 {
+		rl.DrawText("Hit", int32(c.Center.X-30), int32(c.Center.Y-30), 14, c.Color)
 	}
 }
 

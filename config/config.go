@@ -3,4 +3,4 @@ package config
 const MaxZoom float32 = 10.0
 const MinZoom float32 = 0.1
 
-const QubitSystemStatePause bool = false
+const QubitSystemStatePause bool = true

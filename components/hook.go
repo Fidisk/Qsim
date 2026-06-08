@@ -109,7 +109,6 @@ func (v *Hook) Connect(val Component) {
 		v.TargetID = c.ID
 		c.HookID = v.ID
 		c.SetWeight(0)
-		//fmt.Printf("%T ", val)
 	case *QubitDeterminator:
 		c.removeFromHook()
 		c.Center = v.Center

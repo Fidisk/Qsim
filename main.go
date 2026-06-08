@@ -21,6 +21,7 @@ func main() {
 	// Create one or more draggable inner panels
 
 	//panel := windows.NewWindow(200, 150, 400, 300)
+	panel := windows.NewRenderWindow(0, 0, 1400, 800)
 	panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
 
 	// === MINIMUM CHANGE: Add text panel beside previous panels ===
@@ -36,27 +37,39 @@ func main() {
 	)
 	myTextWindow.TextBuffer = "hello"
 
-	q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
-	q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
-	q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+	var create = func(p *windows.RenderWindow) {
+		q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+		q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+		q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
 
-	q1State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{0})
-	q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
-	q3State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{2})
+		q1State := qubits.NewQubitStateManagerFrom([]complex64{0.6, 0.8}, []int32{0})
+		q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
+		q3State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{2})
 
-	q1.Assign(q1State)
-	q2.Assign(q2State)
-	q3.Assign(q3State)
+		q1.Assign(q1State)
+		q2.Assign(q2State)
+		q3.Assign(q3State)
 
-	panel2.PushComponent(q1, q2, q3)
+		p.PushComponent(q1, q2, q3)
 
-	t := complex(float32(1/math.Sqrt(2)), 0)
-	H1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-	H2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-	CNOT1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-	CNOT2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		t := complex(float32(1/math.Sqrt(2)), 0)
+		H1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		H2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		H3 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		CNOT1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		CNOT2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
 
-	panel2.PushComponent(H1, H2, CNOT1, CNOT2)
+		M1 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
+		M2 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
+
+		CX := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		CZ := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+
+		p.PushComponent(H1, H2, H3, CNOT1, CNOT2, M1, M2, CX, CZ)
+	}
+
+	create(panel)
+	create(panel2)
 
 	//blob := comp.NewBlob(0, 0, 50)
 
@@ -92,7 +105,7 @@ func main() {
 
 	//panel2.PushComponent(testGate)
 
-	winManager = append(winManager, panel2, myTextWindow)
+	winManager = append(winManager, panel, panel2, myTextWindow)
 
 	for !rl.WindowShouldClose() {
 		// Update main window resize

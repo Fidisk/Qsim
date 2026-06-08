@@ -25,7 +25,8 @@ func NewQubitStateManagerFrom(amplitudes []complex64, modifierID []int32) *Qubit
 }
 
 func (c *QubitStateManager) SwapColumn(l, r int32) {
-	fmt.Println(c.Amptitude)
+	l = c.Size - l - 1
+	r = c.Size - r - 1
 	replacement := make([]complex64, len(c.Amptitude))
 	for i := range c.Amptitude {
 		j := i
@@ -36,10 +37,10 @@ func (c *QubitStateManager) SwapColumn(l, r int32) {
 		replacement[j] = c.Amptitude[i]
 	}
 	c.Amptitude = replacement
-	fmt.Println(c.Amptitude)
 }
 
 func (c *QubitStateManager) MergeWithPrefix(d *QubitStateManager, l, r int32) {
+	fmt.Println(c, d, l, r)
 	if c.Size == 0 {
 		c.Amptitude = append(c.Amptitude, d.Amptitude...)
 		c.ModifierID = append(c.ModifierID, d.ModifierID...)
@@ -76,12 +77,12 @@ func (c *QubitStateManager) MergeWithPrefix(d *QubitStateManager, l, r int32) {
 }
 
 func (c *QubitStateManager) Multiply(val [][]complex64, n int32) {
+	fmt.Println("äa", c.Amptitude, val)
 	result := make([]complex64, 1<<c.Size)
 	for i := 0; i < (1 << n); i++ {
 		for j := 0; j < (1 << n); j++ {
 			for l := 0; l < (1 << (c.Size - n)); l++ {
-				fmt.Println(i, j, l, c.Size, n, (j<<(c.Size-n))+l)
-				result[(j<<(c.Size-n))+l] += c.Amptitude[i] * val[i][j]
+				result[(j<<(c.Size-n))+l] += c.Amptitude[(i<<(c.Size-n))+l] * val[j][i]
 			}
 		}
 	}

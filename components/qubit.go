@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 
@@ -38,10 +39,13 @@ func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
 	colCnt := 0
 	for i := int32(0); i < n; i++ {
 		tmp := attr.AttributesManager.Get(modifierID[i])
-		state := (representation >> i) & 1
+		state := (representation >> (n - i - 1)) & 1
 
 		switch v := tmp.(type) {
 		case *attr.Color:
+			if state == 0 {
+				continue
+			}
 			colCnt++
 			c.r += v.R * state
 			c.g += v.G * state
@@ -55,9 +59,13 @@ func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
 		default:
 		}
 	}
-	c.r /= int32(colCnt)
-	c.b /= int32(colCnt)
-	c.g /= int32(colCnt)
+	if colCnt == 0 {
+		colCnt = 1
+	}
+	//c.r /= int32(colCnt)
+	//c.b /= int32(colCnt)
+	//c.g /= int32(colCnt)
+	fmt.Println("Qubit ", c.r, c.g, c.b, representation)
 }
 
 func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio float32, representation int32, modifierID []int32, n int32) *Qubit {
