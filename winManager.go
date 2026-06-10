@@ -15,6 +15,7 @@ func shuffleWinManager() {
 		if winManager[i].IsActive() {
 			winManager[i-1], winManager[i] = winManager[i], winManager[i-1]
 		}
+		winManager[i].SetActive(false)
 	}
 	if len(winManager) == 0 {
 		return

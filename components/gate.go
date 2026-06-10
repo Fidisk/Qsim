@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"math"
 	"math/cmplx"
 	"math/rand/v2"
@@ -144,7 +143,6 @@ func (c *Gate) MeasureOutput() {
 	hit := 0
 
 	roll := rand.Float64()
-	fmt.Println(roll, cmplx.Abs(complex128(l)))
 
 	if roll > cmplx.Abs(complex128(l)) {
 		hit = 1
@@ -159,8 +157,6 @@ func (c *Gate) MeasureOutput() {
 	} else {
 		coeff = complex64(complex(1/cmplx.Abs(complex128(complex(1, 0)-l)), 0))
 	}
-
-	fmt.Println(coeff, l)
 
 	coeff = complex64(cmplx.Sqrt(complex128(coeff)))
 
@@ -178,8 +174,6 @@ func (c *Gate) MeasureOutput() {
 	tmp.GetParent().PushComponent(tmp)
 
 	c.OutPutHook.Connect(tmp)
-
-	fmt.Println(result)
 }
 
 func (c *Gate) CalculateOutPut() {
@@ -215,7 +209,6 @@ func (c *Gate) CalculateOutPut() {
 								break
 							}
 						}
-						fmt.Println("Swap ", Cnt[i], pos)
 						d2.SwapColumn(Cnt[i], pos)
 						d2.ModifierID[Cnt[i]], d2.ModifierID[pos] = d2.ModifierID[pos], d2.ModifierID[Cnt[i]]
 						Cnt[i]++
@@ -233,7 +226,6 @@ func (c *Gate) CalculateOutPut() {
 						break
 					}
 				}
-				fmt.Println("Swap ", 0, pos)
 				tmp.SwapColumn(0, pos)
 				tmp.ModifierID[0], tmp.ModifierID[pos] = tmp.ModifierID[pos], tmp.ModifierID[0]
 				Cnt = append(Cnt, 1)
@@ -257,8 +249,6 @@ func (c *Gate) CalculateOutPut() {
 		}
 	}
 
-	fmt.Print(order)
-
 	n := len(order)
 
 	for i := 0; i < n; i++ {
@@ -275,8 +265,6 @@ func (c *Gate) CalculateOutPut() {
 		}
 	}
 
-	fmt.Println(result)
-
 	result.Multiply(c.Operation, c.InputCount)
 
 	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
@@ -285,8 +273,6 @@ func (c *Gate) CalculateOutPut() {
 	tmp.GetParent().PushComponent(tmp)
 
 	c.OutPutHook.Connect(tmp)
-
-	fmt.Println(result)
 }
 
 func (c *Gate) DestroyOutPut() {

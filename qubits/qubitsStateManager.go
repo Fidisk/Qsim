@@ -1,7 +1,6 @@
 package qubits
 
 import (
-	"fmt"
 	"qsim/utils"
 )
 
@@ -40,7 +39,6 @@ func (c *QubitStateManager) SwapColumn(l, r int32) {
 }
 
 func (c *QubitStateManager) MergeWithPrefix(d *QubitStateManager, l, r int32) {
-	fmt.Println(c, d, l, r)
 	if c.Size == 0 {
 		c.Amptitude = append(c.Amptitude, d.Amptitude...)
 		c.ModifierID = append(c.ModifierID, d.ModifierID...)
@@ -77,7 +75,6 @@ func (c *QubitStateManager) MergeWithPrefix(d *QubitStateManager, l, r int32) {
 }
 
 func (c *QubitStateManager) Multiply(val [][]complex64, n int32) {
-	fmt.Println("äa", c.Amptitude, val)
 	result := make([]complex64, 1<<c.Size)
 	for i := 0; i < (1 << n); i++ {
 		for j := 0; j < (1 << n); j++ {

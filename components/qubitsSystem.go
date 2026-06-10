@@ -92,7 +92,7 @@ Move out the way, under construction :3
         | (_)  |____________________| (_)  |             \\
          \_______________________________ /               \\
 -------------------------------------------------------------------
-
+Stolen from Dan Carrion
 */
 
 func (c *QubitsSystem) Draw() {
@@ -100,12 +100,82 @@ func (c *QubitsSystem) Draw() {
 		rl.DrawLineV(c.Center, d.Center, c.Color)
 		d.Draw()
 	}
-	rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
-	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
-	for _, d := range c.QubitList {
-		d.Draw(c.Center, c.Radius)
+
+	// New: centered rectangle split into 2^x × 2^x cells of size n × m
+	exp := c.Origin.Size // x – natural number
+	n := 100             // width of each cell
+	m := 100             // height of each cell
+
+	cellsPerSide := int32(1 << exp) // 2^x
+	totalWidth := float32(cellsPerSide * int32(n))
+	totalHeight := float32(cellsPerSide * int32(m))
+
+	startX := c.Center.X - totalWidth/2
+	startY := c.Center.Y - totalHeight/2
+
+	// Outer border
+	rl.DrawRectangleLines(
+		int32(startX), int32(startY),
+		int32(totalWidth), int32(totalHeight),
+		c.Color,
+	)
+
+	// Vertical grid lines
+	for i := int32(1); i < cellsPerSide; i++ {
+		x := startX + float32(i*int32(n))
+		rl.DrawLineV(
+			rl.Vector2{X: x, Y: startY},
+			rl.Vector2{X: x, Y: startY + totalHeight},
+			c.Color,
+		)
 	}
+
+	for j := int32(1); j < cellsPerSide; j++ {
+		y := startY + float32(j)*float32(m)
+		rl.DrawLineV(
+			rl.Vector2{X: startX, Y: y},
+			rl.Vector2{X: startX + totalWidth, Y: y},
+			c.Color,
+		)
+	}
+
+	/*
+	   rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
+	   rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
+	   for _, d := range c.QubitList {
+	       d.Draw(c.Center, c.Radius)
+	   }
+	*/
 }
+
+/*
+                                 [O]
+                                 [O]
+                                 [O]
+          ____   /`  ___          ||
+      ___/O|__\_/_  /___\         ||
+     /_____\__/___/|x===o|        ||
+______(o)_______(o)||___||________||________
+JRO    ________  ~.>\`    '    ________
+ .  '  \__[]__/  '  ^^   .  .  \[]____/ '
+       //\__/\\  '    ((())    /_/o\\\
+  '.   ( o__o )       aa((((    <_  )/
+        \ __ /  .  '  \-(((( .   \__/   .
+ .     __\__/___      / /\\(     /   \
+      /| \||/  |\    ( ( //  .  ||PD|| '  .
+     / |  \/  @| \    \ //      ||  ||
+    /  |_  __  |\ \   /[__]   ' ||  ||  .
+.   \____|//_| |/ /  /_____\    ||__||
+       |       |\/    | | | .   | / \|
+       |_______|/     | | |     |_\\\|   .
+        |     | .   ' |_|_|      |   |
+ .'     |  |  |      <-<--/      |   |
+        |  |  |  '  '  .      '  |   |  '  '
+  .     |__|__|                  |___|
+       (__) (__)      .  '      (____)  .
+
+	   Stolen from Jonathon R. Oglesbee
+*/
 
 func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	//This do not defer the Origin

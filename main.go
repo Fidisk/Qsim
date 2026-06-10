@@ -118,8 +118,6 @@ func main() {
 			d.Update()
 		}
 
-		shuffleWinManager()
-
 		// Draw everything
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
@@ -133,5 +131,7 @@ func main() {
 		for _, d := range winManager {
 			d.PostUpdate()
 		}
+
+		shuffleWinManager()
 	}
 }

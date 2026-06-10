@@ -116,7 +116,7 @@ func (rw *RenderWindow) Update() {
 		Width: float32(rw.Width), Height: float32(rw.Height),
 	}
 
-	if rl.CheckCollisionPointRec(mousePos, windowRect) {
+	if rl.CheckCollisionPointRec(mousePos, windowRect) && glob.CursorAvailable {
 		rw.holdingCursor = true
 		glob.CursorAvailable = false
 	} else if glob.CursorAvailable {

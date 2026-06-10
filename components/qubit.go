@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"image/color"
 	"math"
 
@@ -62,10 +61,6 @@ func (c *Qubit) buildAttr(representation int32, modifierID []int32, n int32) {
 	if colCnt == 0 {
 		colCnt = 1
 	}
-	//c.r /= int32(colCnt)
-	//c.b /= int32(colCnt)
-	//c.g /= int32(colCnt)
-	fmt.Println("Qubit ", c.r, c.g, c.b, representation)
 }
 
 func NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio float32, representation int32, modifierID []int32, n int32) *Qubit {
