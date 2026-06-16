@@ -20,6 +20,10 @@ type QubitsSystem struct {
 	ID                    int32
 	HookID                int32
 	QubitDeterminatorList []*QubitDeterminator
+	rows                  int32
+	cols                  int32
+	startX                float32
+	startY                float32
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
@@ -34,13 +38,17 @@ func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 	return &tmp
 }
 
+func (c *QubitsSystem) CheckCollide(worldMouse rl.Vector2) bool {
+	return rl.CheckCollisionPointRec(worldMouse, rl.Rectangle{X: c.startX, Y: c.startY, Width: float32(c.cols) * glob.QubitSystemCellWidth, Height: float32(c.rows) * glob.QubitSystemCellHeight})
+}
+
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	for _, d := range c.QubitList {
 		d.Update()
 	}
 
 	// collision check using world coordinates
-	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
+	if c.CheckCollide(worldMouse) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
 			c.dragging = true
 			*isCursorAvailable = false
@@ -75,67 +83,67 @@ func (c *QubitsSystem) Draw() {
 		rl.DrawLineV(c.Center, d.Center, c.Color)
 	}
 
-	// New: rectangle split into 2^ceil(exp/2) columns × 2^floor(exp/2) rows
+	// New: rectangle split into 2^ceil(exp/2) columns × 2^floor(exp/2) c.rows
 	// total cells = 2^(ceil+floor) = 2^exp
-	exp := c.Origin.Size // natural number
-	n := 100             // width of each cell
-	m := 100             // height of each cell
+	exp := c.Origin.Size            // natural number
+	n := glob.QubitSystemCellWidth  // width of each cell
+	m := glob.QubitSystemCellHeight // height of each cell
 
 	// Compute exponents for width and height
 	widthExp := (exp + 1) / 2 // ceil(exp/2)
 	heightExp := exp / 2      // floor(exp/2)
 
-	cols := int32(1 << widthExp)  // 2^ceil(exp/2)
-	rows := int32(1 << heightExp) // 2^floor(exp/2)
+	c.cols = int32(1 << widthExp)  // 2^ceil(exp/2)
+	c.rows = int32(1 << heightExp) // 2^floor(exp/2)
 
-	totalWidth := float32(cols * int32(n))
-	totalHeight := float32(rows * int32(m))
+	totalWidth := float32(c.cols * int32(n))
+	totalHeight := float32(c.rows * int32(m))
 
-	startX := c.Center.X - totalWidth/2
-	startY := c.Center.Y - totalHeight/2
+	c.startX = c.Center.X - totalWidth/2
+	c.startY = c.Center.Y - totalHeight/2
 
 	rl.DrawRectangle(
-		int32(startX), int32(startY),
+		int32(c.startX), int32(c.startY),
 		int32(totalWidth), int32(totalHeight),
 		glob.ColorBg,
 	)
 
 	// Outer border
 	rl.DrawRectangleLines(
-		int32(startX), int32(startY),
+		int32(c.startX), int32(c.startY),
 		int32(totalWidth), int32(totalHeight),
 		c.Color,
 	)
 
 	// Vertical grid lines (between columns)
-	for i := int32(1); i < cols; i++ {
-		x := startX + float32(i*int32(n))
+	for i := int32(1); i < c.cols; i++ {
+		x := c.startX + float32(i*int32(n))
 		rl.DrawLineV(
-			rl.Vector2{X: x, Y: startY},
-			rl.Vector2{X: x, Y: startY + totalHeight},
+			rl.Vector2{X: x, Y: c.startY},
+			rl.Vector2{X: x, Y: c.startY + totalHeight},
 			c.Color,
 		)
 	}
 
-	// Horizontal grid lines (between rows)
-	for j := int32(1); j < rows; j++ {
-		y := startY + float32(j)*float32(m)
+	// Horizontal grid lines (between c.rows)
+	for j := int32(1); j < c.rows; j++ {
+		y := c.startY + float32(j)*float32(m)
 		rl.DrawLineV(
-			rl.Vector2{X: startX, Y: y},
-			rl.Vector2{X: startX + totalWidth, Y: y},
+			rl.Vector2{X: c.startX, Y: y},
+			rl.Vector2{X: c.startX + totalWidth, Y: y},
 			c.Color,
 		)
 	}
 
 	// Draw number and name in each cell
-	for row := int32(0); row < rows; row++ {
-		for col := int32(0); col < cols; col++ {
+	for row := int32(0); row < c.rows; row++ {
+		for col := int32(0); col < c.cols; col++ {
 			// Cell center
-			cellCenterX := startX + float32(col)*float32(n) + float32(n)/2
-			cellCenterY := startY + float32(row)*float32(m) + float32(m)/2
+			cellCenterX := c.startX + float32(col)*float32(n) + float32(n)/2
+			cellCenterY := c.startY + float32(row)*float32(m) + float32(m)/2
 
 			// Linear index (row-major order)
-			index := row*cols + col
+			index := row*c.cols + col
 			numberStr := fmt.Sprintf("%v", c.Origin.Amptitude[index]) // now properly formatted
 			nameStr := fmt.Sprintf("Q%d", index)
 
