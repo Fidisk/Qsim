@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"math"
 	"math/cmplx"
 	"math/rand/v2"
@@ -130,6 +131,7 @@ func (c *QubitsSystem) Draw() {
 		)
 	}
 
+	// Horizontal grid lines
 	for j := int32(1); j < cellsPerSide; j++ {
 		y := startY + float32(j)*float32(m)
 		rl.DrawLineV(
@@ -137,6 +139,42 @@ func (c *QubitsSystem) Draw() {
 			rl.Vector2{X: startX + totalWidth, Y: y},
 			c.Color,
 		)
+	}
+
+	// Draw number and name in each cell
+	for row := int32(0); row < cellsPerSide; row++ {
+		for col := int32(0); col < cellsPerSide; col++ {
+			// Cell center
+			cellCenterX := startX + float32(col)*float32(n) + float32(n)/2
+			cellCenterY := startY + float32(row)*float32(m) + float32(m)/2
+
+			// Example: linear index
+			index := row*cellsPerSide + col
+			numberStr := fmt.Sprintf("%d", index)
+
+			// Placeholder name (you will update this later)
+			nameStr := fmt.Sprintf("Q%d", index)
+
+			// Draw number slightly above center
+			numFontSize := int32(20)
+			numWidth := rl.MeasureText(numberStr, numFontSize)
+			rl.DrawText(numberStr,
+				int32(cellCenterX)-numWidth/2,
+				int32(cellCenterY)-numFontSize-2, // 2px gap
+				numFontSize,
+				c.Color,
+			)
+
+			// Draw name slightly below center
+			nameFontSize := int32(14)
+			nameWidth := rl.MeasureText(nameStr, nameFontSize)
+			rl.DrawText(nameStr,
+				int32(cellCenterX)-nameWidth/2,
+				int32(cellCenterY)+2,
+				nameFontSize,
+				c.Color,
+			)
+		}
 	}
 
 	/*

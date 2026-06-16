@@ -1,0 +1,3 @@
+Window fucking select twice
+Somehow qubit id swap for measurement
+Sub pixel not rendering
