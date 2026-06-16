@@ -70,49 +70,35 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 }
 
-/*-----------------------------------------
-
-Move out the way, under construction :3
-
-                        (       )
-                          (      )
-                           (     )
-                            (    )
-                             (   )
-                              (  )
-          _____________         _
-          | |     | |          | |
-          | |     | |          | |
-          | | --- | |__________|_|___________
-        __|   ___          _____________     \
-       /  |   |_|         |   ________  |    |
-       \__|  (owo)        |__|_______|__|    |             _
-          |______________________________ ___|            //
-          _______________________________ ______________ //
-         / _    ____________________   _  \ ____________||
-        | (_)  |____________________| (_)  |             \\
-         \_______________________________ /               \\
--------------------------------------------------------------------
-Stolen from Dan Carrion
-*/
-
 func (c *QubitsSystem) Draw() {
 	for _, d := range c.QubitDeterminatorList {
 		rl.DrawLineV(c.Center, d.Center, c.Color)
-		d.Draw()
 	}
 
-	// New: centered rectangle split into 2^x × 2^x cells of size n × m
-	exp := c.Origin.Size // x – natural number
+	// New: rectangle split into 2^ceil(exp/2) columns × 2^floor(exp/2) rows
+	// total cells = 2^(ceil+floor) = 2^exp
+	exp := c.Origin.Size // natural number
 	n := 100             // width of each cell
 	m := 100             // height of each cell
 
-	cellsPerSide := int32(1 << exp) // 2^x
-	totalWidth := float32(cellsPerSide * int32(n))
-	totalHeight := float32(cellsPerSide * int32(m))
+	// Compute exponents for width and height
+	widthExp := (exp + 1) / 2 // ceil(exp/2)
+	heightExp := exp / 2      // floor(exp/2)
+
+	cols := int32(1 << widthExp)  // 2^ceil(exp/2)
+	rows := int32(1 << heightExp) // 2^floor(exp/2)
+
+	totalWidth := float32(cols * int32(n))
+	totalHeight := float32(rows * int32(m))
 
 	startX := c.Center.X - totalWidth/2
 	startY := c.Center.Y - totalHeight/2
+
+	rl.DrawRectangle(
+		int32(startX), int32(startY),
+		int32(totalWidth), int32(totalHeight),
+		glob.ColorBg,
+	)
 
 	// Outer border
 	rl.DrawRectangleLines(
@@ -121,8 +107,8 @@ func (c *QubitsSystem) Draw() {
 		c.Color,
 	)
 
-	// Vertical grid lines
-	for i := int32(1); i < cellsPerSide; i++ {
+	// Vertical grid lines (between columns)
+	for i := int32(1); i < cols; i++ {
 		x := startX + float32(i*int32(n))
 		rl.DrawLineV(
 			rl.Vector2{X: x, Y: startY},
@@ -131,8 +117,8 @@ func (c *QubitsSystem) Draw() {
 		)
 	}
 
-	// Horizontal grid lines
-	for j := int32(1); j < cellsPerSide; j++ {
+	// Horizontal grid lines (between rows)
+	for j := int32(1); j < rows; j++ {
 		y := startY + float32(j)*float32(m)
 		rl.DrawLineV(
 			rl.Vector2{X: startX, Y: y},
@@ -142,17 +128,15 @@ func (c *QubitsSystem) Draw() {
 	}
 
 	// Draw number and name in each cell
-	for row := int32(0); row < cellsPerSide; row++ {
-		for col := int32(0); col < cellsPerSide; col++ {
+	for row := int32(0); row < rows; row++ {
+		for col := int32(0); col < cols; col++ {
 			// Cell center
 			cellCenterX := startX + float32(col)*float32(n) + float32(n)/2
 			cellCenterY := startY + float32(row)*float32(m) + float32(m)/2
 
-			// Example: linear index
-			index := row*cellsPerSide + col
-			numberStr := fmt.Sprintf("%d", index)
-
-			// Placeholder name (you will update this later)
+			// Linear index (row-major order)
+			index := row*cols + col
+			numberStr := fmt.Sprintf("%v", c.Origin.Amptitude[index]) // now properly formatted
 			nameStr := fmt.Sprintf("Q%d", index)
 
 			// Draw number slightly above center
@@ -177,6 +161,7 @@ func (c *QubitsSystem) Draw() {
 		}
 	}
 
+	// (Commented‑out old drawing code remains unchanged)
 	/*
 	   rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
 	   rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
@@ -184,36 +169,11 @@ func (c *QubitsSystem) Draw() {
 	       d.Draw(c.Center, c.Radius)
 	   }
 	*/
+
+	for _, d := range c.QubitDeterminatorList {
+		d.Draw()
+	}
 }
-
-/*
-                                 [O]
-                                 [O]
-                                 [O]
-          ____   /`  ___          ||
-      ___/O|__\_/_  /___\         ||
-     /_____\__/___/|x===o|        ||
-______(o)_______(o)||___||________||________
-JRO    ________  ~.>\`    '    ________
- .  '  \__[]__/  '  ^^   .  .  \[]____/ '
-       //\__/\\  '    ((())    /_/o\\\
-  '.   ( o__o )       aa((((    <_  )/
-        \ __ /  .  '  \-(((( .   \__/   .
- .     __\__/___      / /\\(     /   \
-      /| \||/  |\    ( ( //  .  ||PD|| '  .
-     / |  \/  @| \    \ //      ||  ||
-    /  |_  __  |\ \   /[__]   ' ||  ||  .
-.   \____|//_| |/ /  /_____\    ||__||
-       |       |\/    | | | .   | / \|
-       |_______|/     | | |     |_\\\|   .
-        |     | .   ' |_|_|      |   |
- .'     |  |  |      <-<--/      |   |
-        |  |  |  '  '  .      '  |   |  '  '
-  .     |__|__|                  |___|
-       (__) (__)      .  '      (____)  .
-
-	   Stolen from Jonathon R. Oglesbee
-*/
 
 func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	//This do not defer the Origin
