@@ -38,7 +38,7 @@ func (c *QubitStateManager) SwapColumn(l, r int32) {
 	c.Amptitude = replacement
 }
 
-func (c *QubitStateManager) MergeWithPrefix(d *QubitStateManager, l, r int32) {
+func (c *QubitStateManager) Merge(d *QubitStateManager) {
 	if c.Size == 0 {
 		c.Amptitude = append(c.Amptitude, d.Amptitude...)
 		c.ModifierID = append(c.ModifierID, d.ModifierID...)
@@ -50,28 +50,31 @@ func (c *QubitStateManager) MergeWithPrefix(d *QubitStateManager, l, r int32) {
 	replacement := make([]complex64, len(c.Amptitude)*len(d.Amptitude))
 	for i := range c.Amptitude {
 		for j := range d.Amptitude {
-			//l | r | n - l | m - r
-			//Artificial Intelligent cant defeat natural stupidity
-			idx := ((i >> (n - l)) << (n + m - l)) + ((j >> (m - r)) << (n + m - l - r)) + ((i & ((1 << (n - l)) - 1)) << (m - r)) + (j & ((1 << (m - r)) - 1))
+			idx := (i << m) + j
 			replacement[idx] = c.Amptitude[i] * d.Amptitude[j]
 		}
 	}
 	replacementModifier := []int32{}
-	for i := 0; i < int(l); i++ {
+
+	for i := 0; i < len(c.ModifierID); i++ {
 		replacementModifier = append(replacementModifier, c.ModifierID[i])
 	}
-	for i := 0; i < int(r); i++ {
-		replacementModifier = append(replacementModifier, d.ModifierID[i])
-	}
-	for i := l; i < int32(len(c.ModifierID)); i++ {
-		replacementModifier = append(replacementModifier, c.ModifierID[i])
-	}
-	for i := r; i < int32(len(d.ModifierID)); i++ {
+	for i := 0; i < len(d.ModifierID); i++ {
 		replacementModifier = append(replacementModifier, d.ModifierID[i])
 	}
 	c.Size = n + m
 	c.Amptitude = replacement
 	c.ModifierID = replacementModifier
+}
+
+func (c *QubitStateManager) FindID(x int32) int32 {
+	for i, d := range c.ModifierID {
+		if d == x {
+			return int32(i)
+		}
+	}
+	//AHHHHHHHHHHHHH
+	return -1
 }
 
 func (c *QubitStateManager) Multiply(val [][]complex64, n int32) {

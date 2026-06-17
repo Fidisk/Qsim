@@ -2,3 +2,4 @@ Window fucking select twice
 Somehow qubit id swap for measurement
 Sub pixel not rendering
 Line front of details
+How tf we represent null state

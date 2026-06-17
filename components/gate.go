@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"math"
 	"math/cmplx"
 	"math/rand/v2"
@@ -178,14 +179,12 @@ func (c *Gate) MeasureOutput() {
 
 func (c *Gate) CalculateOutPut() {
 	QSM := []*qubits.QubitStateManager{}
-	Cnt := []int32{}
-	Idx := [][]int32{}
+	Idx := []int32{}
+
 	defer func() {
 		QSM = nil
 	}()
-	defer func() {
-		Cnt = nil
-	}()
+
 	IsIN := func(id int32) bool {
 		for _, d := range QSM {
 			if d.ID == id {
@@ -194,76 +193,33 @@ func (c *Gate) CalculateOutPut() {
 		}
 		return false
 	}
-	index := int32(0)
+
 	for _, d := range c.HookList {
 		if !d.IsOutput {
 			QD := utils.GetObjectFromID(d.TargetID).(*QubitDeterminator)
 			qid := QD.GetQubitParent().Origin.ID
 			if IsIN(qid) {
-				for i, d2 := range QSM {
-					if d2.ID == qid {
-						var pos int32 = 0
-						for i := range d2.ModifierID {
-							if d2.ModifierID[i] == QD.ModifierID {
-								pos = int32(i)
-								break
-							}
-						}
-						d2.SwapColumn(Cnt[i], pos)
-						d2.ModifierID[Cnt[i]], d2.ModifierID[pos] = d2.ModifierID[pos], d2.ModifierID[Cnt[i]]
-						Cnt[i]++
-						Idx[i] = append(Idx[i], index)
-						index++
-					}
-				}
+				Idx = append(Idx, QD.ModifierID)
 			} else {
 				tmp := *QD.GetQubitParent().Origin
 				QSM = append(QSM, &tmp)
-				var pos int32 = 0
-				for i := range tmp.ModifierID {
-					if tmp.ModifierID[i] == QD.ModifierID {
-						pos = int32(i)
-						break
-					}
-				}
-				tmp.SwapColumn(0, pos)
-				tmp.ModifierID[0], tmp.ModifierID[pos] = tmp.ModifierID[pos], tmp.ModifierID[0]
-				Cnt = append(Cnt, 1)
-				Idx = append(Idx, []int32{index})
-				index++
+				Idx = append(Idx, QD.ModifierID)
 			}
 		}
 	}
 	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
-	var sl int32 = 0
 	for i := range QSM {
-		result.MergeWithPrefix(QSM[i], sl, Cnt[i])
-		sl += Cnt[i]
+		result.Merge(QSM[i])
 	}
 
-	order := []int32{}
+	fmt.Println(result.Amptitude)
+	fmt.Println(Idx)
 
-	for _, d := range Idx {
-		for _, d2 := range d {
-			order = append(order, d2)
-		}
+	for i := range Idx {
+		result.SwapColumn(int32(i), result.FindID(Idx[i]))
 	}
 
-	n := len(order)
-
-	for i := 0; i < n; i++ {
-		if order[i] != int32(i) {
-			pos := int32(i)
-			for {
-				if order[pos] == pos {
-					break
-				}
-				result.SwapColumn(pos, order[pos])
-				result.ModifierID[pos], result.ModifierID[order[pos]] = result.ModifierID[order[pos]], result.ModifierID[pos]
-				pos = order[order[pos]]
-			}
-		}
-	}
+	fmt.Println(result.Amptitude)
 
 	result.Multiply(c.Operation, c.InputCount)
 

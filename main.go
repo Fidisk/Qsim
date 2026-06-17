@@ -22,7 +22,8 @@ func main() {
 
 	//panel := windows.NewWindow(200, 150, 400, 300)
 	panel := windows.NewRenderWindow(0, 0, 1400, 800)
-	panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
+	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
+	toolBar := windows.NewRenderWindow(0, 800, 1400, 100)
 
 	// === MINIMUM CHANGE: Add text panel beside previous panels ===
 	myTextWindow := windows.NewTextWindow(
@@ -69,7 +70,6 @@ func main() {
 	}
 
 	create(panel)
-	create(panel2)
 
 	//blob := comp.NewBlob(0, 0, 50)
 
@@ -105,7 +105,11 @@ func main() {
 
 	//panel2.PushComponent(testGate)
 
-	winManager = append(winManager, panel, panel2, myTextWindow)
+	toolBar.IsResizeAllow(false)
+	toolBar.IsPanAllow(false)
+	toolBar.Rename("Tool bar")
+
+	winManager = append(winManager, panel, toolBar)
 
 	for !rl.WindowShouldClose() {
 		// Update main window resize

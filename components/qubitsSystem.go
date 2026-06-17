@@ -8,6 +8,9 @@ import (
 	glob "qsim/globals"
 	qub "qsim/qubits"
 	"qsim/utils"
+	"sort"
+	"strconv"
+	"strings"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -144,8 +147,28 @@ func (c *QubitsSystem) Draw() {
 
 			// Linear index (row-major order)
 			index := row*c.cols + col
-			numberStr := fmt.Sprintf("%v", c.Origin.Amptitude[index]) // now properly formatted
-			nameStr := fmt.Sprintf("Q%d", index)
+			r := real(c.Origin.Amptitude[index])
+			img := imag(c.Origin.Amptitude[index])
+			numberStr := fmt.Sprintf("%.2f%+.2fi", r, img)
+
+			//Lmao why doesnt the AI just make a temp arr lol
+			var parts []string
+			temp := index
+			for i := 0; temp > 0; i++ {
+				if temp&1 == 1 {
+					parts = append(parts, strconv.Itoa(int(c.Origin.ModifierID[i])))
+				}
+				temp >>= 1
+			}
+
+			// Sort numerically, not alphabetically
+			sort.Slice(parts, func(i, j int) bool {
+				a, _ := strconv.Atoi(parts[i])
+				b, _ := strconv.Atoi(parts[j])
+				return a < b
+			})
+
+			nameStr := strings.Join(parts, " + ")
 
 			// Draw number slightly above center
 			numFontSize := int32(20)
@@ -289,7 +312,7 @@ func (c *QubitsSystem) PostUpdate() {
 }
 
 func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
-	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist
+	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist*float32(c.cols)
 
 	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
 		return

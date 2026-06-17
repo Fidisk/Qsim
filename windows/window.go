@@ -34,6 +34,9 @@ type Window struct {
 	activate bool
 
 	ColorBorder rl.Color
+
+	CanResize bool
+	CanDrag   bool
 }
 
 // NewWindow creates a new Window with default styling
@@ -55,6 +58,9 @@ func NewWindow(x, y, width, height int32) *Window {
 		activate:       false,
 
 		ColorBorder: rl.NewColor(100, 100, 100, 255),
+
+		CanResize: true,
+		CanDrag:   true,
 	}
 }
 
@@ -94,6 +100,10 @@ func (w *Window) Update() {
 }
 
 func (w *Window) handleResize(mousePos rl.Vector2) {
+	if !w.CanResize {
+		return
+	}
+
 	mouseX := int32(mousePos.X)
 	mouseY := int32(mousePos.Y)
 
@@ -158,6 +168,10 @@ func (w *Window) handleResize(mousePos rl.Vector2) {
 
 // handleDrag manages the title‑bar dragging logic
 func (w *Window) handleDrag(mousePos rl.Vector2) {
+	if !w.CanDrag {
+		return
+	}
+
 	mouseX := int32(mousePos.X)
 	mouseY := int32(mousePos.Y)
 
@@ -209,18 +223,33 @@ func (w *Window) Draw() {
 	if w.cursorOnResize {
 		handleColor = w.ColorResizeHover
 	}
-	rl.DrawTriangle(
-		rl.Vector2{X: float32(w.X + w.Width), Y: float32(w.Y + w.Height - 15)},
-		rl.Vector2{X: float32(w.X + w.Width - 15), Y: float32(w.Y + w.Height)},
-		rl.Vector2{X: float32(w.X + w.Width), Y: float32(w.Y + w.Height)},
-		handleColor,
-	)
 
-	rl.DrawRectangleLines(w.X, w.Y, w.Width, w.Height, w.ColorBorder)
+	if w.CanResize {
+		rl.DrawTriangle(
+			rl.Vector2{X: float32(w.X + w.Width), Y: float32(w.Y + w.Height - 15)},
+			rl.Vector2{X: float32(w.X + w.Width - 15), Y: float32(w.Y + w.Height)},
+			rl.Vector2{X: float32(w.X + w.Width), Y: float32(w.Y + w.Height)},
+			handleColor,
+		)
+
+		rl.DrawRectangleLines(w.X, w.Y, w.Width, w.Height, w.ColorBorder)
+	}
 }
 
 func (w *Window) PostUpdate() {
 	if !glob.CursorLock {
 		w.holdingCursor = false
 	}
+}
+
+func (w *Window) IsResizeAllow(val bool) {
+	w.CanResize = val
+}
+
+func (w *Window) SetDraggable(val bool) {
+	w.CanDrag = val
+}
+
+func (w *Window) Rename(val string) {
+	w.Name = val
 }

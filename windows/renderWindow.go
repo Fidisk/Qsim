@@ -18,12 +18,15 @@ type RenderWindow struct {
 	isPanning      bool
 	panStartMouse  rl.Vector2 // world coordinate on press
 	panStartTarget rl.Vector2 // camera target on press
+
+	CanPan bool
 }
 
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 	rw := &RenderWindow{
 		Window: *NewWindow(x, y, width, height),
 		WComp:  nil,
+		CanPan: true,
 	}
 	rw.Camera = rl.Camera2D{
 		Offset:   rl.NewVector2(0, 0), // will be set each frame
@@ -88,12 +91,14 @@ func (rw *RenderWindow) Draw() {
 	// 4. Disable scissor
 	rl.EndScissorMode()
 
-	rl.DrawTriangle(
-		rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height - 15)},
-		rl.Vector2{X: float32(rw.X + rw.Width - 15), Y: float32(rw.Y + rw.Height)},
-		rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height)},
-		handleColor,
-	)
+	if rw.CanResize {
+		rl.DrawTriangle(
+			rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height - 15)},
+			rl.Vector2{X: float32(rw.X + rw.Width - 15), Y: float32(rw.Y + rw.Height)},
+			rl.Vector2{X: float32(rw.X + rw.Width), Y: float32(rw.Y + rw.Height)},
+			handleColor,
+		)
+	}
 	rl.DrawRectangleLines(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBorder)
 }
 
@@ -136,32 +141,15 @@ func (rw *RenderWindow) Update() {
 	// Update camera offset after possible resize/move
 	rw.updateCameraOffset()
 
-	// --- Pan and Zoom ---
+	// --- Pan (extracted) and Zoom ---
+	rw.handlePanning(mousePos) // <-- replaced the original panning block
+
 	contentRect := rw.GetContentRect()
 	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
-
-		// Middle‑mouse panning (FIXED: Using Screen Space to avoid feedback loops)
-		if rl.IsMouseButtonPressed(rl.MouseButtonMiddle) {
-			rw.isPanning = true
-			rw.panStartMouse = rl.GetMousePosition() // FIX: Store SCREEN position, not world
-			rw.panStartTarget = rw.Camera.Target
-		}
-		if rl.IsMouseButtonReleased(rl.MouseButtonMiddle) {
-			rw.isPanning = false
-		}
-		if rw.isPanning {
-			currentMouse := rl.GetMousePosition()
-			// Calculate delta in screen pixels
-			deltaScreen := rl.Vector2Subtract(rw.panStartMouse, currentMouse)
-			// FIX: Convert screen delta to world delta by dividing by zoom
-			deltaWorld := rl.Vector2Scale(deltaScreen, 1.0/rw.Camera.Zoom)
-			rw.Camera.Target = rl.Vector2Add(rw.panStartTarget, deltaWorld)
-		}
 
 		// Mouse‑wheel zoom (towards cursor) (FIXED: Order of operations)
 		wheel := rl.GetMouseWheelMove()
 		if wheel != 0 {
-			// 1. Get the world position under mouse BEFORE zooming
 			worldBefore := rw.GetWorldMouse()
 
 			oldZoom := rw.Camera.Zoom
@@ -172,22 +160,14 @@ func (rw *RenderWindow) Update() {
 				newZoom = conf.MaxZoom
 			}
 
-			// 2. Apply the zoom factor
 			rw.Camera.Zoom = newZoom
 
-			// 3. Get the world position under mouse AFTER zooming
 			worldAfter := rw.GetWorldMouse()
 
-			// 4. Adjust target by the true difference to anchor zoom to the cursor
 			rw.Camera.Target = rl.Vector2Add(rw.Camera.Target,
 				rl.Vector2Subtract(worldBefore, worldAfter))
 		}
 	}
-
-	// Now update components with world mouse (only if mouse in content area)
-	//if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
-
-	//}
 
 	worldMouse := rw.GetWorldMouse()
 	isCursorAvailable := false
@@ -198,6 +178,37 @@ func (rw *RenderWindow) Update() {
 		rw.WComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 
+}
+
+// handlePanning processes middle‑mouse panning while the cursor is held inside the content area.
+func (rw *RenderWindow) handlePanning(mousePos rl.Vector2) {
+	if !rw.CanPan {
+		return
+	}
+
+	contentRect := rw.GetContentRect()
+	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
+
+		// Middle‑mouse panning (FIXED: Using Screen Space to avoid feedback loops)
+		if rl.IsMouseButtonPressed(rl.MouseButtonMiddle) {
+			rw.isPanning = true
+			rw.panStartMouse = rl.GetMousePosition()
+			rw.panStartTarget = rw.Camera.Target
+		}
+		if rl.IsMouseButtonReleased(rl.MouseButtonMiddle) {
+			rw.isPanning = false
+		}
+		if rw.isPanning {
+			currentMouse := rl.GetMousePosition()
+			deltaScreen := rl.Vector2Subtract(rw.panStartMouse, currentMouse)
+			deltaWorld := rl.Vector2Scale(deltaScreen, 1.0/rw.Camera.Zoom)
+			rw.Camera.Target = rl.Vector2Add(rw.panStartTarget, deltaWorld)
+		}
+	}
+}
+
+func (rw *RenderWindow) IsPanAllow(val bool) {
+	rw.CanPan = true
 }
 
 func (rw *RenderWindow) PostUpdate() {
