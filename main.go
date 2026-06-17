@@ -21,9 +21,9 @@ func main() {
 	// Create one or more draggable inner panels
 
 	//panel := windows.NewWindow(200, 150, 400, 300)
-	panel := windows.NewRenderWindow(0, 0, 1400, 800)
+	panel := windows.NewRenderWindow(0, 0, 1600, 800)
 	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
-	toolBar := windows.NewRenderWindow(0, 800, 1400, 100)
+	toolBar := windows.NewRenderWindow(0, 800, 1600, 50)
 
 	// === MINIMUM CHANGE: Add text panel beside previous panels ===
 	myTextWindow := windows.NewTextWindow(
@@ -108,6 +108,12 @@ func main() {
 	toolBar.IsResizeAllow(false)
 	toolBar.IsPanAllow(false)
 	toolBar.Rename("Tool bar")
+
+	state := true
+	But1 := components.NewToggleButton(-750, 0, 100, 25, rl.LightGray, "TestA", &state, 20, func() {}, func() {})
+	But2 := components.NewToggleButton(-650, 0, 100, 25, rl.LightGray, "TestA", &state, 20, func() {}, func() {})
+
+	toolBar.PushComponent(But1, But2)
 
 	winManager = append(winManager, panel, toolBar)
 

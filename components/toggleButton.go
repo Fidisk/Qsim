@@ -15,7 +15,7 @@ type ToggleButton struct {
 	held          bool   // mouse is currently pressed inside the button
 }
 
-func NewToggleButton(x, y, width, height float32, color rl.Color, label string, fontsize int32, onClick, offClick func()) *ToggleButton {
+func NewToggleButton(x, y, width, height float32, color rl.Color, label string, state *bool, fontsize int32, onClick, offClick func()) *ToggleButton {
 	radius := max(width, height) / 2
 	tb := &ToggleButton{
 		Circle:   NewCircle(x, y, radius, color),
@@ -25,6 +25,7 @@ func NewToggleButton(x, y, width, height float32, color rl.Color, label string, 
 		FontSize: fontsize,
 		OnClick:  onClick,
 		OffClick: offClick,
+		toggled:  state,
 	}
 	tb.SetWeight(0)
 	return tb
