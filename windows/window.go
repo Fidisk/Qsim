@@ -3,8 +3,17 @@ package windows
 import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/components"
 	glob "qsim/globals"
 )
+
+type pWindow interface {
+	Update()
+	Draw()
+	PostUpdate()
+	IsHoldingCursor() bool
+	GetElement() []components.Component
+}
 
 // Window is a draggable and resizable panel
 type Window struct {
@@ -72,6 +81,10 @@ func (w *Window) IsActive() bool {
 // SetActive sets the activation state to true
 func (w *Window) SetActive(b bool) {
 	w.activate = b
+}
+
+func (w *Window) IsHoldingCursor() bool {
+	return w.holdingCursor
 }
 
 // Update handles resize (and cursor) and delegates dragging
