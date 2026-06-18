@@ -117,15 +117,105 @@ func main() {
 
 	winManager = append(winManager, panel, toolBar)
 
+	// Tracking variable to print out to the terminal log ONLY when your mouse switches objects
+	var lastHoveredAddress interface{} = nil
+
 	for !rl.WindowShouldClose() {
 		// Update main window resize
 		glob.Refresh()
 
 		UpdateMainWindow()
 
+		var absoluteTopHovered components.Component = nil
+
 		// Update inner panels
 		for _, d := range winManager {
 			d.Update()
+
+			// Safely search for the top object only if a higher window layer hasn't claimed it yet
+			if absoluteTopHovered == nil {
+				if elementProvider, ok := d.(interface{ GetElement() []components.Component }); ok {
+					elements := elementProvider.GetElement()
+
+					// Translate mouse screen coordinates into camera coordinates relative to the panel
+					var targetMouse rl.Vector2
+					if renderWindow, okRender := d.(*windows.RenderWindow); okRender {
+						targetMouse = rl.GetScreenToWorld2D(rl.GetMousePosition(), renderWindow.Camera)
+					} else {
+						targetMouse = rl.GetMousePosition()
+					}
+
+					// Loop backwards through elements to prioritize the topmost drawn component first
+					for i := len(elements) - 1; i >= 0; i-- {
+						item := elements[i]
+
+						// 1. Check if the element is a Gate, and check its internal hooks first
+						if gate, ok := item.(*components.Gate); ok {
+							foundSubHook := false
+							for _, hook := range gate.HookList {
+								if hook != nil {
+									if baseCircle := hook.GetCircle(); baseCircle != nil {
+										if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
+											absoluteTopHovered = hook
+											foundSubHook = true
+											break
+										}
+									}
+								}
+							}
+							if foundSubHook {
+								break
+							}
+							if gate.OutPutHook != nil {
+								if baseCircle := gate.OutPutHook.GetCircle(); baseCircle != nil {
+									if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
+										absoluteTopHovered = gate.OutPutHook
+										break
+									}
+								}
+							}
+						}
+
+						// 2. Check if the element is a QubitsSystem, and check its internal tracking nodes
+						if qSys, ok := item.(*components.QubitsSystem); ok {
+							foundDet := false
+							for _, det := range qSys.QubitDeterminatorList {
+								if det != nil {
+									if baseCircle := det.GetCircle(); baseCircle != nil {
+										if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
+											absoluteTopHovered = det
+											foundDet = true
+											break
+										}
+									}
+								}
+							}
+							if foundDet {
+								break
+							}
+						}
+
+						// 3. Fallback to checking the parent component boundaries themselves (Gates, Qubits Systems, etc.)
+						if baseCircle := item.GetCircle(); baseCircle != nil {
+							// Hit calculation works cleanly across all item implementations (gates, qubits, etc.)
+							if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
+								absoluteTopHovered = item
+								break // Topmost visual match found
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Print immediately when the cursor transitions onto a new target address
+		if absoluteTopHovered != lastHoveredAddress {
+			lastHoveredAddress = absoluteTopHovered
+			if absoluteTopHovered != nil {
+				println(">>> TOP HOVER DETECTED on address:", absoluteTopHovered)
+			} else {
+				println(">>> MOUSE LEFT ALL COMPONENT BOUNDARIES")
+			}
 		}
 
 		// Draw everything
