@@ -167,9 +167,9 @@ func main() {
 								break
 							}
 							if gate.OutPutHook != nil {
-								if baseCircle := gate.OutPutHook.GetCircle(); baseCircle != nil {
+								if baseCircle := gate.OutPutHook[0].GetCircle(); baseCircle != nil {
 									if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
-										absoluteTopHovered = gate.OutPutHook
+										absoluteTopHovered = gate.OutPutHook[0]
 										break
 									}
 								}

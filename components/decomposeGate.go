@@ -2,6 +2,7 @@ package components
 
 import (
 	glob "qsim/globals"
+	"qsim/qubits"
 	"qsim/utils"
 	"strconv"
 
@@ -38,5 +39,12 @@ func NewDecomposeGate(x, y, radius float32, color rl.Color, label string) *Decom
 }
 
 func (c *DecomposeGate) CalculateOutPut() {
+	var inputQubitSystem *qubits.QubitStateManager = nil
+	for _, d := range c.HookList {
+		if !d.IsOutput {
+			inputQubitSystem = utils.GetObjectFromID(d.TargetID).(*QubitDeterminator).GetQubitParent().Origin
+		}
+	}
 
+	decomposedResult := inputQubitSystem.Decompose()
 }
