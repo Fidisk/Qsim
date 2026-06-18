@@ -23,17 +23,19 @@ type Gate struct {
 	HookList          []*Hook
 	Operation         [][]complex64
 	InputCount        int32
-	OutPutHook        *Hook
+	OutputCount       int32
+	OutPutHook        []*Hook
 	IsMeasurementGate bool
 	MeasureResult     int32
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
 	tmp := Gate{
-		Circle:     *NewCircle(x, y, radius, color),
-		Label:      label,
-		Operation:  operation,
-		InputCount: inputCount,
+		Circle:      *NewCircle(x, y, radius, color),
+		Label:       label,
+		Operation:   operation,
+		InputCount:  inputCount,
+		OutputCount: 1,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
@@ -42,10 +44,11 @@ func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]c
 		newHook.Label = "I" + strconv.Itoa(i)
 		tmp.HookList = append(tmp.HookList, newHook)
 	}
+	tmp.OutPutHook = nil
 	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook)
-	tmp.OutPutHook = outputHook
-	tmp.OutPutHook.Label = "O"
+	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
+	tmp.OutPutHook[0].Label = "O"
 	return &tmp
 }
 
@@ -55,6 +58,7 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 		Label:             label,
 		InputCount:        1,
 		IsMeasurementGate: true,
+		OutputCount:       1,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
@@ -65,8 +69,9 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 	}
 	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook)
-	tmp.OutPutHook = outputHook
-	tmp.OutPutHook.Label = "O"
+	tmp.OutPutHook = nil
+	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
+	tmp.OutPutHook[0].Label = "O"
 	return &tmp
 }
 
@@ -105,13 +110,13 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		}
 	}
 
-	if cnt == int(c.InputCount) && !c.OutPutHook.IsHooked {
+	if cnt == int(c.InputCount) && !c.OutPutHook[0].IsHooked {
 		if c.IsMeasurementGate {
 			c.MeasureOutput()
 		} else {
 			c.CalculateOutPut()
 		}
-	} else if c.OutPutHook.IsHooked && cnt != int(c.InputCount) {
+	} else if c.OutPutHook[0].IsHooked && cnt != int(c.InputCount) {
 		c.DestroyOutPut()
 	}
 }
@@ -174,7 +179,7 @@ func (c *Gate) MeasureOutput() {
 	tmp.SetParent(c.GetParent())
 	tmp.GetParent().PushComponent(tmp)
 
-	c.OutPutHook.Connect(tmp)
+	c.OutPutHook[0].Connect(tmp)
 }
 
 func (c *Gate) CalculateOutPut() {
@@ -228,11 +233,11 @@ func (c *Gate) CalculateOutPut() {
 	tmp.SetParent(c.GetParent())
 	tmp.GetParent().PushComponent(tmp)
 
-	c.OutPutHook.Connect(tmp)
+	c.OutPutHook[0].Connect(tmp)
 }
 
 func (c *Gate) DestroyOutPut() {
-	c.OutPutHook.Disconnect()
+	c.OutPutHook[0].Disconnect()
 }
 
 func (c *Gate) pullToHook(d *Hook) {
