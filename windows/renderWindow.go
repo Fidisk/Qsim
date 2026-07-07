@@ -3,6 +3,7 @@ package windows
 import (
 	comp "qsim/components"
 	glob "qsim/globals"
+	"qsim/utils"
 
 	conf "qsim/config"
 
@@ -256,4 +257,16 @@ func (rw *RenderWindow) RemoveComponent(index int) {
 
 	// 3. Shrink the slice
 	rw.WComp = rw.WComp[:len(rw.WComp)-1]
+}
+
+func (rw *RenderWindow) DeleteChildWithID(idList ...int32) {
+	for _, id := range idList {
+		for i, d := range rw.WComp {
+			if d.GetID() == id {
+				rw.RemoveComponent(i)
+				utils.DeleteObjectWithID(id)
+				break
+			}
+		}
+	}
 }

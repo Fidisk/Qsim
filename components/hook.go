@@ -10,11 +10,12 @@ import (
 
 type Hook struct {
 	Circle
-	IsHooked bool
-	ID       int32
-	TargetID int32
-	IsOutput bool
-	Label    string
+	IsHooked         bool
+	ID               int32
+	TargetID         int32
+	IsOutput         bool
+	Label            string
+	AllowQubitSystem bool
 }
 
 func NewHook(x, y, radius float32, color rl.Color) *Hook {
@@ -36,8 +37,34 @@ func NewOutputHook(x, y, radius float32, color rl.Color) *Hook {
 	return &tmp
 }
 
+func (c *Hook) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
+	switch {
+	case utils.IsMouseState(glob.MouseStateFix):
+		c.IsFixed = !c.IsFixed
+	case utils.IsMouseState(glob.MouseStateDetach):
+		if !c.IsOutput {
+			c.Disconnect()
+		}
+	default:
+		c.dragging = true
+		*isCursorAvailable = false
+		c.holdingCursor = true
+		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+	}
+}
+
+func (c *Hook) onRelease() {
+
+}
+
 func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	if c.IsHooked {
+		if utils.GetObjectFromID(c.TargetID) == nil {
+			c.Disconnect()
+			//Should do smth about physics here, but meh
+			return
+		}
+
 		tmp := utils.GetObjectFromID(c.TargetID)
 		t := tmp.(Component)
 		c.Center = t.GetCircle().Center
@@ -50,10 +77,7 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.dragging = true
-			*isCursorAvailable = false
-			c.holdingCursor = true
-			c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+			c.onClick(worldMouse, isCursorAvailable)
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -119,6 +143,18 @@ func (v *Hook) Connect(val Component) {
 	}
 }
 
+func (v *Hook) ConnectInfo(val Component) {
+	switch c := val.(type) {
+	case *QubitsSystem:
+		//c.removeFromHook()
+		c.Center = v.Center
+		v.IsHooked = true
+		v.TargetID = c.ID
+		c.InfoHookID = v.ID
+		c.SetWeight(0)
+	}
+}
+
 func (v *Hook) Disconnect() {
 	if v.TargetID == 0 {
 		return
@@ -133,6 +169,26 @@ func (v *Hook) Disconnect() {
 	case *QubitDeterminator:
 		c.HookID = 0
 		c.SetWeight(glob.QubitDeterminatorWeight)
+	default:
+	}
+}
+
+func (v *Hook) DisconnectAndKill() {
+	if v.TargetID == 0 {
+		return
+	}
+	tmp := utils.GetObjectFromID(v.TargetID)
+	v.IsHooked = false
+	v.TargetID = 0
+	switch c := tmp.(type) {
+	case *QubitsSystem:
+		c.HookID = 0
+		c.SetWeight(glob.QubitDeterminatorWeight)
+		c.Kill()
+	case *QubitDeterminator:
+		c.HookID = 0
+		c.SetWeight(glob.QubitDeterminatorWeight)
+		c.Kill()
 	default:
 	}
 }

@@ -36,6 +36,7 @@ func (c *QubitStateManager) SwapColumn(l, r int32) {
 		replacement[j] = c.Amptitude[i]
 	}
 	c.Amptitude = replacement
+	c.ModifierID[l], c.ModifierID[r] = c.ModifierID[r], c.ModifierID[l]
 }
 
 func (c *QubitStateManager) Merge(d *QubitStateManager) {
@@ -87,4 +88,18 @@ func (c *QubitStateManager) Multiply(val [][]complex64, n int32) {
 		}
 	}
 	c.Amptitude = result
+}
+
+func (c *QubitStateManager) SetAmplitudes(amps []complex64, ids []int32) {
+	c.Amptitude = amps
+	c.ModifierID = ids
+	c.Size = int32(len(ids))
+}
+
+func (c *QubitStateManager) CopyFrom(other *QubitStateManager) {
+	c.Amptitude = make([]complex64, len(other.Amptitude))
+	copy(c.Amptitude, other.Amptitude)
+	c.ModifierID = make([]int32, len(other.ModifierID))
+	copy(c.ModifierID, other.ModifierID)
+	c.Size = other.Size
 }

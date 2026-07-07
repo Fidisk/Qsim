@@ -40,3 +40,25 @@ func GetObjectFromID(id int32) Object {
 	}
 	return ObjectList[id-1]
 }
+
+func DeleteObjectWithID(idList ...int32) {
+	for _, id := range idList {
+		ObjectList[id-1] = nil //Memory leak here
+	}
+}
+
+func IsMouseState(state globals.MouseOperation) bool {
+	return (globals.MouseState & state) != 0
+}
+
+func GetMouseState() globals.MouseOperation {
+	return globals.MouseState
+}
+
+func SetMouseState(state globals.MouseOperation) {
+	globals.MouseState = state
+}
+
+func ToggleMouseState(state globals.MouseOperation) {
+	globals.MouseState |= state
+}

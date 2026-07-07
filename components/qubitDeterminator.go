@@ -16,6 +16,10 @@ type QubitDeterminator struct {
 	QubitSystemID int32
 }
 
+func (c *QubitDeterminator) GetID() int32 {
+	return c.ID
+}
+
 func NewQubitDeterminator(x, y, radius float32, color rl.Color, qubitID int32) *QubitDeterminator {
 	tmp := QubitDeterminator{
 		Circle:     *NewCircle(x, y, radius, color),
@@ -27,14 +31,30 @@ func NewQubitDeterminator(x, y, radius float32, color rl.Color, qubitID int32) *
 	return &tmp
 }
 
+func (c *QubitDeterminator) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
+	switch {
+	case utils.IsMouseState(glob.MouseStateDetach):
+		if c.HookID != 0 {
+			tmp := utils.GetObjectFromID(c.HookID).(*Hook)
+			tmp.Disconnect()
+		}
+	default:
+		c.dragging = true
+		*isCursorAvailable = false
+		c.holdingCursor = true
+		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+	}
+}
+
+func (c *QubitDeterminator) onRelease() {
+
+}
+
 func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.dragging = true
-			*isCursorAvailable = false
-			c.holdingCursor = true
-			c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+			c.onClick(worldMouse, isCursorAvailable)
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -69,8 +89,12 @@ func (c *QubitDeterminator) Draw() {
 
 func (c *QubitDeterminator) GetQubitParent() *QubitsSystem {
 	//Evil
-	tmp := utils.GetObjectFromID(c.QubitSystemID)
-	return tmp.(*QubitsSystem)
+	tmp, ok := utils.GetObjectFromID(c.QubitSystemID).(*QubitsSystem)
+	if ok {
+		return tmp
+	} else {
+		return nil
+	}
 }
 
 func (c *QubitDeterminator) GetParent() PlaceholderWindow {
@@ -124,4 +148,14 @@ func (c *QubitDeterminator) removeFromHook() {
 
 func (c *QubitDeterminator) PostUpdate() {
 
+}
+
+func (c *QubitDeterminator) Kill() {
+	h, ok := utils.GetObjectFromID(c.HookID).(*Hook)
+
+	if ok {
+		h.Disconnect()
+	}
+
+	c.GetQubitParent().GetParent().DeleteChildWithID(c.ID)
 }

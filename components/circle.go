@@ -18,15 +18,8 @@ type Circle struct {
 	offset   rl.Vector2
 	curForce rl.Vector2
 	weight   float32
-}
 
-func (c *Circle) GetBounds() rl.Rectangle {
-	return rl.NewRectangle(
-		c.Center.X-c.Radius,
-		c.Center.Y-c.Radius,
-		c.Radius*2,
-		c.Radius*2,
-	)
+	IsFixed bool
 }
 
 func (c *Circle) SetWeight(t float32) {
@@ -82,6 +75,10 @@ func (c *Circle) GetForce() rl.Vector2 {
 }
 
 func (c *Circle) ApplyForce() {
+	if c.IsFixed {
+		return
+	}
+
 	c.curForce = c.curForce.ClampValue(-globals.ForceCap, globals.ForceCap)
 	c.Center = c.Center.Add(c.curForce)
 }
@@ -95,6 +92,7 @@ func (c *Circle) ClearForce() {
 }
 
 func (c *Circle) DecayForce() {
+	//Dumb ass way to do friction
 	c.curForce = c.curForce.Scale(globals.ForceDecay)
 
 	if math.Abs(float64(c.curForce.X)) < float64(globals.FrictionDelta) {
@@ -105,9 +103,11 @@ func (c *Circle) DecayForce() {
 	}
 }
 
+// AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 func (c *Circle) AntiGravity(dtmp Component) {
 	d := dtmp.GetCircle()
 
+	//Another dumb ass way, non Newtonian
 	tmp := d.Center.Subtract(c.Center)
 
 	if (tmp == rl.Vector2{X: 0, Y: 0}) {
@@ -116,6 +116,7 @@ func (c *Circle) AntiGravity(dtmp Component) {
 
 	dist := tmp.Length()
 
+	//Right so karma got me, need to rewrite this
 	c.AddForce(tmp.Normalize().Scale(c.weight*d.weight).Scale(-float32(math.Min(float64(1/dist/dist), float64(10)))).ClampValue(-100, 100))
 	d.AddForce(tmp.Normalize().Scale(c.weight*d.weight).Scale(float32(math.Min(float64(1/dist/dist), float64(10)))).ClampValue(-100, 100))
 }
@@ -123,13 +124,20 @@ func (c *Circle) AntiGravity(dtmp Component) {
 func (c *Circle) Gravity(dtmp Component) {
 	d := dtmp.GetCircle()
 
+	//Another dumb ass way, non Newtonian
 	tmp := d.Center.Subtract(c.Center)
 
 	dist := utils.Dist(d.Center, c.Center)
 
+	//Right so karma got me, need to rewrite this
 	c.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(float32(math.Min(float64(1/dist/dist), float64(10)))))
 	d.AddForce(tmp.Normalize().Scale(c.weight * d.weight).Scale(-float32(math.Min(float64(1/dist/dist), float64(10)))))
 }
 
 func (c *Circle) PostUpdate() {
+	//To not cause crash
+}
+
+func (c *Circle) ChainUpdate() {
+	//Bullshit to put this while realistically only a single gate function will need this, but oh welp
 }

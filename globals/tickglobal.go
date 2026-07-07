@@ -11,6 +11,8 @@ var WorldMouse rl.Vector2
 var AlwaysFalse bool = false
 var AlwaysTrue bool = true //An absolute offend to the field of Computer Science
 
+var MouseState MouseOperation = 1
+
 func Refresh() {
 	if !CursorLock {
 		CursorAvailable = true
@@ -33,5 +35,9 @@ func Refresh() {
 		AlwaysFalse = false
 		AlwaysTrue = true
 		//Yeah no, i'm not going to use this
+	}
+
+	if MouseState == 0 {
+		MouseState = 1
 	}
 }

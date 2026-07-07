@@ -27,6 +27,9 @@ type QubitsSystem struct {
 	cols                  int32
 	startX                float32
 	startY                float32
+
+	//Spagetti
+	InfoHookID int32
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
@@ -41,8 +44,26 @@ func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 	return &tmp
 }
 
+func (c *QubitsSystem) GetID() int32 {
+	return c.ID
+}
+
 func (c *QubitsSystem) CheckCollide(worldMouse rl.Vector2) bool {
 	return rl.CheckCollisionPointRec(worldMouse, rl.Rectangle{X: c.startX, Y: c.startY, Width: float32(c.cols) * glob.QubitSystemCellWidth, Height: float32(c.rows) * glob.QubitSystemCellHeight})
+}
+
+func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
+	switch {
+	case utils.IsMouseState(glob.MouseStateFix):
+		c.IsFixed = !c.IsFixed
+	case utils.IsMouseState(glob.MouseStateDetach):
+		//c.Disconnect()
+	default:
+		c.dragging = true
+		*isCursorAvailable = false
+		c.holdingCursor = true
+		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+	}
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
@@ -53,10 +74,7 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	// collision check using world coordinates
 	if c.CheckCollide(worldMouse) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.dragging = true
-			*isCursorAvailable = false
-			c.holdingCursor = true
-			c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+			c.onClick(worldMouse, isCursorAvailable)
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -112,11 +130,12 @@ func (c *QubitsSystem) Draw() {
 	)
 
 	// Outer border
-	rl.DrawRectangleLines(
-		int32(c.startX), int32(c.startY),
-		int32(totalWidth), int32(totalHeight),
-		c.Color,
-	)
+	borderRect := rl.NewRectangle(c.startX, c.startY, totalWidth, totalHeight)
+	borderThickness := float32(1.0)
+	if c.IsFixed {
+		borderThickness = 3.0
+	}
+	rl.DrawRectangleLinesEx(borderRect, borderThickness, c.Color)
 
 	// Vertical grid lines (between columns)
 	for i := int32(1); i < c.cols; i++ {
@@ -255,23 +274,34 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 }
 
 func (c *QubitsSystem) zipToHook() {
-	return
 	tmp := c.GetParent()
 	ele := tmp.GetElement()
 	gotHooked := false
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked {
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && v.AllowQubitSystem {
 				gotHooked = true
 				v.Connect(c)
 			}
 		case *Gate:
 			for _, d2 := range v.HookList {
-				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked {
+				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked && d2.AllowQubitSystem {
 					gotHooked = true
 					d2.Connect(c)
 				}
+			}
+		case *InfoTable:
+			tmp := v.Hook
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && !gotHooked && tmp.AllowQubitSystem {
+				gotHooked = true
+				tmp.ConnectInfo(c)
+			}
+		case *SourceGate:
+			tmp := v.OutHook
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && !gotHooked && tmp.AllowQubitSystem {
+				gotHooked = true
+				tmp.ConnectInfo(c)
 			}
 		default:
 		}
@@ -325,4 +355,12 @@ func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
 
 	d.AddForce(tmp)
 	c.AddForce(tmp.Scale(-1))
+}
+
+func (c *QubitsSystem) Kill() {
+	for _, d := range c.QubitDeterminatorList {
+		d.Kill()
+	}
+
+	c.GetParent().DeleteChildWithID(c.ID)
 }

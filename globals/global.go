@@ -22,6 +22,7 @@ var QubitSystemCellWidth float32 = 100
 var QubitSystemCellHeight float32 = 100
 
 var GateToHookDist float32 = 150
+var InfoCardToHookDist float32 = 40
 var GateToHookGraceDist float32 = 30
 var GateToHookPullCoeff float32 = 0.1
 
@@ -38,3 +39,11 @@ var GateRadius float32 = 30
 var GateColor rl.Color = rl.Lime
 
 var ForceCap float32 = 20
+
+type MouseOperation int
+
+const (
+	MouseStateNormal MouseOperation = 1 << iota
+	MouseStateDetach
+	MouseStateFix
+)

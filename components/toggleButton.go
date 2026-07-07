@@ -9,13 +9,13 @@ type ToggleButton struct {
 	Width, Height float32
 	Label         string
 	FontSize      int32
-	OnClick       func() // called when toggled ON
-	OffClick      func() // called when toggled OFF
-	toggled       *bool  // current state: true = pressed/down
-	held          bool   // mouse is currently pressed inside the button
+	OnClick       func()      // called when toggled ON
+	OffClick      func()      // called when toggled OFF
+	toggled       func() bool // current state: true = pressed/down
+	held          bool        // mouse is currently pressed inside the button
 }
 
-func NewToggleButton(x, y, width, height float32, color rl.Color, label string, state *bool, fontsize int32, onClick, offClick func()) *ToggleButton {
+func NewToggleButton(x, y, width, height float32, color rl.Color, label string, state func() bool, fontsize int32, onClick, offClick func()) *ToggleButton {
 	radius := max(width, height) / 2
 	tb := &ToggleButton{
 		Circle:   NewCircle(x, y, radius, color),
@@ -51,8 +51,7 @@ func (tb *ToggleButton) Update(worldMouse rl.Vector2, holdingCursor bool, isCurs
 		if tb.held {
 			// Toggle only if released inside the button
 			if rl.CheckCollisionPointRec(worldMouse, rect) {
-				*tb.toggled = !*tb.toggled
-				if *tb.toggled {
+				if !tb.toggled() {
 					if tb.OnClick != nil {
 						tb.OnClick()
 					}
@@ -84,7 +83,7 @@ func (tb *ToggleButton) Draw() {
 	w := tb.Width
 	h := tb.Height
 
-	if *tb.toggled {
+	if tb.toggled() {
 		// Depressed look
 		x += togglePressOffset
 		y += togglePressOffset
@@ -108,7 +107,7 @@ func (tb *ToggleButton) Draw() {
 	textWidth := rl.MeasureText(tb.Label, tb.FontSize)
 	textX := int32(tb.Center.X) - textWidth/2
 	textY := int32(tb.Center.Y) - tb.FontSize/2
-	if *tb.toggled {
+	if tb.toggled() {
 		textX += int32(togglePressOffset)
 		textY += int32(togglePressOffset)
 	}
