@@ -60,5 +60,21 @@ func SetMouseState(state globals.MouseOperation) {
 }
 
 func ToggleMouseState(state globals.MouseOperation) {
-	globals.MouseState |= state
+	globals.MouseState ^= state
+}
+
+func IsSpawnState(state globals.SpawnType) bool {
+	return (globals.SpawnState & state) != 0
+}
+
+func GetSpawnState() globals.SpawnType {
+	return globals.SpawnState
+}
+
+func SetSpawnState(state globals.SpawnType) {
+	globals.SpawnState = state
+}
+
+func ToggleSpawnState(state globals.SpawnType) {
+	globals.SpawnState ^= state
 }

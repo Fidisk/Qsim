@@ -12,6 +12,7 @@ var AlwaysFalse bool = false
 var AlwaysTrue bool = true //An absolute offend to the field of Computer Science
 
 var MouseState MouseOperation = 1
+var SpawnState SpawnType = 1
 
 func Refresh() {
 	if !CursorLock {
@@ -39,5 +40,9 @@ func Refresh() {
 
 	if MouseState == 0 {
 		MouseState = 1
+	}
+
+	if SpawnState == 0 {
+		SpawnState = 1
 	}
 }

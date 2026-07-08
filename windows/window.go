@@ -37,6 +37,7 @@ type Window struct {
 
 	CanResize bool
 	CanDrag   bool
+	CanZoom   bool
 }
 
 // NewWindow creates a new Window with default styling
@@ -61,6 +62,7 @@ func NewWindow(x, y, width, height int32) *Window {
 
 		CanResize: true,
 		CanDrag:   true,
+		CanZoom:   true,
 	}
 }
 
@@ -101,6 +103,14 @@ func (w *Window) Update() {
 
 func (w *Window) handleResize(mousePos rl.Vector2) {
 	if !w.CanResize {
+		w.Height = max(0, w.Height)
+		w.Width = max(0, w.Width)
+
+		w.Height = min(w.Height, int32(glob.MainWindowHeight))
+		w.Width = min(w.Width, int32(glob.MainWindowWidth))
+
+		w.Height = min(w.Height, int32(glob.MainWindowHeight)-w.Y)
+		w.Width = min(w.Width, int32(glob.MainWindowWidth)-w.X)
 		return
 	}
 
@@ -246,8 +256,12 @@ func (w *Window) IsResizeAllow(val bool) {
 	w.CanResize = val
 }
 
-func (w *Window) SetDraggable(val bool) {
+func (w *Window) IsDragAllow(val bool) {
 	w.CanDrag = val
+}
+
+func (w *Window) IsZoomAllow(val bool) {
+	w.CanZoom = val
 }
 
 func (w *Window) Rename(val string) {

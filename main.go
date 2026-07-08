@@ -6,8 +6,10 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"qsim/components"
+	"qsim/effect"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/utils"
 
 	"qsim/windows"
 )
@@ -21,7 +23,7 @@ func main() {
 	// Create one or more draggable inner panels
 
 	//panel := windows.NewWindow(200, 150, 400, 300)
-	panel := windows.NewRenderWindow(0, 0, 1600, 800)
+	panel := windows.NewRenderWindow(0, 0, 1500, 800)
 	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
 	toolBar := windows.NewRenderWindow(0, 800, 1600, 50)
 
@@ -71,6 +73,24 @@ func main() {
 
 	create(panel)
 
+	rows := []components.InfoRow{
+		{"Speed and Something that burn my retina", 0.75, 3 + 4i},
+		{"Power", 0.2, -1 + 2i},
+	}
+	table := components.NewInfoTable(400, 200, 260, 100, glob.ColorBg, rows)
+
+	t1 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+	t2 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+	t3 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+	t4 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+	t5 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+	t6 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+
+	testSource := components.NewSourceGate(300, 300, 100, glob.GateColor, "Test", []complex64{0, 1}, 4)
+	panel.PushComponent(testSource)
+
+	panel.PushComponent(table, t1, t2, t3, t4, t5, t6)
+
 	//blob := comp.NewBlob(0, 0, 50)
 
 	//circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
@@ -107,115 +127,152 @@ func main() {
 
 	toolBar.IsResizeAllow(false)
 	toolBar.IsPanAllow(false)
+	toolBar.IsZoomAllow(false)
+	toolBar.IsDragAllow(true)
+	toolBar.PinCamera(func() rl.Vector2 { return rl.Vector2{X: float32(toolBar.Width)/2.0 - 800, Y: 0} })
+	toolBar.AddEffect(func() { effect.ScaleWidthToScreen(toolBar) })
+	toolBar.IsSpawnAllow(false)
 	toolBar.Rename("Tool bar")
 
-	state := true
-	But1 := components.NewToggleButton(-750, 0, 100, 25, rl.LightGray, "TestA", &state, 20, func() {}, func() {})
-	But2 := components.NewToggleButton(-650, 0, 100, 25, rl.LightGray, "TestA", &state, 20, func() {}, func() {})
+	ToolBut1 := components.NewToggleButton(-750, 0, 100, 25, rl.LightGray, "Normal",
+		func() bool { return utils.IsMouseState(glob.MouseStateNormal) }, 20,
+		func() { utils.SetMouseState(glob.MouseStateNormal) },
+		func() { utils.ToggleMouseState(glob.MouseStateNormal) })
+	ToolBut2 := components.NewToggleButton(-650, 0, 100, 25, rl.LightGray, "Detach",
+		func() bool { return utils.IsMouseState(glob.MouseStateDetach) }, 20,
+		func() { utils.SetMouseState(glob.MouseStateDetach) },
+		func() { utils.ToggleMouseState(glob.MouseStateDetach) })
+	ToolBut3 := components.NewToggleButton(-550, 0, 100, 25, rl.LightGray, "Fix",
+		func() bool { return utils.IsMouseState(glob.MouseStateFix) }, 20,
+		func() { utils.SetMouseState(glob.MouseStateFix) },
+		func() { utils.ToggleMouseState(glob.MouseStateFix) })
+	ToolBut4 := components.NewToggleButton(-450, 0, 100, 25, rl.LightGray, "Spawn",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) }, 20,
+		func() { utils.SetMouseState(glob.MouseStateSpawn) },
+		func() { utils.ToggleMouseState(glob.MouseStateSpawn) })
 
-	toolBar.PushComponent(But1, But2)
+	spawnBar := windows.NewRenderWindow(1500, 0, 100, 800)
+	spawnBar.IsResizeAllow(false)
+	spawnBar.IsPanAllow(false)
+	spawnBar.IsZoomAllow(false)
+	spawnBar.IsDragAllow(true)
+	spawnBar.IsSpawnAllow(false)
+	spawnBar.Rename("Object")
 
-	winManager = append(winManager, panel, toolBar)
+	SpawnBut1 := components.NewToggleButton(-25, -362.5, 50, 50, rl.LightGray, "Q",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Qubit) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Qubit)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Qubit)
+		})
 
-	// Tracking variable to print out to the terminal log ONLY when your mouse switches objects
-	var lastHoveredAddress interface{} = nil
+	SpawnBut2 := components.NewToggleButton(25, -362.5, 50, 50, rl.LightGray, "H",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Hadamard) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Hadamard)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Hadamard)
+		})
 
-	for !rl.WindowShouldClose() {
+	SpawnBut3 := components.NewToggleButton(-25, -312.5, 50, 50, rl.LightGray, "X",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.X) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.X)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.X)
+		})
+
+	SpawnBut4 := components.NewToggleButton(25, -312.5, 50, 50, rl.LightGray, "Y",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Y) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Y)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Y)
+		})
+
+	SpawnBut5 := components.NewToggleButton(-25, -262.5, 50, 50, rl.LightGray, "Z",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Z) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Z)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Z)
+		})
+
+	SpawnBut6 := components.NewToggleButton(25, -262.5, 50, 50, rl.LightGray, "CX",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.CX) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.CX)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.CX)
+		})
+
+	SpawnBut7 := components.NewToggleButton(-25, -212.5, 50, 50, rl.LightGray, "CY",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.CY) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.CY)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.CY)
+		})
+
+	SpawnBut8 := components.NewToggleButton(25, -212.5, 50, 50, rl.LightGray, "CZ",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.CZ) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.CZ)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.CZ)
+		})
+
+	SpawnBut9 := components.NewToggleButton(-25, -162.5, 50, 50, rl.LightGray, "M",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Measurement) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Measurement)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Measurement)
+		})
+
+	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9)
+
+	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4)
+
+	winManager = append(winManager, panel, toolBar, spawnBar)
+
+	update := func() {
 		// Update main window resize
 		glob.Refresh()
 
 		UpdateMainWindow()
 
-		var absoluteTopHovered components.Component = nil
-
 		// Update inner panels
 		for _, d := range winManager {
 			d.Update()
-
-			// Safely search for the top object only if a higher window layer hasn't claimed it yet
-			if absoluteTopHovered == nil {
-				if elementProvider, ok := d.(interface{ GetElement() []components.Component }); ok {
-					elements := elementProvider.GetElement()
-
-					// Translate mouse screen coordinates into camera coordinates relative to the panel
-					var targetMouse rl.Vector2
-					if renderWindow, okRender := d.(*windows.RenderWindow); okRender {
-						targetMouse = rl.GetScreenToWorld2D(rl.GetMousePosition(), renderWindow.Camera)
-					} else {
-						targetMouse = rl.GetMousePosition()
-					}
-
-					// Loop backwards through elements to prioritize the topmost drawn component first
-					for i := len(elements) - 1; i >= 0; i-- {
-						item := elements[i]
-
-						// 1. Check if the element is a Gate, and check its internal hooks first
-						if gate, ok := item.(*components.Gate); ok {
-							foundSubHook := false
-							for _, hook := range gate.HookList {
-								if hook != nil {
-									if baseCircle := hook.GetCircle(); baseCircle != nil {
-										if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
-											absoluteTopHovered = hook
-											foundSubHook = true
-											break
-										}
-									}
-								}
-							}
-							if foundSubHook {
-								break
-							}
-							if gate.OutPutHook != nil {
-								if baseCircle := gate.OutPutHook[0].GetCircle(); baseCircle != nil {
-									if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
-										absoluteTopHovered = gate.OutPutHook[0]
-										break
-									}
-								}
-							}
-						}
-
-						// 2. Check if the element is a QubitsSystem, and check its internal tracking nodes
-						if qSys, ok := item.(*components.QubitsSystem); ok {
-							foundDet := false
-							for _, det := range qSys.QubitDeterminatorList {
-								if det != nil {
-									if baseCircle := det.GetCircle(); baseCircle != nil {
-										if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
-											absoluteTopHovered = det
-											foundDet = true
-											break
-										}
-									}
-								}
-							}
-							if foundDet {
-								break
-							}
-						}
-
-						// 3. Fallback to checking the parent component boundaries themselves (Gates, Qubits Systems, etc.)
-						if baseCircle := item.GetCircle(); baseCircle != nil {
-							// Hit calculation works cleanly across all item implementations (gates, qubits, etc.)
-							if rl.CheckCollisionPointCircle(targetMouse, baseCircle.Center, baseCircle.Radius) {
-								absoluteTopHovered = item
-								break // Topmost visual match found
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Print immediately when the cursor transitions onto a new target address
-		if absoluteTopHovered != lastHoveredAddress {
-			lastHoveredAddress = absoluteTopHovered
-			if absoluteTopHovered != nil {
-				println(">>> TOP HOVER DETECTED on address:", absoluteTopHovered)
-			} else {
-				println(">>> MOUSE LEFT ALL COMPONENT BOUNDARIES")
-			}
 		}
 
 		// Draw everything
@@ -233,5 +290,11 @@ func main() {
 		}
 
 		shuffleWinManager()
+	}
+
+	for !rl.WindowShouldClose() {
+		update()
+
+		//fmt.Println(toolBar.Camera.Target)
 	}
 }

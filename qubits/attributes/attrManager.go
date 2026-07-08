@@ -1,5 +1,9 @@
 package attributes
 
+import (
+	"strconv"
+)
+
 type AttrManager struct {
 	modifier []attributes
 }
@@ -20,4 +24,12 @@ var AttributesManager = newAttrManager()
 
 func (a *AttrManager) Get(id int32) attributes {
 	return a.modifier[id]
+}
+
+var QubitModifierID int32 = 5
+
+func GenerateQubitModifierID() int32 {
+	AttributesManager.modifier = append(AttributesManager.modifier, NewName("Q"+strconv.Itoa(int(QubitModifierID))))
+	defer func() { QubitModifierID++ }()
+	return QubitModifierID
 }

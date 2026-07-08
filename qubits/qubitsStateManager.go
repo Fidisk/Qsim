@@ -1,6 +1,7 @@
 package qubits
 
 import (
+	"qsim/qubits/attributes"
 	"qsim/utils"
 )
 
@@ -11,6 +12,20 @@ type QubitStateManager struct {
 	ModifierID []int32
 	Size       int32
 	ID         int32
+}
+
+func NewQubitStateManager(amplitudes []complex64, size int32) *QubitStateManager {
+	id := []int32{}
+	for _ = range size {
+		id = append(id, attributes.GenerateQubitModifierID())
+	}
+	tmp := QubitStateManager{
+		Amptitude:  amplitudes,
+		ModifierID: id,
+		Size:       size,
+	}
+	tmp.ID = utils.GenerateID(tmp)
+	return &tmp
 }
 
 func NewQubitStateManagerFrom(amplitudes []complex64, modifierID []int32) *QubitStateManager {

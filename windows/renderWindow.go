@@ -1,11 +1,12 @@
 package windows
 
 import (
-	comp "qsim/components"
+	"math"
+	"qsim/components"
+	"qsim/config"
 	glob "qsim/globals"
+	"qsim/qubits"
 	"qsim/utils"
-
-	conf "qsim/config"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -13,21 +14,29 @@ import (
 type RenderWindow struct {
 	Window
 	Camera rl.Camera2D
-	WComp  []comp.Component
+	WComp  []components.Component
 
 	// Panning state
 	isPanning      bool
 	panStartMouse  rl.Vector2 // world coordinate on press
 	panStartTarget rl.Vector2 // camera target on press
 
-	CanPan bool
+	CanPan   bool
+	CanSpawn bool
+
+	postEffect []func()
+
+	pinPosition func() rl.Vector2
 }
 
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 	rw := &RenderWindow{
-		Window: *NewWindow(x, y, width, height),
-		WComp:  nil,
-		CanPan: true,
+		Window:      *NewWindow(x, y, width, height),
+		WComp:       nil,
+		CanPan:      true,
+		CanSpawn:    true,
+		postEffect:  nil,
+		pinPosition: nil,
 	}
 	rw.Camera = rl.Camera2D{
 		Offset:   rl.NewVector2(0, 0), // will be set each frame
@@ -146,28 +155,9 @@ func (rw *RenderWindow) Update() {
 	rw.handlePanning(mousePos) // <-- replaced the original panning block
 
 	contentRect := rw.GetContentRect()
-	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
 
-		// Mouse‑wheel zoom (towards cursor) (FIXED: Order of operations)
-		wheel := rl.GetMouseWheelMove()
-		if wheel != 0 {
-			worldBefore := rw.GetWorldMouse()
-
-			oldZoom := rw.Camera.Zoom
-			newZoom := oldZoom + wheel*0.1
-			if newZoom < conf.MinZoom {
-				newZoom = conf.MinZoom
-			} else if newZoom > conf.MaxZoom {
-				newZoom = conf.MaxZoom
-			}
-
-			rw.Camera.Zoom = newZoom
-
-			worldAfter := rw.GetWorldMouse()
-
-			rw.Camera.Target = rl.Vector2Add(rw.Camera.Target,
-				rl.Vector2Subtract(worldBefore, worldAfter))
-		}
+	if rw.pinPosition != nil {
+		rw.Camera.Target = rw.pinPosition()
 	}
 
 	worldMouse := rw.GetWorldMouse()
@@ -179,6 +169,100 @@ func (rw *RenderWindow) Update() {
 		rw.WComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 
+	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
+
+		// Mouse‑wheel zoom (towards cursor) (FIXED: Order of operations)
+		rw.handleZoom()
+
+		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
+			rw.OnClick(worldMouse)
+		}
+	}
+
+}
+
+func (rw *RenderWindow) PinCamera(pos func() rl.Vector2) {
+	rw.pinPosition = pos
+}
+
+func (rw *RenderWindow) UnpinCamera() {
+	rw.pinPosition = nil
+}
+
+func (rw *RenderWindow) OnClick(worldMouse rl.Vector2) {
+	switch {
+	case utils.IsMouseState(glob.MouseStateSpawn):
+		if rw.CanSpawn {
+			rw.SpawnObject(worldMouse)
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.None)
+		}
+	}
+}
+
+func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
+	switch {
+	case utils.IsSpawnState(glob.Qubit):
+		q := components.NewQubitsSystem(worldMouse.X, worldMouse.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+
+		qState := qubits.NewQubitStateManager([]complex64{1, 0}, 1)
+
+		q.Assign(qState)
+
+		rw.PushComponent(q)
+	case utils.IsSpawnState(glob.Hadamard):
+		t := complex(float32(1/math.Sqrt(2)), 0)
+		H1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		rw.PushComponent(H1)
+	case utils.IsSpawnState(glob.X):
+		X1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+		rw.PushComponent(X1)
+	case utils.IsSpawnState(glob.Y):
+		Y1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+		rw.PushComponent(Y1)
+	case utils.IsSpawnState(glob.Z):
+		Z1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+		rw.PushComponent(Z1)
+	case utils.IsSpawnState(glob.CX):
+		CX := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		rw.PushComponent(CX)
+	case utils.IsSpawnState(glob.CY):
+		t := complex64(complex(0, 1))
+		CY := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+		rw.PushComponent(CY)
+	case utils.IsSpawnState(glob.CZ):
+		CZ := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+		rw.PushComponent(CZ)
+	case utils.IsSpawnState(glob.Measurement):
+		m := components.NewMeasurementGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "M")
+		rw.PushComponent(m)
+	}
+}
+
+func (rw *RenderWindow) handleZoom() {
+	if !rw.CanZoom {
+		return
+	}
+
+	wheel := rl.GetMouseWheelMove()
+	if wheel != 0 {
+		worldBefore := rw.GetWorldMouse()
+
+		oldZoom := rw.Camera.Zoom
+		newZoom := oldZoom + wheel*0.1
+		if newZoom < config.MinZoom {
+			newZoom = config.MinZoom
+		} else if newZoom > config.MaxZoom {
+			newZoom = config.MaxZoom
+		}
+
+		rw.Camera.Zoom = newZoom
+
+		worldAfter := rw.GetWorldMouse()
+
+		rw.Camera.Target = rl.Vector2Add(rw.Camera.Target,
+			rl.Vector2Subtract(worldBefore, worldAfter))
+	}
 }
 
 // handlePanning processes middle‑mouse panning while the cursor is held inside the content area.
@@ -212,6 +296,10 @@ func (rw *RenderWindow) IsPanAllow(val bool) {
 	rw.CanPan = true
 }
 
+func (rw *RenderWindow) IsSpawnAllow(val bool) {
+	rw.CanSpawn = val
+}
+
 func (rw *RenderWindow) PostUpdate() {
 	for _, d := range rw.WComp {
 		d.PostUpdate()
@@ -229,14 +317,19 @@ func (rw *RenderWindow) PostUpdate() {
 			rw.WComp[i].GetCircle().AntiGravity(rw.WComp[j].GetCircle())
 		}
 	}
+
+	//AHhhhhhhh
+	for _, d := range rw.postEffect {
+		d()
+	}
 }
 
-func (rw *RenderWindow) GetElement() []comp.Component {
+func (rw *RenderWindow) GetElement() []components.Component {
 	//Danger zone
 	return rw.WComp
 }
 
-func (rw *RenderWindow) PushComponent(val ...comp.Component) {
+func (rw *RenderWindow) PushComponent(val ...components.Component) {
 	for _, d := range val {
 		d.SetParent(rw)
 		rw.WComp = append(rw.WComp, d)
@@ -268,5 +361,11 @@ func (rw *RenderWindow) DeleteChildWithID(idList ...int32) {
 				break
 			}
 		}
+	}
+}
+
+func (rw *RenderWindow) AddEffect(f ...func()) {
+	for _, fun := range f {
+		rw.postEffect = append(rw.postEffect, fun)
 	}
 }

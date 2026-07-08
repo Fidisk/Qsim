@@ -84,6 +84,8 @@ func (c *QubitDeterminator) Draw() {
 	case *attributes.Color:
 		rl.DrawCircleV(c.Center, c.Radius, rl.NewColor(uint8(t.R), uint8(t.G), uint8(t.B), uint8(0255)))
 		rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
+	case *attributes.Name:
+		rl.DrawText(t.Val, int32(c.Center.X)-int32(rl.MeasureText(t.Val, 20)/2), int32(c.Center.Y)-10, 20, c.Color)
 	}
 }
 

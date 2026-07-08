@@ -46,4 +46,20 @@ const (
 	MouseStateNormal MouseOperation = 1 << iota
 	MouseStateDetach
 	MouseStateFix
+	MouseStateSpawn
+)
+
+type SpawnType int
+
+const (
+	None SpawnType = 1 << iota
+	Qubit
+	Hadamard
+	X
+	Y
+	Z
+	CX
+	CY
+	CZ
+	Measurement
 )
