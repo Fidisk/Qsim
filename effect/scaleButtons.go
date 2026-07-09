@@ -28,10 +28,10 @@ var ScaleButtonsToWidth = func(rw *windows.RenderWindow) {
 				fb.Width = newFileWidth
 
 				fb.Center.X = -float32(xb.Width) / 2
-				fb.Center.Y = float32(i-1)*btnHeight - float32(rw.Width)/2
+				fb.Center.Y = float32(i+1)*btnHeight - float32(rw.Height)/2
 
 				xb.Center.X = float32(newFileWidth) / 2
-				xb.Center.Y = float32(i-1)*btnHeight - float32(rw.Width)/2
+				xb.Center.Y = float32(i+1)*btnHeight - float32(rw.Height)/2
 			}
 		}
 	}

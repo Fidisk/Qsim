@@ -31,6 +31,10 @@ type RenderWindow struct {
 	pinPosition func() rl.Vector2
 
 	IsTitleBarVisible bool
+
+	isEditingTitle    bool
+	titleEditBuffer   string
+	titleEditCounter  int
 }
 
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
@@ -81,7 +85,18 @@ func (rw *RenderWindow) Draw() {
 
 	if rw.IsTitleBarVisible {
 		rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.TitleBarHeight, rw.ColorTitleBar)
-		rl.DrawText(rw.Name, rw.X+5, rw.Y+5, 16, rw.ColorText)
+		if rw.isEditingTitle {
+			editBg := rl.NewColor(30, 30, 30, 255)
+			rl.DrawRectangleRec(rl.NewRectangle(float32(rw.X+4), float32(rw.Y+3), float32(rw.Width-8), float32(rw.TitleBarHeight-6)), editBg)
+			rl.DrawRectangleLinesEx(rl.NewRectangle(float32(rw.X+4), float32(rw.Y+3), float32(rw.Width-8), float32(rw.TitleBarHeight-6)), 1, rl.SkyBlue)
+			rl.DrawText(rw.titleEditBuffer, rw.X+8, rw.Y+5, 16, rl.White)
+			if (rw.titleEditCounter/20)%2 == 0 {
+				textW := rl.MeasureText(rw.titleEditBuffer, 16)
+				rl.DrawRectangle(rw.X+8+textW, rw.Y+5, 2, 16, rl.SkyBlue)
+			}
+		} else {
+			rl.DrawText(rw.Name, rw.X+5, rw.Y+5, 16, rw.ColorText)
+		}
 	}
 
 	// Resize handle
@@ -158,6 +173,39 @@ func (rw *RenderWindow) Update() {
 	rw.handleResize(mousePos)
 	if !rw.IsResizing {
 		rw.handleDrag(mousePos)
+	}
+
+	// Title editing
+	titleRect := rl.Rectangle{
+		X: float32(rw.X), Y: float32(rw.Y),
+		Width: float32(rw.Width), Height: float32(rw.TitleBarHeight),
+	}
+	if rw.isEditingTitle {
+		rw.titleEditCounter++
+		key := rl.GetCharPressed()
+		for key > 0 {
+			if key >= 32 && key <= 125 {
+				rw.titleEditBuffer += string(rune(key))
+			}
+			key = rl.GetCharPressed()
+		}
+		if rl.IsKeyPressed(rl.KeyBackspace) && len(rw.titleEditBuffer) > 0 {
+			rw.titleEditBuffer = rw.titleEditBuffer[:len(rw.titleEditBuffer)-1]
+		}
+		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
+			rw.isEditingTitle = false
+			rw.Name = rw.titleEditBuffer
+		}
+		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && !rl.CheckCollisionPointRec(mousePos, titleRect) {
+			rw.isEditingTitle = false
+			rw.Name = rw.titleEditBuffer
+		}
+	} else {
+		if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, titleRect) && rl.IsMouseButtonPressed(rl.MouseButtonRight) {
+			rw.isEditingTitle = true
+			rw.titleEditBuffer = rw.Name
+			rw.titleEditCounter = 0
+		}
 	}
 
 	// Update camera offset after possible resize/move
