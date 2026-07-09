@@ -142,7 +142,38 @@ func main() {
 		func() { utils.SetMouseState(glob.MouseStateErase) },
 		func() { utils.ToggleMouseState(glob.MouseStateErase) })
 
-	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5)
+	ToolButLoad := components.NewButton(-250, 0, 100, 25, rl.LightGray, "Load", 20,
+		func() {
+			fileWin := windows.NewRenderWindow(200, 100, 400, 500)
+			fileWin.Rename("File Browser")
+			fileWin.SetPriority(200)
+			fileWin.IsSpawnAllow(false)
+
+			title := components.NewLabel(220, 120, "Available files:", 18, rl.White)
+			f1 := components.NewLabel(220, 150, "circuit_1.qsim", 14, rl.LightGray)
+			f2 := components.NewLabel(220, 175, "circuit_2.qsim", 14, rl.LightGray)
+			f3 := components.NewLabel(220, 200, "bell_state.qsim", 14, rl.LightGray)
+			f4 := components.NewLabel(220, 225, "grover_test.qsim", 14, rl.LightGray)
+
+			fileWin.PushComponent(title, f1, f2, f3, f4)
+			winManager = append(winManager, fileWin)
+		})
+
+	ToolButSave := components.NewButton(-150, 0, 100, 25, rl.LightGray, "Save", 20,
+		func() {
+			fileWin := windows.NewRenderWindow(650, 100, 400, 300)
+			fileWin.Rename("Save File")
+			fileWin.SetPriority(200)
+			fileWin.IsSpawnAllow(false)
+
+			title := components.NewLabel(670, 120, "Save current circuit as:", 18, rl.White)
+			hint := components.NewLabel(670, 150, "Filename will be prompted later", 14, rl.Gray)
+
+			fileWin.PushComponent(title, hint)
+			winManager = append(winManager, fileWin)
+		})
+
+	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5, ToolButLoad, ToolButSave)
 
 	spawnBar := windows.NewRenderWindow(1500, 0, 100, 800)
 	spawnBar.IsResizeAllow(false)

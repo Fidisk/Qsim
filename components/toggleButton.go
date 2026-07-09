@@ -13,6 +13,7 @@ type ToggleButton struct {
 	OffClick      func()      // called when toggled OFF
 	toggled       func() bool // current state: true = pressed/down
 	held          bool        // mouse is currently pressed inside the button
+	hovered       bool
 }
 
 func NewToggleButton(x, y, width, height float32, color rl.Color, label string, state func() bool, fontsize int32, onClick, offClick func()) *ToggleButton {
@@ -40,7 +41,10 @@ func (tb *ToggleButton) Update(worldMouse rl.Vector2, holdingCursor bool, isCurs
 		tb.Height,
 	)
 
-	if rl.CheckCollisionPointRec(worldMouse, rect) {
+	over := rl.CheckCollisionPointRec(worldMouse, rect)
+	tb.hovered = over && !tb.held
+
+	if over {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (tb.held || *isCursorAvailable) {
 			tb.held = true
 			*isCursorAvailable = false
@@ -50,7 +54,7 @@ func (tb *ToggleButton) Update(worldMouse rl.Vector2, holdingCursor bool, isCurs
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
 		if tb.held {
 			// Toggle only if released inside the button
-			if rl.CheckCollisionPointRec(worldMouse, rect) {
+			if over {
 				if !tb.toggled() {
 					if tb.OnClick != nil {
 						tb.OnClick()
@@ -67,7 +71,7 @@ func (tb *ToggleButton) Update(worldMouse rl.Vector2, holdingCursor bool, isCurs
 	}
 
 	// Cancel press if mouse leaves the button while held
-	if tb.held && !rl.CheckCollisionPointRec(worldMouse, rect) {
+	if tb.held && !over {
 		tb.held = false
 		*isCursorAvailable = true
 	}
@@ -93,6 +97,13 @@ func (tb *ToggleButton) Draw() {
 		rl.DrawRectangleRec(rl.NewRectangle(x, y, toggleBevel, h), darken(tb.Color, 0.3))
 		rl.DrawRectangleRec(rl.NewRectangle(x+w-toggleBevel, y, toggleBevel, h), lighten(tb.Color, 0.3))
 		rl.DrawRectangleRec(rl.NewRectangle(x, y+h-toggleBevel, w, toggleBevel), lighten(tb.Color, 0.3))
+	} else if tb.hovered {
+		// Hovered: subtle darken with lower factor
+		rl.DrawRectangleRec(rl.NewRectangle(x, y, w, h), darken(tb.Color, 0.15))
+		rl.DrawRectangleRec(rl.NewRectangle(x, y, w, toggleBevel), lighten(tb.Color, 0.4))
+		rl.DrawRectangleRec(rl.NewRectangle(x, y, toggleBevel, h), lighten(tb.Color, 0.4))
+		rl.DrawRectangleRec(rl.NewRectangle(x+w-toggleBevel, y, toggleBevel, h), darken(tb.Color, 0.45))
+		rl.DrawRectangleRec(rl.NewRectangle(x, y+h-toggleBevel, w, toggleBevel), darken(tb.Color, 0.45))
 	} else {
 		// Raised look
 		rl.DrawRectangleRec(rl.NewRectangle(x, y, w, h), tb.Color)

@@ -317,6 +317,8 @@ func (rw *RenderWindow) IsSpawnAllow(val bool) {
 }
 
 func (rw *RenderWindow) PostUpdate() {
+	rw.Window.PostUpdate()
+
 	for _, d := range rw.WComp {
 		d.PostUpdate()
 	}
