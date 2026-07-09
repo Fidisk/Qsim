@@ -188,10 +188,40 @@ func main() {
 	ToolButSave := components.NewButton(-150, 0, 100, 25, rl.LightGray, "Save", 20,
 		func() {
 			fileWin := windows.NewRenderWindow(650, 100, 400, 300)
-			fileWin.Rename("Save File")
+			fileWin.Rename("untitled.qsim")
 			fileWin.SetPriority(200)
 			fileWin.IsSpawnAllow(false)
+			fileWin.IsTitleEditableEnable(true)
 
+			savesDir := "saves"
+			_ = os.MkdirAll(savesDir, 0755)
+			entries, _ := os.ReadDir(savesDir)
+
+			var comps []components.Component
+			for _, e := range entries {
+				if !e.IsDir() && filepath.Ext(e.Name()) == ".qsim" {
+					name := e.Name()
+					btn := components.NewButton(0, 0, 350, 25, rl.LightGray, name, 14,
+						func(f string) func() {
+							return func() {
+							}
+						}(name))
+					comps = append(comps, btn)
+					xBtn := components.NewButton(0, 0, 25, 25, rl.Red, "x", 14,
+						func(f string) func() {
+							return func() {
+							}
+						}(name))
+					comps = append(comps, xBtn)
+				}
+			}
+
+			fileWin.IsPanAllow(false)
+			fileWin.IsZoomAllow(false)
+			fileWin.IsVerticalScrollAllow(true)
+			fileWin.PushComponent(comps...)
+			fileWin.AddEffect(func() { effect.ScaleButtonsToWidth(fileWin) })
+			fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: float32(math.Max(0, float64(fileWin.Camera.Target.Y)))} })
 			winManager = append(winManager, fileWin)
 		})
 

@@ -31,10 +31,11 @@ type RenderWindow struct {
 	pinPosition func() rl.Vector2
 
 	IsTitleBarVisible bool
+	IsTitleEditable   bool
 
-	isEditingTitle    bool
-	titleEditBuffer   string
-	titleEditCounter  int
+	isEditingTitle   bool
+	titleEditBuffer  string
+	titleEditCounter int
 }
 
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
@@ -200,7 +201,7 @@ func (rw *RenderWindow) Update() {
 			rw.isEditingTitle = false
 			rw.Name = rw.titleEditBuffer
 		}
-	} else {
+	} else if rw.IsTitleEditable {
 		if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, titleRect) && rl.IsMouseButtonPressed(rl.MouseButtonRight) {
 			rw.isEditingTitle = true
 			rw.titleEditBuffer = rw.Name
@@ -392,6 +393,10 @@ func (rw *RenderWindow) IsVerticalScrollAllow(val bool) {
 
 func (rw *RenderWindow) IsSpawnAllow(val bool) {
 	rw.CanSpawn = val
+}
+
+func (rw *RenderWindow) IsTitleEditableEnable(val bool) {
+	rw.IsTitleEditable = val
 }
 
 func (rw *RenderWindow) PostUpdate() {
