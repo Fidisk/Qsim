@@ -1,14 +1,11 @@
 package main
 
 import (
-	"math"
-
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"qsim/components"
 	"qsim/effect"
 	glob "qsim/globals"
-	"qsim/qubits"
 	"qsim/utils"
 
 	"qsim/windows"
@@ -27,69 +24,58 @@ func main() {
 	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
 	toolBar := windows.NewRenderWindow(0, 800, 1600, 50)
 
-	// === MINIMUM CHANGE: Add text panel beside previous panels ===
-	myTextWindow := windows.NewTextWindow(
-		"State Editor Panel",
-		50, 400, 320, 150,
-		"",   // Initial text inside the window box
-		true, // IsEditable: set to true so you can type into it
-		20,   // Max characters allowed
-		func(finalText string) {
-			println("Submitted text update:", finalText)
-		},
-	)
-	myTextWindow.TextBuffer = "hello"
+	/*
+		var create = func(p *windows.RenderWindow) {
+			q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+			q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+			q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
 
-	var create = func(p *windows.RenderWindow) {
-		q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
-		q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
-		q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+			q1State := qubits.NewQubitStateManagerFrom([]complex64{0.6, 0.8}, []int32{0})
+			q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
+			q3State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{2})
 
-		q1State := qubits.NewQubitStateManagerFrom([]complex64{0.6, 0.8}, []int32{0})
-		q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
-		q3State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{2})
+			q1.Assign(q1State)
+			q2.Assign(q2State)
+			q3.Assign(q3State)
 
-		q1.Assign(q1State)
-		q2.Assign(q2State)
-		q3.Assign(q3State)
+			p.PushComponent(q1, q2, q3)
 
-		p.PushComponent(q1, q2, q3)
+			t := complex(float32(1/math.Sqrt(2)), 0)
+			H1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+			H2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+			H3 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+			CNOT1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+			CNOT2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
 
-		t := complex(float32(1/math.Sqrt(2)), 0)
-		H1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-		H2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-		H3 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-		CNOT1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-		CNOT2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+			M1 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
+			M2 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
 
-		M1 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
-		M2 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
+			CX := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+			CZ := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
 
-		CX := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-		CZ := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+			p.PushComponent(H1, H2, H3, CNOT1, CNOT2, M1, M2, CX, CZ)
+		}
 
-		p.PushComponent(H1, H2, H3, CNOT1, CNOT2, M1, M2, CX, CZ)
-	}
+		create(panel)
 
-	create(panel)
+		rows := []components.InfoRow{
+			{"Speed and Something that burn my retina", 0.75, 3 + 4i},
+			{"Power", 0.2, -1 + 2i},
+		}
+		table := components.NewInfoTable(400, 200, 260, 100, glob.ColorBg, rows)
 
-	rows := []components.InfoRow{
-		{"Speed and Something that burn my retina", 0.75, 3 + 4i},
-		{"Power", 0.2, -1 + 2i},
-	}
-	table := components.NewInfoTable(400, 200, 260, 100, glob.ColorBg, rows)
+		t1 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t2 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t3 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t4 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t5 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t6 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
 
-	t1 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-	t2 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-	t3 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-	t4 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-	t5 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-	t6 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		testSource := components.NewSourceGate(300, 300, 100, glob.GateColor, "Test", []complex64{0, 1}, 4)
+		panel.PushComponent(testSource)
 
-	testSource := components.NewSourceGate(300, 300, 100, glob.GateColor, "Test", []complex64{0, 1}, 4)
-	panel.PushComponent(testSource)
-
-	panel.PushComponent(table, t1, t2, t3, t4, t5, t6)
+		panel.PushComponent(table, t1, t2, t3, t4, t5, t6)\
+	*/
 
 	//blob := comp.NewBlob(0, 0, 50)
 
@@ -132,6 +118,7 @@ func main() {
 	toolBar.PinCamera(func() rl.Vector2 { return rl.Vector2{X: float32(toolBar.Width)/2.0 - 800, Y: 0} })
 	toolBar.AddEffect(func() { effect.ScaleWidthToScreen(toolBar) })
 	toolBar.IsSpawnAllow(false)
+	toolBar.SetPriority(100)
 	toolBar.Rename("Tool bar")
 
 	ToolBut1 := components.NewToggleButton(-750, 0, 100, 25, rl.LightGray, "Normal",
@@ -163,6 +150,11 @@ func main() {
 	spawnBar.IsZoomAllow(false)
 	spawnBar.IsDragAllow(true)
 	spawnBar.IsSpawnAllow(false)
+	spawnBar.SetPriority(100)
+	spawnBar.AddEffect(func() {
+		effect.ConstSize(spawnBar, 100, 800)
+		effect.PinToRight(spawnBar)
+	})
 	spawnBar.Rename("Object")
 
 	SpawnBut1 := components.NewToggleButton(-25, -362.5, 50, 50, rl.LightGray, "Q",
@@ -264,9 +256,41 @@ func main() {
 			utils.ToggleSpawnState(glob.Measurement)
 		})
 
-	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9)
+	SpawnBut10 := components.NewToggleButton(25, -162.5, 50, 50, rl.LightGray, "I",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Info) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Info)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Info)
+		})
 
-	winManager = append(winManager, panel, toolBar, spawnBar)
+	SpawnBut11 := components.NewToggleButton(-25, -112.5, 50, 50, rl.LightGray, "GQ",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.GQubit) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.GQubit)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.GQubit)
+		})
+
+	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11)
+
+	windowsBar := windows.NewRenderWindow(0, 850, 1600, 50)
+	windowsBar.IsResizeAllow(false)
+	windowsBar.IsPanAllow(false)
+	windowsBar.IsZoomAllow(false)
+	windowsBar.IsDragAllow(true)
+	windowsBar.IsSpawnAllow(false)
+	windowsBar.SetPriority(100)
+	windowsBar.EnableTitleBar(false)
+	windowsBar.Rename("Windows")
+
+	winManager = append(winManager, panel, toolBar, spawnBar, windowsBar)
 
 	update := func() {
 		// Update main window resize

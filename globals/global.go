@@ -63,4 +63,6 @@ const (
 	CY
 	CZ
 	Measurement
+	Info
+	GQubit
 )

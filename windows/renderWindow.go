@@ -27,16 +27,19 @@ type RenderWindow struct {
 	postEffect []func()
 
 	pinPosition func() rl.Vector2
+
+	IsTitleBarVisible bool
 }
 
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 	rw := &RenderWindow{
-		Window:      *NewWindow(x, y, width, height),
-		WComp:       nil,
-		CanPan:      true,
-		CanSpawn:    true,
-		postEffect:  nil,
-		pinPosition: nil,
+		Window:            *NewWindow(x, y, width, height),
+		WComp:             nil,
+		CanPan:            true,
+		CanSpawn:          true,
+		postEffect:        nil,
+		pinPosition:       nil,
+		IsTitleBarVisible: true,
 	}
 	rw.Camera = rl.Camera2D{
 		Offset:   rl.NewVector2(0, 0), // will be set each frame
@@ -73,8 +76,11 @@ func (rw *RenderWindow) GetWorldMouse() rl.Vector2 {
 func (rw *RenderWindow) Draw() {
 	// 1. Draw window decorations in screen space (unclipped)
 	rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBg)
-	rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.TitleBarHeight, rw.ColorTitleBar)
-	rl.DrawText(rw.Name, rw.X+5, rw.Y+5, 16, rw.ColorText)
+
+	if rw.IsTitleBarVisible {
+		rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.TitleBarHeight, rw.ColorTitleBar)
+		rl.DrawText(rw.Name, rw.X+5, rw.Y+5, 16, rw.ColorText)
+	}
 
 	// Resize handle
 	handleColor := rw.ColorResize
@@ -110,6 +116,10 @@ func (rw *RenderWindow) Draw() {
 		)
 	}
 	rl.DrawRectangleLines(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBorder)
+}
+
+func (rw *RenderWindow) EnableTitleBar(enable bool) {
+	rw.IsTitleBarVisible = enable
 }
 
 func (rw *RenderWindow) Update() {
@@ -236,6 +246,12 @@ func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
 	case utils.IsSpawnState(glob.Measurement):
 		m := components.NewMeasurementGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "M")
 		rw.PushComponent(m)
+	case utils.IsSpawnState(glob.Info):
+		t1 := components.NewInfoTable(worldMouse.X, worldMouse.Y, 260, 40, glob.ColorBg, []components.InfoRow{})
+		rw.PushComponent(t1)
+	case utils.IsSpawnState(glob.GQubit):
+		testSource := components.NewSourceGate(worldMouse.X, worldMouse.Y, 100, glob.GateColor, "Test", []complex64{0, 1}, 4)
+		rw.PushComponent(testSource)
 	}
 }
 

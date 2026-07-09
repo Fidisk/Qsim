@@ -38,6 +38,16 @@ type Window struct {
 	CanResize bool
 	CanDrag   bool
 	CanZoom   bool
+
+	Priority int32
+}
+
+func (w *Window) GetPriority() int32 {
+	return w.Priority
+}
+
+func (w *Window) SetPriority(val int32) {
+	w.Priority = val
 }
 
 // NewWindow creates a new Window with default styling
