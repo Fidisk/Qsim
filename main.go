@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 
@@ -177,10 +178,10 @@ func main() {
 
 			fileWin.IsPanAllow(false)
 			fileWin.IsZoomAllow(false)
-			fileWin.IsDragAllow(false)
+			fileWin.IsVerticalScrollAllow(true)
 			fileWin.PushComponent(comps...)
 			fileWin.AddEffect(func() { effect.ScaleButtonsToWidth(fileWin) })
-			fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: 0} })
+			fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: float32(math.Max(0, float64(fileWin.Camera.Target.Y)))} })
 			winManager = append(winManager, fileWin)
 		})
 

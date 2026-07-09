@@ -21,8 +21,10 @@ type RenderWindow struct {
 	panStartMouse  rl.Vector2 // world coordinate on press
 	panStartTarget rl.Vector2 // camera target on press
 
-	CanPan   bool
-	CanSpawn bool
+	CanPan                bool
+	CanSpawn              bool
+	IsHorizontalScrolling bool
+	IsVerticalScrolling   bool
 
 	postEffect []func()
 
@@ -161,8 +163,9 @@ func (rw *RenderWindow) Update() {
 	// Update camera offset after possible resize/move
 	rw.updateCameraOffset()
 
-	// --- Pan (extracted) and Zoom ---
-	rw.handlePanning(mousePos) // <-- replaced the original panning block
+	// --- Pan, Scroll, and Zoom ---
+	rw.handlePanning(mousePos)
+	rw.handleScroll(mousePos)
 
 	contentRect := rw.GetContentRect()
 
@@ -308,8 +311,35 @@ func (rw *RenderWindow) handlePanning(mousePos rl.Vector2) {
 	}
 }
 
+// handleScroll processes mouse‑wheel axis‑constrained scrolling.
+func (rw *RenderWindow) handleScroll(mousePos rl.Vector2) {
+	if !rw.IsHorizontalScrolling && !rw.IsVerticalScrolling {
+		return
+	}
+
+	const scrollSpeed float32 = 20.0
+	contentRect := rw.GetContentRect()
+	if rw.holdingCursor && rl.CheckCollisionPointRec(mousePos, contentRect) {
+		wheel := rl.GetMouseWheelMoveV()
+		if rw.IsHorizontalScrolling {
+			rw.Camera.Target.X += wheel.X * scrollSpeed / rw.Camera.Zoom
+		}
+		if rw.IsVerticalScrolling {
+			rw.Camera.Target.Y -= wheel.Y * scrollSpeed / rw.Camera.Zoom
+		}
+	}
+}
+
 func (rw *RenderWindow) IsPanAllow(val bool) {
 	rw.CanPan = true
+}
+
+func (rw *RenderWindow) IsHorizontalScrollAllow(val bool) {
+	rw.IsHorizontalScrolling = val
+}
+
+func (rw *RenderWindow) IsVerticalScrollAllow(val bool) {
+	rw.IsVerticalScrolling = val
 }
 
 func (rw *RenderWindow) IsSpawnAllow(val bool) {
