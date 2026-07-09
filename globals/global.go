@@ -47,6 +47,7 @@ const (
 	MouseStateDetach
 	MouseStateFix
 	MouseStateSpawn
+	MouseStateErase
 )
 
 type SpawnType int

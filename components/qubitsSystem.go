@@ -58,6 +58,8 @@ func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 		c.IsFixed = !c.IsFixed
 	case utils.IsMouseState(glob.MouseStateDetach):
 		//c.Disconnect()
+	case utils.IsMouseState(glob.MouseStateErase):
+		c.Kill()
 	default:
 		c.dragging = true
 		*isCursorAvailable = false

@@ -150,6 +150,12 @@ func main() {
 		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) }, 20,
 		func() { utils.SetMouseState(glob.MouseStateSpawn) },
 		func() { utils.ToggleMouseState(glob.MouseStateSpawn) })
+	ToolBut5 := components.NewToggleButton(-350, 0, 100, 25, rl.LightGray, "Erase",
+		func() bool { return utils.IsMouseState(glob.MouseStateErase) }, 20,
+		func() { utils.SetMouseState(glob.MouseStateErase) },
+		func() { utils.ToggleMouseState(glob.MouseStateErase) })
+
+	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5)
 
 	spawnBar := windows.NewRenderWindow(1500, 0, 100, 800)
 	spawnBar.IsResizeAllow(false)
@@ -259,8 +265,6 @@ func main() {
 		})
 
 	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9)
-
-	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4)
 
 	winManager = append(winManager, panel, toolBar, spawnBar)
 

@@ -87,7 +87,12 @@ func (c *Gate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	case utils.IsMouseState(glob.MouseStateFix):
 		c.IsFixed = !c.IsFixed
 	case utils.IsMouseState(glob.MouseStateDetach):
-		//c.Disconnect()
+		c.DestroyOutPut()
+		for _, d := range c.HookList {
+			d.Disconnect()
+		}
+	case utils.IsMouseState(glob.MouseStateErase):
+		c.Destroy()
 	default:
 		c.dragging = true
 		*isCursorAvailable = false
@@ -349,4 +354,12 @@ func (c *Gate) PostUpdate() {
 
 func (c *Gate) GetID() int32 {
 	return c.ID
+}
+
+func (c *Gate) Destroy() {
+	c.DestroyOutPut()
+	for _, d := range c.HookList {
+		d.DisconnectAndKill()
+	}
+	c.GetParent().DeleteChildWithID(c.ID)
 }
