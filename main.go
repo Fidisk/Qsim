@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"qsim/components"
@@ -149,13 +152,35 @@ func main() {
 			fileWin.SetPriority(200)
 			fileWin.IsSpawnAllow(false)
 
-			title := components.NewLabel(220, 120, "Available files:", 18, rl.White)
-			f1 := components.NewLabel(220, 150, "circuit_1.qsim", 14, rl.LightGray)
-			f2 := components.NewLabel(220, 175, "circuit_2.qsim", 14, rl.LightGray)
-			f3 := components.NewLabel(220, 200, "bell_state.qsim", 14, rl.LightGray)
-			f4 := components.NewLabel(220, 225, "grover_test.qsim", 14, rl.LightGray)
+			savesDir := "saves"
+			_ = os.MkdirAll(savesDir, 0755)
+			entries, _ := os.ReadDir(savesDir)
 
-			fileWin.PushComponent(title, f1, f2, f3, f4)
+			var comps []components.Component
+			for _, e := range entries {
+				if !e.IsDir() && filepath.Ext(e.Name()) == ".qsim" {
+					name := e.Name()
+					btn := components.NewButton(0, 0, 350, 25, rl.LightGray, name, 14,
+						func(f string) func() {
+							return func() {
+							}
+						}(name))
+					comps = append(comps, btn)
+					xBtn := components.NewButton(0, 0, 25, 25, rl.Red, "x", 14,
+						func(f string) func() {
+							return func() {
+							}
+						}(name))
+					comps = append(comps, xBtn)
+				}
+			}
+
+			fileWin.IsPanAllow(false)
+			fileWin.IsZoomAllow(false)
+			fileWin.IsDragAllow(false)
+			fileWin.PushComponent(comps...)
+			fileWin.AddEffect(func() { effect.ScaleButtonsToWidth(fileWin) })
+			fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: 0} })
 			winManager = append(winManager, fileWin)
 		})
 
@@ -166,10 +191,6 @@ func main() {
 			fileWin.SetPriority(200)
 			fileWin.IsSpawnAllow(false)
 
-			title := components.NewLabel(670, 120, "Save current circuit as:", 18, rl.White)
-			hint := components.NewLabel(670, 150, "Filename will be prompted later", 14, rl.Gray)
-
-			fileWin.PushComponent(title, hint)
 			winManager = append(winManager, fileWin)
 		})
 
