@@ -198,6 +198,7 @@ func main() {
 			input := components.NewInput(0, 0, 400, 25, 16, 64, func(text string) {
 				os.MkdirAll("saves", 0755)
 				os.WriteFile(filepath.Join("saves", text), []byte{}, 0644)
+				DeleteWindowByID(fileWin.GetID())
 			})
 			input.SetText("untitled.qsim")
 			fileWin.PushComponent(input)

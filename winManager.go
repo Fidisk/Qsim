@@ -1,6 +1,9 @@
 package main
 
-import "sort"
+import (
+	"qsim/utils"
+	"sort"
+)
 
 type pWindow interface {
 	Draw()
@@ -9,6 +12,7 @@ type pWindow interface {
 	IsActive() bool
 	SetActive(bool)
 	GetPriority() int32
+	GetID() int32
 }
 
 var winManager []pWindow
@@ -28,4 +32,14 @@ func shuffleWinManager() {
 		return
 	}
 	winManager[0].SetActive(false)
+}
+
+func DeleteWindowByID(id int32) {
+	for i, w := range winManager {
+		if w.GetID() == id {
+			winManager = append(winManager[:i], winManager[i+1:]...)
+			break
+		}
+	}
+	utils.DeleteObjectWithID(id)
 }

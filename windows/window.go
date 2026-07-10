@@ -4,11 +4,13 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	glob "qsim/globals"
+	"qsim/utils"
 )
 
 // Window is a draggable and resizable panel
 type Window struct {
 	Name string
+	ID   int32
 
 	X, Y, Width, Height int32
 	TitleBarHeight      int32
@@ -52,7 +54,7 @@ func (w *Window) SetPriority(val int32) {
 
 // NewWindow creates a new Window with default styling
 func NewWindow(x, y, width, height int32) *Window {
-	return &Window{
+	tmp := &Window{
 		Name: "Panel",
 		X:    x, Y: y, Width: width, Height: height,
 		TitleBarHeight:   25,
@@ -74,6 +76,12 @@ func NewWindow(x, y, width, height int32) *Window {
 		CanDrag:   true,
 		CanZoom:   true,
 	}
+	tmp.ID = utils.GenerateID(tmp)
+	return tmp
+}
+
+func (w *Window) GetID() int32 {
+	return w.ID
 }
 
 // IsActive returns the current activation state
