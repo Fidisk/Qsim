@@ -1,6 +1,8 @@
 package windows
 
 import (
+	"encoding/json"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	glob "qsim/globals"
@@ -284,4 +286,31 @@ func (w *Window) IsZoomAllow(val bool) {
 
 func (w *Window) Rename(val string) {
 	w.Name = val
+}
+
+func (w *Window) SaveState() string {
+	data := map[string]interface{}{
+		"type":           "Window",
+		"name":           w.Name,
+		"id":             w.ID,
+		"x":              w.X,
+		"y":              w.Y,
+		"width":          w.Width,
+		"height":         w.Height,
+		"titleBarHeight": w.TitleBarHeight,
+		"resizeMinW":     w.ResizeMinW,
+		"resizeMinH":     w.ResizeMinH,
+		"colorBg":        w.ColorBg,
+		"colorTitleBar":  w.ColorTitleBar,
+		"colorText":      w.ColorText,
+		"colorResize":    w.ColorResize,
+		"colorResizeHover": w.ColorResizeHover,
+		"colorBorder":    w.ColorBorder,
+		"canResize":      w.CanResize,
+		"canDrag":        w.CanDrag,
+		"canZoom":        w.CanZoom,
+		"priority":       w.Priority,
+	}
+	b, _ := json.Marshal(data)
+	return string(b)
 }

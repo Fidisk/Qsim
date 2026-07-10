@@ -1,6 +1,8 @@
 package windows
 
 import (
+	"encoding/json"
+
 	glob "qsim/globals"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -203,4 +205,16 @@ func (tw *TextWindow) IsActive() bool {
 
 func (tw *TextWindow) SetActive(active bool) {
 	tw.Active = active
+}
+
+func (tw *TextWindow) SaveState() string {
+	data := map[string]interface{}{
+		"type":       "TextWindow",
+		"window":     json.RawMessage(tw.Window.SaveState()),
+		"textBuffer": tw.TextBuffer,
+		"maxChars":   tw.MaxChars,
+		"isEditable": tw.IsEditable,
+	}
+	b, _ := json.Marshal(data)
+	return string(b)
 }

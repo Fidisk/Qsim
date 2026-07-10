@@ -13,6 +13,7 @@ type pWindow interface {
 	SetActive(bool)
 	GetPriority() int32
 	GetID() int32
+	SaveState() string
 }
 
 var winManager []pWindow
@@ -42,4 +43,12 @@ func DeleteWindowByID(id int32) {
 		}
 	}
 	utils.DeleteObjectWithID(id)
+}
+
+func SaveState() string {
+	res := ""
+	for _, w := range winManager {
+		res += w.SaveState() + "\n"
+	}
+	return res
 }
