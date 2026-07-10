@@ -188,8 +188,11 @@ func (c *Gate) MeasureOutput() {
 
 		hook := c.OutPutHook[hit]
 		if hook.IsHooked {
-			tmp := utils.GetObjectFromID(hook.TargetID).(*QubitsSystem).Origin
-			tmp.CopyFrom(result)
+			tmp := utils.GetObjectFromID(hook.TargetID)
+			if tmp == nil {
+				continue
+			}
+			tmp.(*QubitsSystem).Origin.CopyFrom(result)
 		} else {
 			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 			tmp.Assign(result)
@@ -249,10 +252,15 @@ func (c *Gate) CalculateOutPut() bool {
 	result.Multiply(c.Operation, c.InputCount)
 
 	if c.OutPutHook[0].IsHooked {
-		tmp := utils.GetObjectFromID(c.OutPutHook[0].TargetID).(*QubitsSystem).Origin
-		tmp.CopyFrom(result)
+		tmp := utils.GetObjectFromID(c.OutPutHook[0].TargetID)
+		if tmp == nil {
+			goto createOutput
+		}
+		tmp.(*QubitsSystem).Origin.CopyFrom(result)
 		return true
 	}
+
+createOutput:
 
 	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 	tmp.Assign(result)
@@ -283,6 +291,10 @@ func (c *Gate) pullToHook(d *Hook) {
 
 	if d.IsHooked {
 		tmp2 := utils.GetObjectFromID(d.TargetID)
+		if tmp2 == nil {
+			d.Disconnect()
+			return
+		}
 		t := tmp2.(Component)
 		t.AddForce(tmp)
 		c.AddForce(tmp.Scale(-1))
@@ -297,6 +309,10 @@ func (c *Gate) Draw() {
 	for _, d := range c.HookList {
 		if d.IsHooked {
 			tmp := utils.GetObjectFromID(d.TargetID)
+			if tmp == nil {
+				d.Disconnect()
+				continue
+			}
 			t := tmp.(Component)
 
 			r := utils.Dist(c.Center, d.Center) - t.GetCircle().Radius

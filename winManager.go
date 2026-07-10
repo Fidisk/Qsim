@@ -2,6 +2,7 @@ package main
 
 import (
 	"qsim/utils"
+	"qsim/windows"
 	"sort"
 )
 
@@ -48,7 +49,9 @@ func DeleteWindowByID(id int32) {
 func SaveState() string {
 	res := ""
 	for _, w := range winManager {
-		res += w.SaveState() + "\n"
+		if rw, ok := w.(*windows.RenderWindow); ok && rw.CanSpawn {
+			res += w.SaveState() + "\n"
+		}
 	}
 	return res
 }

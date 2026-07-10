@@ -113,8 +113,13 @@ func (sg *SourceGate) pullToHook() {
 	dir := sg.Center.Subtract(d.Center).Normalize().Scale(val * glob.GateToHookPullCoeff)
 
 	if d.IsHooked {
-		target := utils.GetObjectFromID(d.TargetID).(Component)
-		target.AddForce(dir)
+		target := utils.GetObjectFromID(d.TargetID)
+		if target == nil {
+			d.Disconnect()
+			return
+		}
+		t := target.(Component)
+		t.AddForce(dir)
 		sg.AddForce(dir.Scale(-1))
 	} else {
 		d.AddForce(dir)
@@ -167,7 +172,11 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 	sg.OutHook.Update(worldMouse, holdingCursor, isCursorAvailable)
 
 	if sg.OutHook.IsHooked {
-		target := utils.GetObjectFromID(sg.OutHook.TargetID).(*QubitsSystem)
+		targetObj := utils.GetObjectFromID(sg.OutHook.TargetID)
+		if targetObj == nil {
+			return
+		}
+		target := targetObj.(*QubitsSystem)
 		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.ModifierID})
 		if target.Origin != nil {
 			target.Origin.CopyFrom(state)
@@ -260,6 +269,10 @@ func (sg *SourceGate) Draw() {
 	rightCenter := rl.Vector2{X: sg.Center.X + sg.tableWidth/2, Y: sg.Center.Y}
 	if sg.OutHook.IsHooked {
 		target := utils.GetObjectFromID(sg.OutHook.TargetID)
+		if target == nil {
+			sg.OutHook.Disconnect()
+			return
+		}
 		t := target.(Component)
 		end := rl.Vector2Add(rightCenter, rl.Vector2Scale(
 			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, rightCenter)),

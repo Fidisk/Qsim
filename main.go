@@ -164,6 +164,30 @@ func main() {
 					btn := components.NewButton(0, 0, 350, 25, rl.LightGray, name, 14,
 						func(f string) func() {
 							return func() {
+								data, err := os.ReadFile(filepath.Join(savesDir, f))
+								if err != nil {
+									return
+								}
+								loaded := windows.LoadState(string(data))
+
+								// Remove existing circuit panels
+								var keep []pWindow
+								for _, w := range winManager {
+									if rw, ok := w.(*windows.RenderWindow); ok && rw.CanSpawn {
+										utils.DeleteObjectWithID(rw.GetID())
+									} else {
+										keep = append(keep, w)
+									}
+								}
+								winManager = keep
+
+								// Add loaded windows
+								for _, w := range loaded {
+									if rw, ok := w.(*windows.RenderWindow); ok {
+										winManager = append(winManager, rw)
+									}
+								}
+								DeleteWindowByID(fileWin.GetID())
 							}
 						}(name))
 					comps = append(comps, btn)

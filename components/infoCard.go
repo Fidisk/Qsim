@@ -77,8 +77,13 @@ func (it *InfoTable) pullToHook() {
 	val = float32(math.Min(float64(val), float64(100)))
 	dir := it.Center.Subtract(it.Hook.Center).Normalize().Scale(val * glob.GateToHookPullCoeff)
 	if it.Hook.IsHooked {
-		target := utils.GetObjectFromID(it.Hook.TargetID).(Component)
-		target.AddForce(dir)
+		target := utils.GetObjectFromID(it.Hook.TargetID)
+		if target == nil {
+			it.Hook.Disconnect()
+			return
+		}
+		t := target.(Component)
+		t.AddForce(dir)
 		it.AddForce(dir.Scale(-1))
 	} else {
 		it.Hook.AddForce(dir)
@@ -176,9 +181,11 @@ func (it *InfoTable) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorA
 	it.Hook.Update(worldMouse, holdingCursor, isCursorAvailable)
 
 	if it.Hook.IsHooked {
-		tmp := utils.GetObjectFromID(it.Hook.TargetID).(*QubitsSystem).Origin
-
-		//tmp now qubitManager
+		target := utils.GetObjectFromID(it.Hook.TargetID)
+		if target == nil {
+			return
+		}
+		tmp := target.(*QubitsSystem).Origin
 		it.RebuildRowsFromStateManager(tmp)
 
 		it.Height = 2*tablePaddingTop + float32(len(it.Rows))*tableRowHeight
@@ -246,6 +253,10 @@ func (it *InfoTable) Draw() {
 	rightCenter := rl.Vector2{X: it.Center.X, Y: it.Center.Y}
 	if it.Hook.IsHooked {
 		target := utils.GetObjectFromID(it.Hook.TargetID)
+		if target == nil {
+			it.Hook.Disconnect()
+			return
+		}
 		t := target.(Component)
 		end := rl.Vector2Add(rightCenter, rl.Vector2Scale(
 			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, rightCenter)),

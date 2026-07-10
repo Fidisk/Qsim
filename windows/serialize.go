@@ -95,6 +95,8 @@ func serializeQubitsSystem(qs *components.QubitsSystem) map[string]interface{} {
 			"radius":        d.Radius,
 			"color":         colorMap(d.Color),
 			"modifierID":    d.ModifierID,
+			"id":            d.ID,
+			"hookID":        d.HookID,
 			"qubitSystemID": d.QubitSystemID,
 		}
 	}
@@ -106,6 +108,8 @@ func serializeQubitsSystem(qs *components.QubitsSystem) map[string]interface{} {
 		"color":              colorMap(qs.Color),
 		"isFixed":            qs.IsFixed,
 		"weight":             qs.GetWeight(),
+		"hookID":             qs.HookID,
+		"infoHookID":         qs.InfoHookID,
 		"origin":             serializeQubitStateManager(qs.Origin),
 		"qubitDeterminators": dets,
 	}
