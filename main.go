@@ -196,7 +196,8 @@ func main() {
 			fileWin.IsResizeAllow(false)
 
 			input := components.NewInput(0, 0, 400, 25, 16, 64, func(text string) {
-				// TODO: save file with name text
+				os.MkdirAll("saves", 0755)
+				os.WriteFile(filepath.Join("saves", text), []byte{}, 0644)
 			})
 			input.SetText("untitled.qsim")
 			fileWin.PushComponent(input)
