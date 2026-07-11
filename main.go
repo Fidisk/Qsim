@@ -192,10 +192,22 @@ func main() {
 						}(name))
 					comps = append(comps, btn)
 					xBtn := components.NewButton(0, 0, 25, 25, rl.Red, "x", 14,
-						func(f string) func() {
+						func(f string, fw *windows.RenderWindow) func() {
 							return func() {
+								os.Remove(filepath.Join("saves", f))
+								idx := -1
+								for i, c := range fw.GetElement() {
+									if b, ok := c.(*components.Button); ok && b.Label == f {
+										idx = i
+										break
+									}
+								}
+								if idx >= 0 {
+									fw.RemoveComponent(idx + 1)
+									fw.RemoveComponent(idx)
+								}
 							}
-						}(name))
+						}(name, fileWin))
 					comps = append(comps, xBtn)
 				}
 			}

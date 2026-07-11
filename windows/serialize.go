@@ -170,6 +170,7 @@ func serializeGate(g *components.Gate) map[string]interface{} {
 		"outputCount":       g.OutputCount,
 		"isMeasurementGate": g.IsMeasurementGate,
 		"measureResult":     g.MeasureResult,
+		"operation":         op,
 		"hooks":             hooks,
 	}
 }
