@@ -288,14 +288,14 @@ func (c *QubitsSystem) zipToHook() {
 			}
 		case *Gate:
 			for _, d2 := range v.HookList {
-				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked && d2.AllowQubitSystem {
+				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && d2.AllowQubitSystem {
 					gotHooked = true
 					d2.Connect(c)
 				}
 			}
 		case *InfoTable:
 			tmp := v.Hook
-			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && !gotHooked && tmp.AllowQubitSystem {
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem {
 				gotHooked = true
 				tmp.ConnectInfo(c)
 			}

@@ -302,7 +302,7 @@ func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
 		t1 := components.NewInfoTable(worldMouse.X, worldMouse.Y, 260, 40, glob.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
 	case utils.IsSpawnState(glob.GQubit):
-		testSource := components.NewSourceGate(worldMouse.X, worldMouse.Y, 100, glob.GateColor, "Test", []complex64{0, 1}, 4)
+		testSource := components.NewSourceGate(worldMouse.X, worldMouse.Y, 100, glob.GateColor, "Test", []complex64{0, 1})
 		rw.PushComponent(testSource)
 	}
 }

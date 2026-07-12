@@ -9,6 +9,7 @@ import (
 
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/qubits/attributes"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -58,7 +59,31 @@ const (
 )
 
 // NewSourceGate creates a source gate.
-func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []complex64, modID int32) *SourceGate {
+func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []complex64) *SourceGate {
+	if len(amp) != 2 {
+		amp = []complex64{complex(1, 0), complex(0, 0)}
+	}
+	sg := &SourceGate{
+		Circle:     *NewCircle(x, y, radius, color),
+		Label:      label,
+		Color:      color,
+		Amplitude:  amp,
+		ModifierID: attributes.GenerateQubitModifierID(),
+	}
+	sg.ID = utils.GenerateID(sg)
+	sg.SetWeight(glob.GateWeight)
+	// Output hook on the right edge of the table
+	sg.OutHook = NewOutputHook(x+sgTableWidth/2+glob.OutputHookRadius, y, glob.OutputHookRadius, glob.OutputHookColor)
+	sg.OutHook.Label = "O"
+	sg.OutHook.AllowQubitSystem = true
+	sg.OutHook.IsOutput = true
+	// Cache table size
+	sg.tableWidth = sgTableWidth
+	sg.tableHeight = sgTableHeight
+	return sg
+}
+
+func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp []complex64, modID int32) *SourceGate {
 	if len(amp) != 2 {
 		amp = []complex64{complex(1, 0), complex(0, 0)}
 	}

@@ -378,27 +378,27 @@ func unmarshalGate(raw map[string]interface{}, ctx *loadCtx) *components.Gate {
 	if isMeas {
 		g = components.NewMeasurementGate(center.X, center.Y, radius, color, label)
 	} else {
-	opRaw, ok := raw["operation"].([]interface{})
-	var op [][]complex64
-	if ok {
-		op = make([][]complex64, len(opRaw))
-		for i, row := range opRaw {
-			rowVals := row.([]interface{})
-			op[i] = make([]complex64, len(rowVals))
-			for j, val := range rowVals {
-				op[i][j] = parseComplex(val.(map[string]interface{}))
+		opRaw, ok := raw["operation"].([]interface{})
+		var op [][]complex64
+		if ok {
+			op = make([][]complex64, len(opRaw))
+			for i, row := range opRaw {
+				rowVals := row.([]interface{})
+				op[i] = make([]complex64, len(rowVals))
+				for j, val := range rowVals {
+					op[i][j] = parseComplex(val.(map[string]interface{}))
+				}
 			}
 		}
-	}
-	if !isMeas && (op == nil || len(op) == 0) {
-		sz := 1 << inputCount
-		op = make([][]complex64, sz)
-		for i := 0; i < sz; i++ {
-			op[i] = make([]complex64, sz)
-			op[i][i] = 1
+		if !isMeas && (op == nil || len(op) == 0) {
+			sz := 1 << inputCount
+			op = make([][]complex64, sz)
+			for i := 0; i < sz; i++ {
+				op[i] = make([]complex64, sz)
+				op[i][i] = 1
+			}
 		}
-	}
-	g = components.NewGate(center.X, center.Y, radius, color, label, op, inputCount)
+		g = components.NewGate(center.X, center.Y, radius, color, label, op, inputCount)
 	}
 
 	g.Center = center
@@ -517,7 +517,7 @@ func unmarshalSourceGate(raw map[string]interface{}, ctx *loadCtx) *components.S
 		modID = int32(v.(float64))
 	}
 
-	sg := components.NewSourceGate(center.X, center.Y, radius, color, label, amps, modID)
+	sg := components.NewSourceGateWithID(center.X, center.Y, radius, color, label, amps, modID)
 	sg.Center = center
 	sg.Color = color
 	ctx.oldToNew[int32(raw["id"].(float64))] = sg

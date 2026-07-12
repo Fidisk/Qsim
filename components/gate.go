@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"math"
 	"math/cmplx"
 	glob "qsim/globals"
@@ -129,7 +128,6 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
 
 		if d.IsHooked && !d.IsOutput {
-			fmt.Println(d.IsHooked, d.IsOutput)
 			cnt++
 		}
 	}
