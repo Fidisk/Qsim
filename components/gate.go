@@ -177,7 +177,7 @@ func (c *Gate) MeasureOutput() {
 		result := qubits.NewQubitStateManagerFrom([]complex64{}, QSM.ModifierID)
 
 		for i, d := range QSM.Amptitude {
-			if ((i >> (n - pos)) & 1) == hit {
+			if ((i >> pos) & 1) == hit {
 				result.Amptitude = append(result.Amptitude, d*coeff)
 			} else {
 				result.Amptitude = append(result.Amptitude, 0)
