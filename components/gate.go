@@ -27,6 +27,7 @@ type Gate struct {
 	OutPutHook        []*Hook
 	IsMeasurementGate bool
 	MeasureResult     int32
+	Measured          bool
 	OutcomeProbs      [2]float64
 	OutcomeLabels     [2]string
 }
@@ -151,7 +152,9 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 
 	if cnt == int(c.InputCount) {
 		if c.IsMeasurementGate {
-			c.MeasureOutput()
+			if !c.Measured {
+				c.MeasureOutput()
+			}
 		} else {
 			if !c.CalculateOutPut() {
 				c.DestroyOutPut()
@@ -178,7 +181,7 @@ func (c *Gate) MeasureOutput() {
 	n := QSM.Size - 1
 	for i, d := range QSM.Amptitude {
 		if ((i >> (n - pos)) & 1) == 0 {
-			l += d * d
+			l += complex(real(d)*real(d)+imag(d)*imag(d), 0)
 		}
 	}
 
@@ -276,9 +279,10 @@ func (c *Gate) CalculateOutPut() bool {
 				tmp := *QD.GetQubitParent().Origin
 				QSM = append(QSM, &tmp)
 				Idx = append(Idx, QD.ModifierID)
-			}
 		}
 	}
+	c.Measured = true
+}
 	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	for i := range QSM {
 		result.Merge(QSM[i])
@@ -311,6 +315,7 @@ createOutput:
 }
 
 func (c *Gate) DestroyOutPut() {
+	c.Measured = false
 	for _, d := range c.OutPutHook {
 		d.DisconnectAndKill()
 	}
