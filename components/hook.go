@@ -124,6 +124,28 @@ func (c *Hook) Draw() {
 	rl.DrawText(c.Label, textX, textY, fontSize, c.Color)
 }
 
+func (c *Hook) DrawGhost() {
+	if c.IsHooked {
+		return
+	}
+	ghostColor := rl.Fade(c.Color, 0.3)
+
+	left := rl.Vector2{X: c.Center.X - c.Radius, Y: c.Center.Y}
+	right := rl.Vector2{X: c.Center.X + c.Radius, Y: c.Center.Y}
+	top := rl.Vector2{X: c.Center.X, Y: c.Center.Y - c.Radius}
+	bottom := rl.Vector2{X: c.Center.X, Y: c.Center.Y + c.Radius}
+
+	rl.DrawLineEx(left, right, 4, ghostColor)
+	rl.DrawLineEx(top, bottom, 4, ghostColor)
+
+	fontSize := int32(14)
+	offsetX := float32(8)
+	offsetY := float32(8)
+	textX := int32(c.Center.X - c.Radius - offsetX)
+	textY := int32(c.Center.Y - c.Radius - offsetY - float32(fontSize))
+	rl.DrawText(c.Label, textX, textY, fontSize, ghostColor)
+}
+
 func (v *Hook) Connect(val Component) {
 	switch c := val.(type) {
 	case *QubitsSystem:

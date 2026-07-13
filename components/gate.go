@@ -381,12 +381,15 @@ func (c *Gate) Draw() {
 
 func (c *Gate) DrawGhost() {
 	ghostColor := rl.Fade(c.Color, 0.3)
+	ghostBg := rl.Fade(glob.ColorBg, 0.3)
+
 	rect := rl.Rectangle{
 		X:      c.Center.X - c.Radius,
 		Y:      c.Center.Y - c.Radius,
 		Width:  c.Radius * 2,
 		Height: c.Radius * 2,
 	}
+	rl.DrawRectangleRec(rect, ghostBg)
 	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
 
 	if c.Label != "" {
@@ -396,6 +399,21 @@ func (c *Gate) DrawGhost() {
 		textY := int32(c.Center.Y) - fontSize/2
 		rl.DrawText(c.Label, textX, textY, fontSize, ghostColor)
 	}
+
+	for _, d := range c.HookList {
+		dir := rl.Vector2Normalize(rl.Vector2Subtract(d.Center, c.Center))
+		start := rl.Vector2Add(c.Center, rl.Vector2Scale(dir, c.Radius))
+		rl.DrawLineV(start, d.Center, ghostColor)
+		d.DrawGhost()
+	}
+}
+
+func (c *Gate) GetChildCircles() []*Circle {
+	children := make([]*Circle, len(c.HookList))
+	for i, h := range c.HookList {
+		children[i] = h.GetCircle()
+	}
+	return children
 }
 
 func (c *Gate) PostUpdate() {

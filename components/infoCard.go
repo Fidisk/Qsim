@@ -371,6 +371,14 @@ func (it *InfoTable) DrawGhost() {
 		it.Height,
 	)
 	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+	it.Hook.DrawGhost()
+}
+
+func (it *InfoTable) GetChildCircles() []*Circle {
+	if it.Hook == nil {
+		return nil
+	}
+	return []*Circle{it.Hook.GetCircle()}
 }
 
 // ---------- helpers ----------

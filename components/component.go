@@ -29,6 +29,8 @@ type Component interface {
 	SetWeight(float32)
 	GetWeight() float32
 	GetID() int32
+
+	GetChildCircles() []*Circle
 }
 
 type WindowComponent struct {

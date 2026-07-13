@@ -272,6 +272,14 @@ func (c *QubitsSystem) DrawGhost() {
 	}
 }
 
+func (c *QubitsSystem) GetChildCircles() []*Circle {
+	children := make([]*Circle, len(c.QubitDeterminatorList))
+	for i, d := range c.QubitDeterminatorList {
+		children[i] = d.GetCircle()
+	}
+	return children
+}
+
 func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	//This do not defer the Origin
 	c.Origin = p

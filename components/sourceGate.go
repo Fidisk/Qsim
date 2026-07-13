@@ -427,6 +427,14 @@ func (sg *SourceGate) DrawGhost() {
 	ghostColor := rl.Fade(sg.Color, 0.3)
 	rect := sg.getTableRect()
 	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+	sg.OutHook.DrawGhost()
+}
+
+func (sg *SourceGate) GetChildCircles() []*Circle {
+	if sg.OutHook == nil {
+		return nil
+	}
+	return []*Circle{sg.OutHook.GetCircle()}
 }
 
 func (sg *SourceGate) PostUpdate() {}

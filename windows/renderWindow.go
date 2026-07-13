@@ -36,6 +36,9 @@ type RenderWindow struct {
 	isEditingTitle   bool
 	titleEditBuffer  string
 	titleEditCounter int
+
+	spawnPreview   components.Component
+	spawnPrevState glob.SpawnType
 }
 
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
@@ -120,7 +123,15 @@ func (rw *RenderWindow) Draw() {
 	for _, c := range rw.WComp {
 		circle := c.GetCircle()
 		if circle.IsDragging() {
+			offset := circle.VirtualCenter.Subtract(circle.Center)
+			children := c.GetChildCircles()
+			for _, child := range children {
+				child.Center = child.Center.Subtract(offset)
+			}
 			c.DrawGhost()
+			for _, child := range children {
+				child.Center = child.Center.Add(offset)
+			}
 			saved := circle.Center
 			circle.Center = circle.VirtualCenter
 			c.Draw()
@@ -128,6 +139,35 @@ func (rw *RenderWindow) Draw() {
 		} else {
 			c.Draw()
 		}
+	}
+	if rw.CanSpawn && utils.IsMouseState(glob.MouseStateSpawn) {
+		state := utils.GetSpawnState()
+		if state != glob.None {
+			if state != rw.spawnPrevState || rw.spawnPreview == nil {
+				rw.spawnPrevState = state
+				rw.spawnPreview = rw.makeSpawnPreview(state)
+			}
+			if rw.spawnPreview != nil {
+				mouse := rw.GetWorldMouse()
+				c := rw.spawnPreview.GetCircle()
+				snapped := rl.Vector2{
+					X: utils.SnapToGrid(mouse.X, config.SnapToGridInterval),
+					Y: utils.SnapToGrid(mouse.Y, config.SnapToGridInterval),
+				}
+				delta := snapped.Subtract(c.Center)
+				c.Center = snapped
+				for _, child := range rw.spawnPreview.GetChildCircles() {
+					child.Center = child.Center.Add(delta)
+				}
+				rw.spawnPreview.DrawGhost()
+			}
+		} else {
+			rw.spawnPreview = nil
+			rw.spawnPrevState = glob.None
+		}
+	} else {
+		rw.spawnPreview = nil
+		rw.spawnPrevState = glob.None
 	}
 	rl.EndMode2D()
 
@@ -272,9 +312,13 @@ func (rw *RenderWindow) OnClick(worldMouse rl.Vector2) {
 }
 
 func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
+	snapped := rl.Vector2{
+		X: utils.SnapToGrid(worldMouse.X, config.SnapToGridInterval),
+		Y: utils.SnapToGrid(worldMouse.Y, config.SnapToGridInterval),
+	}
 	switch {
 	case utils.IsSpawnState(glob.Qubit):
-		q := components.NewQubitsSystem(worldMouse.X, worldMouse.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+		q := components.NewQubitsSystem(snapped.X, snapped.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 
 		qState := qubits.NewQubitStateManager([]complex64{1, 0}, 1)
 
@@ -283,37 +327,67 @@ func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
 		rw.PushComponent(q)
 	case utils.IsSpawnState(glob.Hadamard):
 		t := complex(float32(1/math.Sqrt(2)), 0)
-		H1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		H1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
 		rw.PushComponent(H1)
 	case utils.IsSpawnState(glob.X):
-		X1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+		X1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
 		rw.PushComponent(X1)
 	case utils.IsSpawnState(glob.Y):
-		Y1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+		Y1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
 		rw.PushComponent(Y1)
 	case utils.IsSpawnState(glob.Z):
-		Z1 := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+		Z1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
 		rw.PushComponent(Z1)
 	case utils.IsSpawnState(glob.CX):
-		CX := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		CX := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
 		rw.PushComponent(CX)
 	case utils.IsSpawnState(glob.CY):
 		t := complex64(complex(0, 1))
-		CY := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+		CY := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
 		rw.PushComponent(CY)
 	case utils.IsSpawnState(glob.CZ):
-		CZ := components.NewGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+		CZ := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
 		rw.PushComponent(CZ)
 	case utils.IsSpawnState(glob.Measurement):
-		m := components.NewMeasurementGate(worldMouse.X, worldMouse.Y, glob.GateRadius, glob.GateColor, "M")
+		m := components.NewMeasurementGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "M")
 		rw.PushComponent(m)
 	case utils.IsSpawnState(glob.Info):
-		t1 := components.NewInfoTable(worldMouse.X, worldMouse.Y, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, glob.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
 	case utils.IsSpawnState(glob.GQubit):
-		testSource := components.NewSourceGate(worldMouse.X, worldMouse.Y, 100, glob.GateColor, "Test", []complex64{0, 1})
+		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, glob.GateColor, "Test", []complex64{0, 1})
 		rw.PushComponent(testSource)
 	}
+}
+
+func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Component {
+	switch {
+	case state&glob.Qubit != 0:
+		return components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, glob.QubitSystemColor)
+	case state&glob.Hadamard != 0:
+		t := complex(float32(1/math.Sqrt(2)), 0)
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+	case state&glob.X != 0:
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+	case state&glob.Y != 0:
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+	case state&glob.Z != 0:
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+	case state&glob.CX != 0:
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+	case state&glob.CY != 0:
+		t := complex64(complex(0, 1))
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+	case state&glob.CZ != 0:
+		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+	case state&glob.Measurement != 0:
+		return components.NewMeasurementGate(0, 0, glob.GateRadius, glob.GateColor, "M")
+	case state&glob.Info != 0:
+		return components.NewInfoTable(0, 0, 260, 40, glob.ColorBg, []components.InfoRow{})
+	case state&glob.GQubit != 0:
+		return components.NewSourceGate(0, 0, 100, glob.GateColor, "Test", []complex64{0, 1})
+	}
+	return nil
 }
 
 func (rw *RenderWindow) handleZoom() {
