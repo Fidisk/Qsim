@@ -304,7 +304,12 @@ func (rw *RenderWindow) OnClick(worldMouse rl.Vector2) {
 	switch {
 	case utils.IsMouseState(glob.MouseStateSpawn):
 		if rw.CanSpawn {
-			rw.SpawnObject(worldMouse)
+			if utils.IsSpawnState(glob.LineDraw) {
+				ld := components.NewLineDraw(worldMouse.X, worldMouse.Y)
+				rw.PushComponent(ld)
+			} else {
+				rw.SpawnObject(worldMouse)
+			}
 			utils.ToggleMouseState(glob.MouseStateSpawn)
 			utils.SetSpawnState(glob.None)
 		}
@@ -357,6 +362,9 @@ func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
 	case utils.IsSpawnState(glob.GQubit):
 		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, glob.GateColor, "Test", []complex64{0, 1})
 		rw.PushComponent(testSource)
+	case utils.IsSpawnState(glob.TextBox):
+		tb := components.NewTextBox(snapped.X, snapped.Y, 200, 30, 16)
+		rw.PushComponent(tb)
 	}
 }
 
@@ -386,6 +394,10 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		return components.NewInfoTable(0, 0, 260, 40, glob.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:
 		return components.NewSourceGate(0, 0, 100, glob.GateColor, "Test", []complex64{0, 1})
+	case state&glob.TextBox != 0:
+		return components.NewTextBox(0, 0, 200, 30, 16)
+	case state&glob.LineDraw != 0:
+		return nil
 	}
 	return nil
 }

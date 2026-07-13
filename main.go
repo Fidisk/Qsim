@@ -385,7 +385,29 @@ func main() {
 			utils.ToggleSpawnState(glob.GQubit)
 		})
 
-	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11)
+	SpawnBut12 := components.NewToggleButton(25, -112.5, 50, 50, rl.LightGray, "T",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.TextBox) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.TextBox)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.TextBox)
+		})
+
+	SpawnBut13 := components.NewToggleButton(-25, -62.5, 50, 50, rl.LightGray, "L",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LineDraw) }, 40,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.LineDraw)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.LineDraw)
+		})
+
+	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13)
 
 	windowsBar := windows.NewRenderWindow(0, 850, 1600, 50)
 	windowsBar.IsResizeAllow(false)

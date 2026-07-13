@@ -57,6 +57,10 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeInput(v)
 	case *components.Label:
 		return serializeLabel(v)
+	case *components.TextBox:
+		return serializeTextBox(v)
+	case *components.LineDraw:
+		return serializeLineDraw(v)
 	case *components.Circle:
 		return serializeCircle(v)
 	default:
@@ -272,5 +276,26 @@ func serializeLabel(l *components.Label) map[string]interface{} {
 		"text":     l.Text,
 		"fontSize": l.FontSize,
 		"color":    colorMap(l.Color),
+	}
+}
+
+func serializeTextBox(tb *components.TextBox) map[string]interface{} {
+	return map[string]interface{}{
+		"type":     "TextBox",
+		"center":   vec2Map(tb.Center),
+		"width":    tb.Width,
+		"height":   tb.Height,
+		"text":     tb.Text,
+		"fontSize": tb.FontSize,
+	}
+}
+
+func serializeLineDraw(ld *components.LineDraw) map[string]interface{} {
+	return map[string]interface{}{
+		"type":   "LineDraw",
+		"start":  vec2Map(ld.Center),
+		"end":    vec2Map(ld.End),
+		"lineColor":  colorMap(ld.LineColor),
+		"placed": !ld.Placing,
 	}
 }

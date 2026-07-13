@@ -262,6 +262,10 @@ func unmarshalComponent(raw map[string]interface{}, ctx *loadCtx) components.Com
 		return unmarshalInput(raw)
 	case "Label":
 		return unmarshalLabel(raw)
+	case "TextBox":
+		return unmarshalTextBox(raw)
+	case "LineDraw":
+		return unmarshalLineDraw(raw)
 	case "Circle":
 		return unmarshalCircle(raw)
 	}
@@ -574,6 +578,29 @@ func unmarshalLabel(raw map[string]interface{}) *components.Label {
 	fontSize := int32(raw["fontSize"].(float64))
 	color := parseColor(raw["color"].(map[string]interface{}))
 	return components.NewLabel(center.X, center.Y, text, fontSize, color)
+}
+
+func unmarshalTextBox(raw map[string]interface{}) *components.TextBox {
+	center := parseVec2(raw["center"].(map[string]interface{}))
+	width := float32(raw["width"].(float64))
+	height := float32(raw["height"].(float64))
+	fontSize := int32(raw["fontSize"].(float64))
+	text, _ := raw["text"].(string)
+	tb := components.NewTextBox(center.X, center.Y, width, height, fontSize)
+	tb.Text = text
+	return tb
+}
+
+func unmarshalLineDraw(raw map[string]interface{}) *components.LineDraw {
+	start := parseVec2(raw["start"].(map[string]interface{}))
+	end := parseVec2(raw["end"].(map[string]interface{}))
+	lineColor := parseColor(raw["lineColor"].(map[string]interface{}))
+	placed, _ := raw["placed"].(bool)
+	ld := components.NewLineDraw(start.X, start.Y)
+	ld.End = end
+	ld.LineColor = lineColor
+	ld.Placing = !placed
+	return ld
 }
 
 func remapReferences(comps []components.Component, ctx *loadCtx) {

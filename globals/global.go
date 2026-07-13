@@ -65,4 +65,6 @@ const (
 	Measurement
 	Info
 	GQubit
+	TextBox
+	LineDraw
 )
