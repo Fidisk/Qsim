@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/cmplx"
 	"math/rand/v2"
+	"qsim/config"
 	glob "qsim/globals"
 	qub "qsim/qubits"
 	"qsim/utils"
@@ -65,6 +66,7 @@ func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 		*isCursorAvailable = false
 		c.holdingCursor = true
 		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+		c.VirtualCenter = c.Center
 	}
 }
 
@@ -85,9 +87,13 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		*isCursorAvailable = true
 
 		c.zipToHook()
+		c.Center = c.VirtualCenter
+		c.ClearForce()
 	}
 	if c.dragging {
-		c.Center = rl.Vector2Add(worldMouse, c.offset)
+		raw := rl.Vector2Add(worldMouse, c.offset)
+		c.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
+		c.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
 		c.ClearForce()
 	} else {
 		c.DecayForce()
@@ -344,6 +350,9 @@ func (c *QubitsSystem) PostUpdate() {
 }
 
 func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
+	if !config.PhysicsEnabled {
+		return
+	}
 	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist*float32(c.cols)
 
 	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {

@@ -47,6 +47,10 @@ func DeleteObjectWithID(idList ...int32) {
 	}
 }
 
+func SnapToGrid(v, interval float32) float32 {
+	return float32(math.Round(float64(v/interval))) * interval
+}
+
 func IsMouseState(state globals.MouseOperation) bool {
 	return (globals.MouseState & state) != 0
 }

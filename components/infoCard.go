@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/cmplx"
+	"qsim/config"
 	"qsim/globals"
 	glob "qsim/globals"
 	qub "qsim/qubits"
@@ -82,10 +83,13 @@ func (it *InfoTable) pullToHook() {
 			it.Hook.Disconnect()
 			return
 		}
+		if !config.PhysicsEnabled {
+			return
+		}
 		t := target.(Component)
 		t.AddForce(dir)
 		it.AddForce(dir.Scale(-1))
-	} else {
+	} else if config.PhysicsEnabled {
 		it.Hook.AddForce(dir)
 		it.AddForce(dir.Scale(-1))
 	}
@@ -166,15 +170,20 @@ func (it *InfoTable) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorA
 			*isCursorAvailable = false
 			it.holdingCursor = true
 			it.offset = rl.Vector2Subtract(it.Center, worldMouse)
+			it.VirtualCenter = it.Center
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && it.holdingCursor {
 		it.dragging = false
 		it.holdingCursor = false
 		*isCursorAvailable = true
+		it.Center = it.VirtualCenter
+		it.ClearForce()
 	}
 	if it.dragging {
-		it.Center = rl.Vector2Add(worldMouse, it.offset)
+		raw := rl.Vector2Add(worldMouse, it.offset)
+		it.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
+		it.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
 	}
 
 	it.pullToHook()

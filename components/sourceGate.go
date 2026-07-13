@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/cmplx"
+	"qsim/config"
 	"strconv"
 	"strings"
 
@@ -143,10 +144,13 @@ func (sg *SourceGate) pullToHook() {
 			d.Disconnect()
 			return
 		}
+		if !config.PhysicsEnabled {
+			return
+		}
 		t := target.(Component)
 		t.AddForce(dir)
 		sg.AddForce(dir.Scale(-1))
-	} else {
+	} else if config.PhysicsEnabled {
 		d.AddForce(dir)
 		sg.AddForce(dir.Scale(-1))
 	}
@@ -176,6 +180,7 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 			*isCursorAvailable = false
 			sg.holdingCursor = true
 			sg.offset = rl.Vector2Subtract(sg.Center, worldMouse)
+			sg.VirtualCenter = sg.Center
 		}
 	}
 
@@ -183,10 +188,14 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 		sg.dragging = false
 		sg.holdingCursor = false
 		*isCursorAvailable = true
+		sg.Center = sg.VirtualCenter
+		sg.ClearForce()
 	}
 
 	if sg.dragging {
-		sg.Center = rl.Vector2Add(worldMouse, sg.offset)
+		raw := rl.Vector2Add(worldMouse, sg.offset)
+		sg.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
+		sg.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
 		sg.ClearForce()
 	} else {
 		sg.DecayForce()

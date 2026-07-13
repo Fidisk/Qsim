@@ -118,7 +118,15 @@ func (rw *RenderWindow) Draw() {
 	// 3. Draw components in world space (camera transforms, scissor clips)
 	rl.BeginMode2D(rw.Camera)
 	for _, c := range rw.WComp {
-		c.Draw()
+		circle := c.GetCircle()
+		if circle.IsDragging() {
+			saved := circle.Center
+			circle.Center = circle.VirtualCenter
+			c.Draw()
+			circle.Center = saved
+		} else {
+			c.Draw()
+		}
 	}
 	rl.EndMode2D()
 

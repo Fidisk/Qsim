@@ -3,6 +3,7 @@ package components
 import (
 	"math"
 	"math/cmplx"
+	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/utils"
@@ -97,6 +98,7 @@ func (c *Gate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 		*isCursorAvailable = false
 		c.holdingCursor = true
 		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+		c.VirtualCenter = c.Center
 	}
 }
 
@@ -111,9 +113,13 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		c.dragging = false
 		c.holdingCursor = false
 		*isCursorAvailable = true
+		c.Center = c.VirtualCenter
+		c.ClearForce()
 	}
 	if c.dragging {
-		c.Center = rl.Vector2Add(worldMouse, c.offset)
+		raw := rl.Vector2Add(worldMouse, c.offset)
+		c.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
+		c.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
 		c.ClearForce()
 	} else {
 		c.DecayForce()
@@ -293,9 +299,16 @@ func (c *Gate) pullToHook(d *Hook) {
 			d.Disconnect()
 			return
 		}
+		if !config.PhysicsEnabled {
+			return
+		}
 		t := tmp2.(Component)
 		t.AddForce(tmp)
 		c.AddForce(tmp.Scale(-1))
+		return
+	}
+
+	if !config.PhysicsEnabled {
 		return
 	}
 
