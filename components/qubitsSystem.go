@@ -92,8 +92,13 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
+		oldVC := c.VirtualCenter
 		c.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
 		c.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
+		delta := c.VirtualCenter.Subtract(oldVC)
+		for _, d := range c.QubitDeterminatorList {
+			d.Center = d.Center.Add(delta)
+		}
 		c.ClearForce()
 	} else {
 		c.DecayForce()

@@ -38,13 +38,15 @@ func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]c
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
+	vertSpacing := glob.HookRadius * 1.5
 	for i := 0; i < int(inputCount); i++ {
-		newHook := NewHook(x, y, glob.HookRadius, glob.HookColor)
+		offY := (float32(i) - float32(inputCount-1)/2) * vertSpacing
+		newHook := NewHook(x-glob.GateToHookDist, y+offY, glob.HookRadius, glob.HookColor)
 		newHook.Label = "I" + strconv.Itoa(i)
 		tmp.HookList = append(tmp.HookList, newHook)
 	}
 	tmp.OutPutHook = nil
-	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
+	outputHook := NewOutputHook(x+glob.GateToHookDist, y, glob.OutputHookRadius, glob.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook)
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
 	tmp.OutPutHook[0].Label = "O"
@@ -62,19 +64,18 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
-	for i := 0; i < int(tmp.InputCount); i++ {
-		newHook := NewHook(x, y, glob.HookRadius, glob.HookColor)
-		newHook.Label = "I"
-		tmp.HookList = append(tmp.HookList, newHook)
-	}
-	outputHook := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
+	newHook := NewHook(x-glob.GateToHookDist, y, glob.HookRadius, glob.HookColor)
+	newHook.Label = "I"
+	tmp.HookList = append(tmp.HookList, newHook)
+
+	outputHook := NewOutputHook(x+glob.GateToHookDist, y-glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook)
 	tmp.OutPutHook = nil
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
 	tmp.OutPutHook[0].Label = "O"
 	tmp.OutPutHook[0].AllowQubitSystem = true
 
-	outputHook2 := NewOutputHook(x, y, glob.OutputHookRadius, glob.OutputHookColor)
+	outputHook2 := NewOutputHook(x+glob.GateToHookDist, y+glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook2)
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook2)
 	tmp.OutPutHook[1].Label = "O"
@@ -118,8 +119,13 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
+		oldVC := c.VirtualCenter
 		c.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
 		c.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
+		delta := c.VirtualCenter.Subtract(oldVC)
+		for _, d := range c.HookList {
+			d.Center = d.Center.Add(delta)
+		}
 		c.ClearForce()
 	} else {
 		c.DecayForce()
