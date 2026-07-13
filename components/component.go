@@ -10,6 +10,7 @@ type PlaceholderWindow interface {
 
 type Component interface {
 	Draw()
+	DrawGhost()
 	Update(rl.Vector2, bool, *bool)
 	PostUpdate()
 	IsHoldingCursor() bool

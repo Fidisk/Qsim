@@ -120,6 +120,7 @@ func (rw *RenderWindow) Draw() {
 	for _, c := range rw.WComp {
 		circle := c.GetCircle()
 		if circle.IsDragging() {
+			c.DrawGhost()
 			saved := circle.Center
 			circle.Center = circle.VirtualCenter
 			c.Draw()

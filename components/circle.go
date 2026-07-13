@@ -84,6 +84,10 @@ func (c *Circle) Draw() {
 	rl.DrawCircleV(c.Center, c.Radius, c.Color)
 }
 
+func (c *Circle) DrawGhost() {
+	rl.DrawCircleLinesV(c.Center, c.Radius, rl.Fade(c.Color, 0.3))
+}
+
 func (c *Circle) GetForce() rl.Vector2 {
 	return c.curForce
 }

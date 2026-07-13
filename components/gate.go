@@ -371,6 +371,25 @@ func (c *Gate) Draw() {
 	}
 }
 
+func (c *Gate) DrawGhost() {
+	ghostColor := rl.Fade(c.Color, 0.3)
+	rect := rl.Rectangle{
+		X:      c.Center.X - c.Radius,
+		Y:      c.Center.Y - c.Radius,
+		Width:  c.Radius * 2,
+		Height: c.Radius * 2,
+	}
+	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+
+	if c.Label != "" {
+		fontSize := int32(c.Radius / 2)
+		textWidth := rl.MeasureText(c.Label, fontSize)
+		textX := int32(c.Center.X) - textWidth/2
+		textY := int32(c.Center.Y) - fontSize/2
+		rl.DrawText(c.Label, textX, textY, fontSize, ghostColor)
+	}
+}
+
 func (c *Gate) PostUpdate() {
 	for i := range c.HookList {
 		for j := i + 1; j < len(c.HookList); j++ {

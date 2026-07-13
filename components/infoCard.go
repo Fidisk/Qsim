@@ -357,6 +357,17 @@ func (it *InfoTable) Draw() {
 	}
 }
 
+func (it *InfoTable) DrawGhost() {
+	ghostColor := rl.Fade(it.Color, 0.3)
+	rect := rl.NewRectangle(
+		it.Center.X-it.Width/2,
+		it.Center.Y-it.Height/2,
+		it.Width,
+		it.Height,
+	)
+	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+}
+
 // ---------- helpers ----------
 func maxF(a, b float32) float32 {
 	if a > b {

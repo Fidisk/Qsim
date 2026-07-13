@@ -418,4 +418,10 @@ func (sg *SourceGate) Draw() {
 	}
 }
 
+func (sg *SourceGate) DrawGhost() {
+	ghostColor := rl.Fade(sg.Color, 0.3)
+	rect := sg.getTableRect()
+	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+}
+
 func (sg *SourceGate) PostUpdate() {}

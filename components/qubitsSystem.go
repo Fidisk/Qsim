@@ -233,6 +233,38 @@ func (c *QubitsSystem) Draw() {
 	}
 }
 
+func (c *QubitsSystem) DrawGhost() {
+	ghostColor := rl.Fade(c.Color, 0.3)
+
+	for _, d := range c.QubitDeterminatorList {
+		rl.DrawLineV(c.Center, d.Center, ghostColor)
+	}
+
+	exp := c.Origin.Size
+	n := glob.QubitSystemCellWidth
+	m := glob.QubitSystemCellHeight
+	widthExp := (exp + 1) / 2
+	heightExp := exp / 2
+	cols := int32(1 << widthExp)
+	rows := int32(1 << heightExp)
+	totalWidth := float32(cols * int32(n))
+	totalHeight := float32(rows * int32(m))
+	startX := c.Center.X - totalWidth/2
+	startY := c.Center.Y - totalHeight/2
+
+	borderRect := rl.NewRectangle(startX, startY, totalWidth, totalHeight)
+	rl.DrawRectangleLinesEx(borderRect, 2, ghostColor)
+
+	for i := int32(1); i < cols; i++ {
+		x := startX + float32(i*int32(n))
+		rl.DrawLineV(rl.Vector2{X: x, Y: startY}, rl.Vector2{X: x, Y: startY + totalHeight}, ghostColor)
+	}
+	for j := int32(1); j < rows; j++ {
+		y := startY + float32(j)*float32(m)
+		rl.DrawLineV(rl.Vector2{X: startX, Y: y}, rl.Vector2{X: startX + totalWidth, Y: y}, ghostColor)
+	}
+}
+
 func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	//This do not defer the Origin
 	c.Origin = p
