@@ -183,8 +183,10 @@ func (it *InfoTable) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorA
 	if it.dragging {
 		raw := rl.Vector2Add(worldMouse, it.offset)
 		oldVC := it.VirtualCenter
-		it.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
-		it.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
+		it.VirtualCenter = rl.Vector2Lerp(it.VirtualCenter, rl.Vector2{
+			X: utils.SnapToGrid(raw.X, config.SnapToGridInterval),
+			Y: utils.SnapToGrid(raw.Y, config.SnapToGridInterval),
+		}, 0.25)
 		delta := it.VirtualCenter.Subtract(oldVC)
 		it.Hook.Center = it.Hook.Center.Add(delta)
 	}

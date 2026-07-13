@@ -195,8 +195,10 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 	if sg.dragging {
 		raw := rl.Vector2Add(worldMouse, sg.offset)
 		oldVC := sg.VirtualCenter
-		sg.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
-		sg.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
+		sg.VirtualCenter = rl.Vector2Lerp(sg.VirtualCenter, rl.Vector2{
+			X: utils.SnapToGrid(raw.X, config.SnapToGridInterval),
+			Y: utils.SnapToGrid(raw.Y, config.SnapToGridInterval),
+		}, 0.25)
 		delta := sg.VirtualCenter.Subtract(oldVC)
 		sg.OutHook.Center = sg.OutHook.Center.Add(delta)
 		sg.ClearForce()

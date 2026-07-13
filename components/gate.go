@@ -120,8 +120,10 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
 		oldVC := c.VirtualCenter
-		c.VirtualCenter.X = utils.SnapToGrid(raw.X, config.SnapToGridInterval)
-		c.VirtualCenter.Y = utils.SnapToGrid(raw.Y, config.SnapToGridInterval)
+		c.VirtualCenter = rl.Vector2Lerp(c.VirtualCenter, rl.Vector2{
+			X: utils.SnapToGrid(raw.X, config.SnapToGridInterval),
+			Y: utils.SnapToGrid(raw.Y, config.SnapToGridInterval),
+		}, 0.25)
 		delta := c.VirtualCenter.Subtract(oldVC)
 		for _, d := range c.HookList {
 			d.Center = d.Center.Add(delta)
