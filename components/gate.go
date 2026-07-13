@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"math"
 	"math/cmplx"
 	"qsim/config"
@@ -26,6 +27,8 @@ type Gate struct {
 	OutPutHook        []*Hook
 	IsMeasurementGate bool
 	MeasureResult     int32
+	OutcomeProbs      [2]float64
+	OutcomeLabels     [2]string
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
@@ -180,18 +183,42 @@ func (c *Gate) MeasureOutput() {
 	}
 
 	for hit := 0; hit <= 1; hit++ {
-		var coeff complex64
+		var prob float64
 		if hit == 0 {
-			coeff = complex64(complex(1/cmplx.Abs(complex128(l)), 0))
+			prob = cmplx.Abs(complex128(l))
 		} else {
-			coeff = complex64(complex(1/cmplx.Abs(complex128(complex(1, 0)-l)), 0))
+			prob = cmplx.Abs(complex128(complex(1, 0) - l))
 		}
+		c.OutcomeProbs[hit] = prob
+		c.OutcomeLabels[hit] = fmt.Sprintf("|%d>", hit)
+
+		if prob == 0 {
+			amps := make([]complex64, 1<<QSM.Size)
+			amps[hit<<(n-pos)] = 1
+			result := qubits.NewQubitStateManagerFrom(amps, QSM.ModifierID)
+			hook := c.OutPutHook[hit]
+			if hook.IsHooked {
+				tmp := utils.GetObjectFromID(hook.TargetID)
+				if tmp != nil {
+					tmp.(*QubitsSystem).Origin.CopyFrom(result)
+					continue
+				}
+			}
+			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+			tmp.Assign(result)
+			tmp.SetParent(c.GetParent())
+			tmp.GetParent().PushComponent(tmp)
+			hook.Connect(tmp)
+			continue
+		}
+
+		coeff := complex64(complex(1/prob, 0))
 		coeff = complex64(cmplx.Sqrt(complex128(coeff)))
 
 		result := qubits.NewQubitStateManagerFrom([]complex64{}, QSM.ModifierID)
 
 		for i, d := range QSM.Amptitude {
-			if ((i >> pos) & 1) == hit {
+			if ((i >> (n - pos)) & 1) == hit {
 				result.Amptitude = append(result.Amptitude, d*coeff)
 			} else {
 				result.Amptitude = append(result.Amptitude, 0)
@@ -345,6 +372,15 @@ func (c *Gate) Draw() {
 			rl.DrawLineV(c.Center, d.Center, c.Color)
 		}
 		d.Draw()
+	}
+
+	if c.IsMeasurementGate {
+		for i, oh := range c.OutPutHook {
+			mid := rl.Vector2Scale(rl.Vector2Add(c.Center, oh.Center), 0.5)
+			label := fmt.Sprintf("%s, probability: %.2f", c.OutcomeLabels[i], c.OutcomeProbs[i])
+			textWidth := rl.MeasureText(label, 14)
+			rl.DrawText(label, int32(mid.X)-textWidth/2, int32(mid.Y)-20, 14, rl.White)
+		}
 	}
 
 	rect := rl.Rectangle{
