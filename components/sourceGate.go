@@ -26,6 +26,8 @@ type SourceGate struct {
 	Amplitude  []complex64 // index 0 = |0⟩, index 1 = |1⟩
 	ModifierID int32
 
+	modifierGenerated bool
+
 	// dragging state
 	dragging      bool
 	holdingCursor bool
@@ -44,6 +46,14 @@ type SourceGate struct {
 	// table dimensions (cached)
 	tableWidth  float32
 	tableHeight float32
+}
+
+func (sg *SourceGate) getModifierID() int32 {
+	if !sg.modifierGenerated {
+		sg.ModifierID = attributes.GenerateQubitModifierID()
+		sg.modifierGenerated = true
+	}
+	return sg.ModifierID
 }
 
 // layout constants
@@ -65,11 +75,10 @@ func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []com
 		amp = []complex64{complex(1, 0), complex(0, 0)}
 	}
 	sg := &SourceGate{
-		Circle:     *NewCircle(x, y, radius, color),
-		Label:      label,
-		Color:      color,
-		Amplitude:  amp,
-		ModifierID: attributes.GenerateQubitModifierID(),
+		Circle:    *NewCircle(x, y, radius, color),
+		Label:     label,
+		Color:     color,
+		Amplitude: amp,
 	}
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
@@ -89,11 +98,12 @@ func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp
 		amp = []complex64{complex(1, 0), complex(0, 0)}
 	}
 	sg := &SourceGate{
-		Circle:     *NewCircle(x, y, radius, color),
-		Label:      label,
-		Color:      color,
-		Amplitude:  amp,
-		ModifierID: modID,
+		Circle:            *NewCircle(x, y, radius, color),
+		Label:             label,
+		Color:             color,
+		Amplitude:         amp,
+		ModifierID:        modID,
+		modifierGenerated: true,
 	}
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
@@ -216,14 +226,14 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 			return
 		}
 		target := targetObj.(*QubitsSystem)
-		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.ModifierID})
+		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.getModifierID()})
 		if target.Origin != nil {
 			target.Origin.CopyFrom(state)
 		} else {
 			target.Assign(state)
 		}
 	} else {
-		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.ModifierID})
+		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.getModifierID()})
 
 		tmp := NewQubitsSystem(sg.Center.X, sg.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 		tmp.Assign(state)

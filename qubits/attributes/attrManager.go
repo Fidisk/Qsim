@@ -9,12 +9,7 @@ type AttrManager struct {
 }
 
 func newAttrManager() *AttrManager {
-	red := NewColor(255, 0, 0)
-	green := NewColor(0, 255, 0)
-	blue := NewColor(0, 0, 255)
-	square := NewSide(5, 4)
-	hexa := NewSide(7, 4)
-	tmp := []attributes{red, green, blue, square, hexa}
+	tmp := []attributes{}
 	return &AttrManager{
 		modifier: tmp,
 	}
@@ -26,10 +21,11 @@ func (a *AttrManager) Get(id int32) attributes {
 	return a.modifier[id]
 }
 
-var QubitModifierID int32 = 5
+var QubitModifierID int32 = 0
 
 func GenerateQubitModifierID() int32 {
-	AttributesManager.modifier = append(AttributesManager.modifier, NewName("Q"+strconv.Itoa(int(QubitModifierID))))
-	defer func() { QubitModifierID++ }()
-	return QubitModifierID
+	id := QubitModifierID
+	AttributesManager.modifier = append(AttributesManager.modifier, NewName("Q"+strconv.Itoa(int(id))))
+	QubitModifierID++
+	return id
 }
