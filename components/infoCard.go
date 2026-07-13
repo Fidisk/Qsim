@@ -375,7 +375,7 @@ func (it *InfoTable) DrawGhost() {
 }
 
 func (it *InfoTable) GetChildCircles() []*Circle {
-	if it.Hook == nil {
+	if it.Hook == nil || it.Hook.IsHooked {
 		return nil
 	}
 	return []*Circle{it.Hook.GetCircle()}

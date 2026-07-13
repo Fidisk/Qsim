@@ -441,7 +441,7 @@ func (sg *SourceGate) DrawGhost() {
 }
 
 func (sg *SourceGate) GetChildCircles() []*Circle {
-	if sg.OutHook == nil {
+	if sg.OutHook == nil || sg.OutHook.IsHooked {
 		return nil
 	}
 	return []*Circle{sg.OutHook.GetCircle()}

@@ -450,9 +450,11 @@ func (c *Gate) DrawGhost() {
 }
 
 func (c *Gate) GetChildCircles() []*Circle {
-	children := make([]*Circle, len(c.HookList))
-	for i, h := range c.HookList {
-		children[i] = h.GetCircle()
+	var children []*Circle
+	for _, h := range c.HookList {
+		if !h.IsHooked {
+			children = append(children, h.GetCircle())
+		}
 	}
 	return children
 }

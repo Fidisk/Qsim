@@ -70,6 +70,15 @@ func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	}
 }
 
+func (c *QubitsSystem) isDeterminatorVisible(d *QubitDeterminator) bool {
+	for _, det := range c.QubitDeterminatorList {
+		if det.HookID != 0 {
+			return d.HookID != 0
+		}
+	}
+	return true
+}
+
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	for _, d := range c.QubitList {
 		d.Update()
@@ -108,6 +117,9 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 
 	for _, d := range c.QubitDeterminatorList {
+		if !c.isDeterminatorVisible(d) {
+			continue
+		}
 		c.pullToQubitSystem(d)
 
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
@@ -116,7 +128,9 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 
 func (c *QubitsSystem) Draw() {
 	for _, d := range c.QubitDeterminatorList {
-		rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
+		if c.isDeterminatorVisible(d) {
+			rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
+		}
 	}
 
 	// New: rectangle split into 2^ceil(exp/2) columns × 2^floor(exp/2) c.rows
@@ -236,7 +250,9 @@ func (c *QubitsSystem) Draw() {
 	*/
 
 	for _, d := range c.QubitDeterminatorList {
-		d.Draw()
+		if c.isDeterminatorVisible(d) {
+			d.Draw()
+		}
 	}
 }
 
@@ -244,7 +260,9 @@ func (c *QubitsSystem) DrawGhost() {
 	ghostColor := rl.Fade(c.Color, 0.3)
 
 	for _, d := range c.QubitDeterminatorList {
-		rl.DrawLineEx(c.Center, d.Center, 4, ghostColor)
+		if c.isDeterminatorVisible(d) {
+			rl.DrawLineEx(c.Center, d.Center, 4, ghostColor)
+		}
 	}
 
 	exp := c.Origin.Size
@@ -273,9 +291,11 @@ func (c *QubitsSystem) DrawGhost() {
 }
 
 func (c *QubitsSystem) GetChildCircles() []*Circle {
-	children := make([]*Circle, len(c.QubitDeterminatorList))
-	for i, d := range c.QubitDeterminatorList {
-		children[i] = d.GetCircle()
+	var children []*Circle
+	for _, d := range c.QubitDeterminatorList {
+		if c.isDeterminatorVisible(d) {
+			children = append(children, d.GetCircle())
+		}
 	}
 	return children
 }
@@ -390,7 +410,13 @@ func (c *QubitsSystem) split() {
 
 func (c *QubitsSystem) PostUpdate() {
 	for i := range c.QubitDeterminatorList {
+		if !c.isDeterminatorVisible(c.QubitDeterminatorList[i]) {
+			continue
+		}
 		for j := i + 1; j < len(c.QubitDeterminatorList); j++ {
+			if !c.isDeterminatorVisible(c.QubitDeterminatorList[j]) {
+				continue
+			}
 			c.QubitDeterminatorList[i].GetCircle().AntiGravity(c.QubitDeterminatorList[j].GetCircle())
 		}
 	}
@@ -398,6 +424,12 @@ func (c *QubitsSystem) PostUpdate() {
 
 func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
 	if !config.PhysicsEnabled {
+		return
+	}
+	if !c.isDeterminatorVisible(d) {
+		return
+	}
+	if d.HookID != 0 {
 		return
 	}
 	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist*float32(c.cols)
