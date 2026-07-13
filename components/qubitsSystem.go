@@ -116,7 +116,7 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 
 func (c *QubitsSystem) Draw() {
 	for _, d := range c.QubitDeterminatorList {
-		rl.DrawLineV(c.Center, d.Center, c.Color)
+		rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
 	}
 
 	// New: rectangle split into 2^ceil(exp/2) columns × 2^floor(exp/2) c.rows
@@ -146,29 +146,29 @@ func (c *QubitsSystem) Draw() {
 
 	// Outer border
 	borderRect := rl.NewRectangle(c.startX, c.startY, totalWidth, totalHeight)
-	borderThickness := float32(1.0)
+	borderThickness := float32(4.0)
 	if c.IsFixed {
-		borderThickness = 3.0
+		borderThickness = 5.0
 	}
 	rl.DrawRectangleLinesEx(borderRect, borderThickness, c.Color)
 
 	// Vertical grid lines (between columns)
 	for i := int32(1); i < c.cols; i++ {
 		x := c.startX + float32(i*int32(n))
-		rl.DrawLineV(
+		rl.DrawLineEx(
 			rl.Vector2{X: x, Y: c.startY},
 			rl.Vector2{X: x, Y: c.startY + totalHeight},
-			c.Color,
+			4, c.Color,
 		)
 	}
 
 	// Horizontal grid lines (between c.rows)
 	for j := int32(1); j < c.rows; j++ {
 		y := c.startY + float32(j)*float32(m)
-		rl.DrawLineV(
+		rl.DrawLineEx(
 			rl.Vector2{X: c.startX, Y: y},
 			rl.Vector2{X: c.startX + totalWidth, Y: y},
-			c.Color,
+			4, c.Color,
 		)
 	}
 
@@ -244,7 +244,7 @@ func (c *QubitsSystem) DrawGhost() {
 	ghostColor := rl.Fade(c.Color, 0.3)
 
 	for _, d := range c.QubitDeterminatorList {
-		rl.DrawLineV(c.Center, d.Center, ghostColor)
+		rl.DrawLineEx(c.Center, d.Center, 4, ghostColor)
 	}
 
 	exp := c.Origin.Size
@@ -260,15 +260,15 @@ func (c *QubitsSystem) DrawGhost() {
 	startY := c.Center.Y - totalHeight/2
 
 	borderRect := rl.NewRectangle(startX, startY, totalWidth, totalHeight)
-	rl.DrawRectangleLinesEx(borderRect, 2, ghostColor)
+	rl.DrawRectangleLinesEx(borderRect, 4, ghostColor)
 
 	for i := int32(1); i < cols; i++ {
 		x := startX + float32(i*int32(n))
-		rl.DrawLineV(rl.Vector2{X: x, Y: startY}, rl.Vector2{X: x, Y: startY + totalHeight}, ghostColor)
+		rl.DrawLineEx(rl.Vector2{X: x, Y: startY}, rl.Vector2{X: x, Y: startY + totalHeight}, 4, ghostColor)
 	}
 	for j := int32(1); j < rows; j++ {
 		y := startY + float32(j)*float32(m)
-		rl.DrawLineV(rl.Vector2{X: startX, Y: y}, rl.Vector2{X: startX + totalWidth, Y: y}, ghostColor)
+		rl.DrawLineEx(rl.Vector2{X: startX, Y: y}, rl.Vector2{X: startX + totalWidth, Y: y}, 4, ghostColor)
 	}
 }
 

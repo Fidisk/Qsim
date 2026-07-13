@@ -148,7 +148,7 @@ func (tb *TextBox) Draw() {
 		border = rl.SkyBlue
 	}
 	rl.DrawRectangleRec(rl.NewRectangle(x, y, w, h), bg)
-	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, w, h), 1, border)
+	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, w, h), 4, border)
 
 	lines := strings.Split(tb.Text, "\n")
 	lineH := float32(tb.FontSize) + 4
@@ -163,12 +163,12 @@ func (tb *TextBox) Draw() {
 		lastLine := lines[len(lines)-1]
 		cursorX := int32(x+8) + rl.MeasureText(lastLine, tb.FontSize)
 		cursorY := int32(textY + float32(len(lines)-1)*lineH)
-		rl.DrawRectangle(cursorX, cursorY, 2, tb.FontSize, rl.SkyBlue)
+		rl.DrawRectangle(cursorX, cursorY, 4, tb.FontSize, rl.SkyBlue)
 	}
 }
 
 func (tb *TextBox) DrawGhost() {
 	x := tb.Center.X - tb.Width/2
 	y := tb.Center.Y - tb.Height/2
-	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, tb.Width, tb.Height), 2, rl.Fade(rl.White, 0.3))
+	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, tb.Width, tb.Height), 4, rl.Fade(rl.White, 0.3))
 }

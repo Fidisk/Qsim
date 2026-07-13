@@ -367,9 +367,9 @@ func (c *Gate) Draw() {
 				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),
 				r,
 			))
-			rl.DrawLineV(start, end, c.Color)
+			rl.DrawLineEx(start, end, 4, c.Color)
 		} else {
-			rl.DrawLineV(c.Center, d.Center, c.Color)
+			rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
 		}
 		d.Draw()
 	}
@@ -390,9 +390,9 @@ func (c *Gate) Draw() {
 		Height: c.Radius * 2,
 	}
 	rl.DrawRectangleRec(rect, glob.ColorBg)
-	thickness := float32(1.0)
+	thickness := float32(4.0)
 	if c.IsFixed {
-		thickness = 3.0
+		thickness = 5.0
 	}
 	rl.DrawRectangleLinesEx(rect, thickness, c.Color)
 
@@ -426,7 +426,7 @@ func (c *Gate) DrawGhost() {
 		Height: c.Radius * 2,
 	}
 	rl.DrawRectangleRec(rect, ghostBg)
-	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+	rl.DrawRectangleLinesEx(rect, 4, ghostColor)
 
 	if c.Label != "" {
 		fontSize := int32(c.Radius / 2)
@@ -439,7 +439,7 @@ func (c *Gate) DrawGhost() {
 	for _, d := range c.HookList {
 		dir := rl.Vector2Normalize(rl.Vector2Subtract(d.Center, c.Center))
 		start := rl.Vector2Add(c.Center, rl.Vector2Scale(dir, c.Radius))
-		rl.DrawLineV(start, d.Center, ghostColor)
+		rl.DrawLineEx(start, d.Center, 4, ghostColor)
 		d.DrawGhost()
 	}
 }

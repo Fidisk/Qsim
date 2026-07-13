@@ -276,9 +276,9 @@ func (it *InfoTable) Draw() {
 			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, rightCenter)),
 			utils.Dist(rightCenter, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		rl.DrawLineV(rightCenter, end, globals.HookColor)
+		rl.DrawLineEx(rightCenter, end, 4, globals.HookColor)
 	} else {
-		rl.DrawLineV(rightCenter, it.Hook.Center, globals.HookColor)
+		rl.DrawLineEx(rightCenter, it.Hook.Center, 4, globals.HookColor)
 	}
 	it.Hook.Draw()
 
@@ -290,7 +290,7 @@ func (it *InfoTable) Draw() {
 		it.Height,
 	)
 	rl.DrawRectangleRec(rect, it.Color)
-	rl.DrawRectangleLines(int32(rect.X), int32(rect.Y), int32(rect.Width), int32(rect.Height), rl.Black)
+	rl.DrawRectangleLinesEx(rect, 4, rl.Black)
 
 	const paddingLeft = 8
 	const paddingTop = 8
@@ -302,8 +302,8 @@ func (it *InfoTable) Draw() {
 	col2Right := it.Center.X - it.Width/2 + paddingLeft + it.Width*0.75
 
 	// --- Draw column separators (like QubitsSystem grid lines) ---
-	rl.DrawLineV(rl.Vector2{X: col1Right, Y: rect.Y}, rl.Vector2{X: col1Right, Y: rect.Y + rect.Height}, rl.Black)
-	rl.DrawLineV(rl.Vector2{X: col2Right, Y: rect.Y}, rl.Vector2{X: col2Right, Y: rect.Y + rect.Height}, rl.Black)
+	rl.DrawLineEx(rl.Vector2{X: col1Right, Y: rect.Y}, rl.Vector2{X: col1Right, Y: rect.Y + rect.Height}, 4, rl.Black)
+	rl.DrawLineEx(rl.Vector2{X: col2Right, Y: rect.Y}, rl.Vector2{X: col2Right, Y: rect.Y + rect.Height}, 4, rl.Black)
 
 	// Available width for the label column
 	labelMaxWidth := col1Right - (it.Center.X - it.Width/2) - paddingLeft
@@ -353,10 +353,10 @@ func (it *InfoTable) Draw() {
 		rl.DrawText(complexStr, cTextX, labelY, fontSize, rl.White)
 
 		if i < len(it.Rows)-1 {
-			rl.DrawLineV(
+			rl.DrawLineEx(
 				rl.Vector2{X: rect.X, Y: rowY + rowHeight},
 				rl.Vector2{X: rect.X + rect.Width, Y: rowY + rowHeight},
-				rl.Black,
+				4, rl.Black,
 			)
 		}
 	}
@@ -370,7 +370,7 @@ func (it *InfoTable) DrawGhost() {
 		it.Width,
 		it.Height,
 	)
-	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+	rl.DrawRectangleLinesEx(rect, 4, ghostColor)
 	it.Hook.DrawGhost()
 }
 

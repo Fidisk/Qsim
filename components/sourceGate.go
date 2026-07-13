@@ -317,26 +317,26 @@ func (sg *SourceGate) Draw() {
 			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, rightCenter)),
 			utils.Dist(rightCenter, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		rl.DrawLineV(rightCenter, end, sg.Color)
+		rl.DrawLineEx(rightCenter, end, 4, sg.Color)
 	} else {
-		rl.DrawLineV(rightCenter, sg.OutHook.Center, sg.Color)
+		rl.DrawLineEx(rightCenter, sg.OutHook.Center, 4, sg.Color)
 	}
 	sg.OutHook.Draw()
 
 	// --- Table rectangle ---
 	rect := sg.getTableRect()
 	rl.DrawRectangleRec(rect, glob.ColorBg)
-	thickness := float32(1.0)
+	thickness := float32(4.0)
 	if sg.IsFixed {
-		thickness = 3.0
+		thickness = 5.0
 	}
 	rl.DrawRectangleLinesEx(rect, thickness, sg.Color)
 
 	// Column dividers
 	col1Right := rect.X + sgPaddingLeft + sgCol1Width
 	col2Right := col1Right + sgPaddingLeft + sgCol2Width
-	rl.DrawLineV(rl.Vector2{X: col1Right, Y: rect.Y}, rl.Vector2{X: col1Right, Y: rect.Y + rect.Height}, sg.Color)
-	rl.DrawLineV(rl.Vector2{X: col2Right, Y: rect.Y}, rl.Vector2{X: col2Right, Y: rect.Y + rect.Height}, sg.Color)
+	rl.DrawLineEx(rl.Vector2{X: col1Right, Y: rect.Y}, rl.Vector2{X: col1Right, Y: rect.Y + rect.Height}, 4, sg.Color)
+	rl.DrawLineEx(rl.Vector2{X: col2Right, Y: rect.Y}, rl.Vector2{X: col2Right, Y: rect.Y + rect.Height}, 4, sg.Color)
 
 	fontSize := int32(14)
 
@@ -376,10 +376,10 @@ func (sg *SourceGate) Draw() {
 
 		// Row separator
 		if i == 0 {
-			rl.DrawLineV(
+			rl.DrawLineEx(
 				rl.Vector2{X: rect.X, Y: rowY + sgRowHeight},
 				rl.Vector2{X: rect.X + rect.Width, Y: rowY + sgRowHeight},
-				sg.Color,
+				4, sg.Color,
 			)
 		}
 	}
@@ -426,7 +426,7 @@ func (sg *SourceGate) Draw() {
 func (sg *SourceGate) DrawGhost() {
 	ghostColor := rl.Fade(sg.Color, 0.3)
 	rect := sg.getTableRect()
-	rl.DrawRectangleLinesEx(rect, 2, ghostColor)
+	rl.DrawRectangleLinesEx(rect, 4, ghostColor)
 	sg.OutHook.DrawGhost()
 }
 

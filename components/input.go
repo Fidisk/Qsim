@@ -81,7 +81,7 @@ func (in *Input) Draw() {
 		border = rl.SkyBlue
 	}
 	rl.DrawRectangleRec(rl.NewRectangle(x, y, w, h), bg)
-	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, w, h), 1, border)
+	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, w, h), 4, border)
 
 	textX := int32(x + 8)
 	textY := int32(y + (h-float32(in.FontSize))/2)
@@ -89,7 +89,7 @@ func (in *Input) Draw() {
 
 	if in.Active && (in.frameCounter/20)%2 == 0 {
 		textW := rl.MeasureText(in.Text, in.FontSize)
-		rl.DrawRectangle(textX+textW, textY, 2, in.FontSize, rl.SkyBlue)
+		rl.DrawRectangle(textX+textW, textY, 4, in.FontSize, rl.SkyBlue)
 	}
 }
 
