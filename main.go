@@ -120,7 +120,11 @@ func main() {
 	toolBar.IsZoomAllow(false)
 	toolBar.IsDragAllow(true)
 	toolBar.PinCamera(func() rl.Vector2 { return rl.Vector2{X: float32(toolBar.Width)/2.0 - 800, Y: 0} })
-	toolBar.AddEffect(func() { effect.ScaleWidthToScreen(toolBar) })
+	toolBar.AddEffect(func() {
+		effect.ScaleWidthToScreen(toolBar)
+		toolBar.Height = 50
+		//effect.PinToBottom(toolBar, 50)
+	})
 	toolBar.IsSpawnAllow(false)
 	toolBar.SetPriority(100)
 	toolBar.Rename("Tool bar")
