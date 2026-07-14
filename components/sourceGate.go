@@ -315,7 +315,8 @@ func (sg *SourceGate) processEditing(isCursorAvailable *bool) {
 
 func (sg *SourceGate) Draw() {
 	// --- Connection line to output hook ---
-	rightCenter := rl.Vector2{X: sg.Center.X + sg.tableWidth/2, Y: sg.Center.Y}
+	tableRect := sg.getTableRect()
+	edge := utils.RectEdgePoint(sg.Center, sg.OutHook.Center, tableRect.Width/2, tableRect.Height/2)
 	if sg.OutHook.IsHooked {
 		target := utils.GetObjectFromID(sg.OutHook.TargetID)
 		if target == nil {
@@ -323,13 +324,13 @@ func (sg *SourceGate) Draw() {
 			return
 		}
 		t := target.(Component)
-		end := rl.Vector2Add(rightCenter, rl.Vector2Scale(
-			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, rightCenter)),
-			utils.Dist(rightCenter, t.GetCircle().Center)-t.GetCircle().Radius,
+		end := rl.Vector2Add(edge, rl.Vector2Scale(
+			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, edge)),
+			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		rl.DrawLineEx(rightCenter, end, 4, sg.Color)
+		rl.DrawLineEx(edge, end, 4, sg.Color)
 	} else {
-		rl.DrawLineEx(rightCenter, sg.OutHook.Center, 4, sg.Color)
+		rl.DrawLineEx(edge, sg.OutHook.Center, 4, sg.Color)
 	}
 	sg.OutHook.Draw()
 

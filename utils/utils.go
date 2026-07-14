@@ -82,3 +82,22 @@ func SetSpawnState(state globals.SpawnType) {
 func ToggleSpawnState(state globals.SpawnType) {
 	globals.SpawnState ^= state
 }
+
+// RectEdgePoint returns the point on the edge of a rectangle of the given
+// half-dimensions, in the direction from center toward target.
+func RectEdgePoint(center, target rl.Vector2, halfW, halfH float32) rl.Vector2 {
+	dir := rl.Vector2Subtract(target, center)
+	if dir.X == 0 && dir.Y == 0 {
+		return center
+	}
+	// Scale so that the ray exits at the rectangle boundary
+	absX := float32(math.Abs(float64(dir.X)))
+	absY := float32(math.Abs(float64(dir.Y)))
+	var t float32
+	if absX*halfH > absY*halfW {
+		t = halfW / absX
+	} else {
+		t = halfH / absY
+	}
+	return rl.Vector2Add(center, rl.Vector2Scale(dir, t))
+}

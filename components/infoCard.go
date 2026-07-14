@@ -264,7 +264,7 @@ func (it *InfoTable) RebuildRowsFromStateManager(sm *qub.QubitStateManager) {
 }
 
 func (it *InfoTable) Draw() {
-	rightCenter := rl.Vector2{X: it.Center.X, Y: it.Center.Y}
+	edge := utils.RectEdgePoint(it.Center, it.Hook.Center, it.Width/2, it.Height/2)
 	if it.Hook.IsHooked {
 		target := utils.GetObjectFromID(it.Hook.TargetID)
 		if target == nil {
@@ -272,13 +272,13 @@ func (it *InfoTable) Draw() {
 			return
 		}
 		t := target.(Component)
-		end := rl.Vector2Add(rightCenter, rl.Vector2Scale(
-			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, rightCenter)),
-			utils.Dist(rightCenter, t.GetCircle().Center)-t.GetCircle().Radius,
+		end := rl.Vector2Add(edge, rl.Vector2Scale(
+			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, edge)),
+			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		rl.DrawLineEx(rightCenter, end, 4, globals.HookColor)
+		rl.DrawLineEx(edge, end, 4, globals.HookColor)
 	} else {
-		rl.DrawLineEx(rightCenter, it.Hook.Center, 4, globals.HookColor)
+		rl.DrawLineEx(edge, it.Hook.Center, 4, globals.HookColor)
 	}
 	it.Hook.Draw()
 

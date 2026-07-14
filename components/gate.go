@@ -358,6 +358,7 @@ func (c *Gate) pullToHook(d *Hook) {
 
 func (c *Gate) Draw() {
 	for _, d := range c.HookList {
+		start := utils.RectEdgePoint(c.Center, d.Center, c.Radius, c.Radius)
 		if d.IsHooked {
 			tmp := utils.GetObjectFromID(d.TargetID)
 			if tmp == nil {
@@ -367,14 +368,13 @@ func (c *Gate) Draw() {
 			t := tmp.(Component)
 
 			r := utils.Dist(c.Center, d.Center) - t.GetCircle().Radius
-			start := c.Center
 			end := rl.Vector2Add(start, rl.Vector2Scale(
 				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),
 				r,
 			))
 			rl.DrawLineEx(start, end, 4, c.Color)
 		} else {
-			rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
+			rl.DrawLineEx(start, d.Center, 4, c.Color)
 		}
 		d.Draw()
 	}
@@ -442,8 +442,7 @@ func (c *Gate) DrawGhost() {
 	}
 
 	for _, d := range c.HookList {
-		dir := rl.Vector2Normalize(rl.Vector2Subtract(d.Center, c.Center))
-		start := rl.Vector2Add(c.Center, rl.Vector2Scale(dir, c.Radius))
+		start := utils.RectEdgePoint(c.Center, d.Center, c.Radius, c.Radius)
 		rl.DrawLineEx(start, d.Center, 4, ghostColor)
 		d.DrawGhost()
 	}
