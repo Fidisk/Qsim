@@ -343,6 +343,13 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) *components
 			if v, ok := d["hookID"]; ok {
 				qs.QubitDeterminatorList[i].HookID = int32(v.(float64))
 			}
+			if v, ok := d["qubitSystemID"]; ok {
+				if newQS, found := ctx.oldToNew[int32(v.(float64))]; found {
+					if qs2, ok2 := newQS.(*components.QubitsSystem); ok2 {
+						qs.QubitDeterminatorList[i].QubitSystemID = qs2.ID
+					}
+				}
+			}
 		}
 	}
 

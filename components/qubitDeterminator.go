@@ -35,8 +35,10 @@ func (c *QubitDeterminator) onClick(worldMouse rl.Vector2, isCursorAvailable *bo
 	switch {
 	case utils.IsMouseState(glob.MouseStateDetach):
 		if c.HookID != 0 {
-			tmp := utils.GetObjectFromID(c.HookID).(*Hook)
-			tmp.Disconnect()
+			tmp := utils.GetObjectFromID(c.HookID)
+			if h, ok := tmp.(*Hook); ok {
+				h.Disconnect()
+			}
 		}
 	default:
 		c.dragging = true
@@ -105,7 +107,14 @@ func (c *QubitDeterminator) GetParent() PlaceholderWindow {
 }
 
 func (c *QubitDeterminator) zipToHook() {
-	tmp := c.GetQubitParent().GetParent()
+	qp := c.GetQubitParent()
+	if qp == nil {
+		return
+	}
+	tmp := qp.GetParent()
+	if tmp == nil {
+		return
+	}
 	ele := tmp.GetElement()
 	gotHooked := false
 	for _, d := range ele {
@@ -159,5 +168,11 @@ func (c *QubitDeterminator) Kill() {
 		h.Disconnect()
 	}
 
-	c.GetQubitParent().GetParent().DeleteChildWithID(c.ID)
+	qp := c.GetQubitParent()
+	if qp != nil {
+		parent := qp.GetParent()
+		if parent != nil {
+			parent.DeleteChildWithID(c.ID)
+		}
+	}
 }

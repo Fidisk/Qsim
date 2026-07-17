@@ -160,14 +160,24 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 				c.DestroyOutPut()
 			}
 		}
-	} else if c.OutPutHook[0].IsHooked && cnt != int(c.InputCount) {
+	} else if len(c.OutPutHook) > 0 && c.OutPutHook[0].IsHooked && cnt != int(c.InputCount) {
 		c.DestroyOutPut()
 	}
 }
 func (c *Gate) MeasureOutput() {
-	d := c.HookList[0]
-	QD := utils.GetObjectFromID(d.TargetID).(*QubitDeterminator)
-	QSM := QD.GetQubitParent().Origin
+	if len(c.HookList) == 0 || !c.HookList[0].IsHooked {
+		return
+	}
+	target := utils.GetObjectFromID(c.HookList[0].TargetID)
+	QD, ok := target.(*QubitDeterminator)
+	if !ok {
+		return
+	}
+	qp := QD.GetQubitParent()
+	if qp == nil || qp.Origin == nil {
+		return
+	}
+	QSM := qp.Origin
 
 	var pos int32
 	for i, d := range QSM.ModifierID {
@@ -195,6 +205,10 @@ func (c *Gate) MeasureOutput() {
 		c.OutcomeProbs[hit] = prob
 		c.OutcomeLabels[hit] = fmt.Sprintf("|%d>", hit)
 
+		if hit >= len(c.OutPutHook) {
+			continue
+		}
+
 		if prob == 0 {
 			amps := make([]complex64, 1<<QSM.Size)
 			amps[hit<<(n-pos)] = 1
@@ -203,14 +217,19 @@ func (c *Gate) MeasureOutput() {
 			if hook.IsHooked {
 				tmp := utils.GetObjectFromID(hook.TargetID)
 				if tmp != nil {
-					tmp.(*QubitsSystem).Origin.CopyFrom(result)
-					continue
+					if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
+						qs.Origin.CopyFrom(result)
+						continue
+					}
 				}
 			}
 			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 			tmp.Assign(result)
-			tmp.SetParent(c.GetParent())
-			tmp.GetParent().PushComponent(tmp)
+			parent := c.GetParent()
+			if parent != nil {
+				tmp.SetParent(parent)
+				parent.PushComponent(tmp)
+			}
 			hook.Connect(tmp)
 			continue
 		}
@@ -234,12 +253,17 @@ func (c *Gate) MeasureOutput() {
 			if tmp == nil {
 				continue
 			}
-			tmp.(*QubitsSystem).Origin.CopyFrom(result)
+			if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
+				qs.Origin.CopyFrom(result)
+			}
 		} else {
 			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 			tmp.Assign(result)
-			tmp.SetParent(c.GetParent())
-			tmp.GetParent().PushComponent(tmp)
+			parent := c.GetParent()
+			if parent != nil {
+				tmp.SetParent(parent)
+				parent.PushComponent(tmp)
+			}
 			hook.Connect(tmp)
 		}
 	}
@@ -294,21 +318,21 @@ func (c *Gate) CalculateOutPut() bool {
 
 	result.Multiply(c.Operation, c.InputCount)
 
-	if c.OutPutHook[0].IsHooked {
+	if len(c.OutPutHook) > 0 && c.OutPutHook[0].IsHooked {
 		tmp := utils.GetObjectFromID(c.OutPutHook[0].TargetID)
-		if tmp == nil {
-			goto createOutput
+		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
+			qs.Origin.CopyFrom(result)
+			return true
 		}
-		tmp.(*QubitsSystem).Origin.CopyFrom(result)
-		return true
 	}
-
-createOutput:
 
 	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 	tmp.Assign(result)
-	tmp.SetParent(c.GetParent())
-	tmp.GetParent().PushComponent(tmp)
+	parent := c.GetParent()
+	if parent != nil {
+		tmp.SetParent(parent)
+		parent.PushComponent(tmp)
+	}
 
 	c.OutPutHook[0].Connect(tmp)
 	return true
@@ -342,7 +366,11 @@ func (c *Gate) pullToHook(d *Hook) {
 		if !config.PhysicsEnabled {
 			return
 		}
-		t := tmp2.(Component)
+		t, ok := tmp2.(Component)
+		if !ok {
+			d.Disconnect()
+			return
+		}
 		t.AddForce(tmp)
 		c.AddForce(tmp.Scale(-1))
 		return
@@ -365,7 +393,11 @@ func (c *Gate) Draw() {
 				d.Disconnect()
 				continue
 			}
-			t := tmp.(Component)
+			t, ok := tmp.(Component)
+		if !ok {
+			d.Disconnect()
+			continue
+		}
 
 			r := utils.Dist(c.Center, d.Center) - t.GetCircle().Radius
 			end := rl.Vector2Add(start, rl.Vector2Scale(

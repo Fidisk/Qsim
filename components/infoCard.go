@@ -199,8 +199,11 @@ func (it *InfoTable) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorA
 		if target == nil {
 			return
 		}
-		tmp := target.(*QubitsSystem).Origin
-		it.RebuildRowsFromStateManager(tmp)
+		qs, ok := target.(*QubitsSystem)
+		if !ok {
+			return
+		}
+		it.RebuildRowsFromStateManager(qs.Origin)
 
 		it.Height = 2*tablePaddingTop + float32(len(it.Rows))*tableRowHeight
 	}

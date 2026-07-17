@@ -225,7 +225,10 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 		if targetObj == nil {
 			return
 		}
-		target := targetObj.(*QubitsSystem)
+		target, ok := targetObj.(*QubitsSystem)
+		if !ok {
+			return
+		}
 		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.getModifierID()})
 		if target.Origin != nil {
 			target.Origin.CopyFrom(state)
@@ -237,8 +240,11 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 
 		tmp := NewQubitsSystem(sg.Center.X, sg.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
 		tmp.Assign(state)
-		tmp.SetParent(sg.GetParent())
-		tmp.GetParent().PushComponent(tmp)
+		parent := sg.GetParent()
+		if parent != nil {
+			tmp.SetParent(parent)
+			parent.PushComponent(tmp)
+		}
 
 		sg.OutHook.Connect(tmp)
 	}
@@ -323,7 +329,11 @@ func (sg *SourceGate) Draw() {
 			sg.OutHook.Disconnect()
 			return
 		}
-		t := target.(Component)
+		t, ok := target.(Component)
+		if !ok {
+			sg.OutHook.Disconnect()
+			return
+		}
 		end := rl.Vector2Add(edge, rl.Vector2Scale(
 			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, edge)),
 			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,

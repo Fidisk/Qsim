@@ -127,6 +127,9 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 }
 
 func (c *QubitsSystem) Draw() {
+	if c.Origin == nil {
+		return
+	}
 	for _, d := range c.QubitDeterminatorList {
 		if c.isDeterminatorVisible(d) {
 			rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
@@ -257,6 +260,9 @@ func (c *QubitsSystem) Draw() {
 }
 
 func (c *QubitsSystem) DrawGhost() {
+	if c.Origin == nil {
+		return
+	}
 	ghostColor := rl.Fade(c.Color, 0.3)
 
 	for _, d := range c.QubitDeterminatorList {
@@ -350,6 +356,9 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 
 func (c *QubitsSystem) zipToHook() {
 	tmp := c.GetParent()
+	if tmp == nil {
+		return
+	}
 	ele := tmp.GetElement()
 	gotHooked := false
 	for _, d := range ele {
@@ -452,5 +461,8 @@ func (c *QubitsSystem) Kill() {
 		d.Kill()
 	}
 
-	c.GetParent().DeleteChildWithID(c.ID)
+	parent := c.GetParent()
+	if parent != nil {
+		parent.DeleteChildWithID(c.ID)
+	}
 }

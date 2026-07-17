@@ -66,7 +66,11 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		}
 
 		tmp := utils.GetObjectFromID(c.TargetID)
-		t := tmp.(Component)
+		t, ok := tmp.(Component)
+		if !ok {
+			c.Disconnect()
+			return
+		}
 		c.Center = t.GetCircle().Center
 		//c.ClearForce()
 		t.AddForce(c.GetCircle().GetForce())

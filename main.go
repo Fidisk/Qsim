@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/animation"
 	"qsim/components"
 	"qsim/effect"
 	glob "qsim/globals"
@@ -175,6 +177,7 @@ func main() {
 								loaded := windows.LoadState(string(data))
 
 								// Remove existing circuit panels
+								animation.Reset()
 								var keep []pWindow
 								for _, w := range winManager {
 									if rw, ok := w.(*windows.RenderWindow); ok && rw.CanSpawn {
@@ -189,6 +192,7 @@ func main() {
 								for _, w := range loaded {
 									if rw, ok := w.(*windows.RenderWindow); ok {
 										winManager = append(winManager, rw)
+										panel = rw
 									}
 								}
 								DeleteWindowByID(fileWin.GetID())
@@ -409,17 +413,97 @@ func main() {
 
 	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13)
 
-	windowsBar := windows.NewRenderWindow(0, 850, 1600, 50)
-	windowsBar.IsResizeAllow(false)
-	windowsBar.IsPanAllow(false)
-	windowsBar.IsZoomAllow(false)
-	windowsBar.IsDragAllow(true)
-	windowsBar.IsSpawnAllow(false)
-	windowsBar.SetPriority(100)
-	windowsBar.EnableTitleBar(false)
-	windowsBar.Rename("Windows")
+	animBar := windows.NewRenderWindow(0, 850, 1600, 50)
+	animBar.IsResizeAllow(false)
+	animBar.IsPanAllow(false)
+	animBar.IsZoomAllow(false)
+	animBar.IsDragAllow(true)
+	animBar.IsSpawnAllow(false)
+	animBar.SetPriority(100)
+	animBar.EnableTitleBar(false)
+	animBar.Rename("Animation")
+	animBar.AddEffect(func() {
+		effect.ScaleWidthToScreen(animBar)
+	})
 
-	winManager = append(winManager, panel, toolBar, spawnBar, windowsBar)
+	resetAnim := func() {
+		animation.Anim.CurrentIdx = 0
+		animation.Anim.SubIdx = 0
+		animation.Anim.Progress = 0
+		animation.Anim.State = animation.StatePaused
+	}
+	startPlay := func() {
+		if animation.IsFinished() || len(animation.Anim.Gates) == 0 {
+			animation.Reset()
+			animation.Anim.Gates = animation.GenerateSteps(panel.WComp)
+			if len(animation.Anim.Gates) == 0 {
+				return
+			}
+		}
+		animation.Anim.State = animation.StatePlaying
+	}
+	goBack := func() {
+		if animation.Anim.CurrentIdx == 0 && animation.Anim.SubIdx == 0 {
+			animation.Anim.Progress = 0
+			animation.Anim.State = animation.StatePaused
+			return
+		}
+		if animation.Anim.SubIdx > 0 {
+			animation.Anim.SubIdx--
+		} else {
+			animation.Anim.CurrentIdx--
+			ga := animation.CurrentAnim()
+			if ga != nil {
+				animation.Anim.SubIdx = len(ga.Inputs) + 1
+			}
+		}
+		animation.Anim.Progress = 0
+		animation.Anim.State = animation.StatePaused
+	}
+	skipStep := func() {
+		if animation.IsFinished() {
+			return
+		}
+		ga := animation.CurrentAnim()
+		if ga == nil {
+			return
+		}
+		maxSub := len(ga.Inputs) + 1
+		if animation.Anim.SubIdx < maxSub {
+			animation.Anim.SubIdx++
+		} else {
+			animation.Anim.SubIdx = 0
+			animation.Anim.CurrentIdx++
+		}
+		animation.Anim.Progress = 0
+		if animation.IsFinished() {
+			animation.Anim.State = animation.StateIdle
+		} else {
+			animation.Anim.State = animation.StatePaused
+		}
+	}
+	finishAnim := func() {
+		if len(animation.Anim.Gates) > 0 {
+			animation.Anim.CurrentIdx = len(animation.Anim.Gates)
+			animation.Anim.Progress = 0
+			animation.Anim.State = animation.StateIdle
+		}
+	}
+
+	AnimButReset := components.NewButton(-200, 0, 70, 25, rl.LightGray, "|<", 20, resetAnim)
+	AnimButBack := components.NewButton(-130, 0, 70, 25, rl.LightGray, "<", 20, goBack)
+	AnimButPlay := components.NewToggleButton(-60, 0, 70, 25, rl.LightGray, ">",
+		func() bool { return animation.Anim.State == animation.StatePlaying }, 20,
+		startPlay,
+		func() { animation.Anim.State = animation.StatePaused })
+	AnimButSkip := components.NewButton(10, 0, 70, 25, rl.LightGray, ">>", 20, skipStep)
+	AnimButEnd := components.NewButton(80, 0, 70, 25, rl.LightGray, ">|", 20, finishAnim)
+
+	stepLabel := components.NewLabel(170, -5, "Steps: 0/0", 16, rl.White)
+
+	animBar.PushComponent(AnimButReset, AnimButBack, AnimButPlay, AnimButSkip, AnimButEnd, stepLabel)
+
+	winManager = append(winManager, panel, toolBar, spawnBar, animBar)
 
 	update := func() {
 		// Update main window resize
@@ -431,6 +515,16 @@ func main() {
 		for _, d := range winManager {
 			d.Update()
 		}
+
+		animation.Update()
+
+		if animation.Anim.State == animation.StatePlaying {
+			AnimButPlay.Label = "||"
+		} else {
+			AnimButPlay.Label = ">"
+		}
+
+		stepLabel.Text = fmt.Sprintf("Gate: %d/%d", animation.Anim.CurrentIdx+1, len(animation.Anim.Gates))
 
 		// Draw everything
 		rl.BeginDrawing()

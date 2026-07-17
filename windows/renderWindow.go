@@ -2,6 +2,7 @@ package windows
 
 import (
 	"math"
+	"qsim/animation"
 	"qsim/components"
 	"qsim/config"
 	glob "qsim/globals"
@@ -168,6 +169,9 @@ func (rw *RenderWindow) Draw() {
 	} else {
 		rw.spawnPreview = nil
 		rw.spawnPrevState = glob.None
+	}
+	if rw.CanSpawn {
+		animation.Draw()
 	}
 	rl.EndMode2D()
 
