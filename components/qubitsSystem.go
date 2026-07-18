@@ -313,8 +313,23 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	//The downfall of OOP
 	c.QubitList = nil
 
+	// Compute grid layout for right-side determinator placement
+	exp := p.Size
+	n := glob.QubitSystemCellWidth
+	m := glob.QubitSystemCellHeight
+	widthExp := (exp + 1) / 2
+	heightExp := exp / 2
+	cols := int32(1 << widthExp)
+	rows := int32(1 << heightExp)
+	totalWidth := float32(cols * int32(n))
+	totalHeight := float32(rows * int32(m))
+	startX := c.Center.X - totalWidth/2
+	startY := c.Center.Y - totalHeight/2
+	rightX := startX + totalWidth + n
+
 	for i := range p.Size {
-		q := NewQubitDeterminator(c.Center.X, c.Center.Y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
+		y := startY + (float32(i)+0.5)*totalHeight/float32(p.Size)
+		q := NewQubitDeterminator(rightX, y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
 
 		q.QubitSystemID = c.ID
 

@@ -286,13 +286,19 @@ func unmarshalCircle(raw map[string]interface{}) *components.Circle {
 	return c
 }
 
-func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) *components.QubitsSystem {
+func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *components.QubitsSystem) {
+	defer func() {
+		if r := recover(); r != nil {
+			qs = components.NewQubitsSystem(100, 100, 30, rl.Purple)
+			qs.Origin = qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{0})
+		}
+	}()
 	center := parseVec2(raw["center"].(map[string]interface{}))
 	radius := float32(raw["radius"].(float64))
 	color := parseColor(raw["color"].(map[string]interface{}))
 	oldID := int32(raw["id"].(float64))
 
-	qs := components.NewQubitsSystem(center.X, center.Y, radius, color)
+	qs = components.NewQubitsSystem(center.X, center.Y, radius, color)
 	qs.Center = center
 	qs.Color = color
 	ctx.oldToNew[oldID] = qs
@@ -304,7 +310,6 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) *components
 		qs.SetWeight(float32(v.(float64)))
 	}
 
-	// Store old hook IDs for remapping
 	if v, ok := raw["hookID"]; ok {
 		qs.HookID = int32(v.(float64))
 	}
@@ -321,39 +326,71 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) *components
 	detsRaw, ok := raw["qubitDeterminators"].([]interface{})
 	if ok {
 		for i, dRaw := range detsRaw {
-			if i >= len(qs.QubitDeterminatorList) {
-				continue
-			}
 			d := dRaw.(map[string]interface{})
 			dPos := parseVec2(d["center"].(map[string]interface{}))
-			qs.QubitDeterminatorList[i].Center = dPos
+			var det *components.QubitDeterminator
+			if i < len(qs.QubitDeterminatorList) {
+				det = qs.QubitDeterminatorList[i]
+				det.Center = dPos
+			} else {
+				modID := int32(0)
+				if v, ok := d["modifierID"]; ok {
+					modID = int32(v.(float64))
+				}
+				detColor := rl.Purple
+				if v, ok := d["color"]; ok {
+					detColor = parseColor(v.(map[string]interface{}))
+				}
+				detRadius := float32(10)
+				if v, ok := d["radius"]; ok {
+					detRadius = float32(v.(float64))
+				}
+				det = components.NewQubitDeterminator(dPos.X, dPos.Y, detRadius, detColor, modID)
+				det.QubitSystemID = qs.ID
+				qs.QubitDeterminatorList = append(qs.QubitDeterminatorList, det)
+			}
 			if v, ok := d["radius"]; ok {
-				qs.QubitDeterminatorList[i].Radius = float32(v.(float64))
+				det.Radius = float32(v.(float64))
 			}
 			if v, ok := d["color"]; ok {
-				qs.QubitDeterminatorList[i].Color = parseColor(v.(map[string]interface{}))
+				det.Color = parseColor(v.(map[string]interface{}))
 			}
 			if v, ok := d["modifierID"]; ok {
-				qs.QubitDeterminatorList[i].ModifierID = int32(v.(float64))
+				det.ModifierID = int32(v.(float64))
 			}
 			if v, ok := d["id"]; ok {
-				ctx.oldToNew[int32(v.(float64))] = qs.QubitDeterminatorList[i]
+				ctx.oldToNew[int32(v.(float64))] = det
 			}
-			// Store old hook ID for remapping
 			if v, ok := d["hookID"]; ok {
-				qs.QubitDeterminatorList[i].HookID = int32(v.(float64))
+				det.HookID = int32(v.(float64))
 			}
 			if v, ok := d["qubitSystemID"]; ok {
 				if newQS, found := ctx.oldToNew[int32(v.(float64))]; found {
 					if qs2, ok2 := newQS.(*components.QubitsSystem); ok2 {
-						qs.QubitDeterminatorList[i].QubitSystemID = qs2.ID
+						det.QubitSystemID = qs2.ID
 					}
 				}
 			}
 		}
 	}
 
-	return qs
+	if qs.Origin == nil {
+		if len(qs.QubitDeterminatorList) > 0 {
+			modIDs := make([]int32, len(qs.QubitDeterminatorList))
+			for i, det := range qs.QubitDeterminatorList {
+				modIDs[i] = det.ModifierID
+			}
+			amps := make([]complex64, 1<<len(qs.QubitDeterminatorList))
+			if len(amps) > 0 {
+				amps[0] = 1
+			}
+			qs.Origin = qubits.NewQubitStateManagerFrom(amps, modIDs)
+		} else {
+			qs.Origin = qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{0})
+		}
+	}
+
+	return
 }
 
 func unmarshalQubitStateManager(raw map[string]interface{}) *qubits.QubitStateManager {

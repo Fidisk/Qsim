@@ -62,7 +62,7 @@ func NewInfoTable(x, y, width, height float32, color rl.Color, rows []InfoRow) *
 		Rows:   rows,
 	}
 	tmp.ID = utils.GenerateID(tmp)
-	tmp.Hook = NewHook(x+width/2+10, y, globals.HookRadius, globals.HookColor)
+	tmp.Hook = NewHook(utils.SnapToGrid(x+width/2+10, config.SnapToGridInterval), y, globals.HookRadius, globals.HookColor)
 	tmp.Hook.Label = "Input"
 	tmp.Hook.AllowQubitSystem = true
 	return &tmp
@@ -70,7 +70,7 @@ func NewInfoTable(x, y, width, height float32, color rl.Color, rows []InfoRow) *
 
 func (it *InfoTable) pullToHook() {
 	margin := float32(math.Max(math.Max(float64(it.Width), float64(it.Height)), float64((it.Width+it.Height)/2)))
-	val := utils.Dist(it.Center, it.Hook.Center) - glob.InfoCardToHookDist - margin
+	val := utils.Dist(it.Center, it.Hook.Center) - utils.SnapToGrid(glob.InfoCardToHookDist+margin, config.SnapToGridInterval)
 	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
 		return
 	}

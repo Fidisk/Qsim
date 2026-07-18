@@ -1,6 +1,7 @@
 package components
 
 import (
+	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits/attributes"
 	"qsim/utils"
@@ -45,6 +46,7 @@ func (c *QubitDeterminator) onClick(worldMouse rl.Vector2, isCursorAvailable *bo
 		*isCursorAvailable = false
 		c.holdingCursor = true
 		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
+		c.VirtualCenter = c.Center
 	}
 }
 
@@ -67,7 +69,12 @@ func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, is
 		c.zipToHook()
 	}
 	if c.dragging {
-		c.Center = rl.Vector2Add(worldMouse, c.offset)
+		raw := rl.Vector2Add(worldMouse, c.offset)
+		c.VirtualCenter = rl.Vector2Lerp(c.VirtualCenter, rl.Vector2{
+			X: utils.SnapToGrid(raw.X, config.SnapToGridInterval),
+			Y: utils.SnapToGrid(raw.Y, config.SnapToGridInterval),
+		}, 0.25)
+		c.Center = c.VirtualCenter
 		c.ClearForce()
 	} else {
 		c.DecayForce()

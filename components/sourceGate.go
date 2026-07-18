@@ -83,7 +83,7 @@ func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []com
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
 	// Output hook on the right edge of the table
-	sg.OutHook = NewOutputHook(x+sgTableWidth/2+glob.OutputHookRadius, y, glob.OutputHookRadius, glob.OutputHookColor)
+	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, glob.OutputHookColor)
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
@@ -108,7 +108,7 @@ func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
 	// Output hook on the right edge of the table
-	sg.OutHook = NewOutputHook(x+sgTableWidth/2+glob.OutputHookRadius, y, glob.OutputHookRadius, glob.OutputHookColor)
+	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, glob.OutputHookColor)
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
@@ -139,7 +139,7 @@ func (sg *SourceGate) CheckCollide(worldMouse rl.Vector2) bool {
 func (sg *SourceGate) pullToHook() {
 	d := sg.OutHook
 	// Hook distance from the right edge of the table
-	targetDist := sg.tableWidth/2 + glob.GateToHookDist
+	targetDist := utils.SnapToGrid(sg.tableWidth/2+glob.GateToHookDist, config.SnapToGridInterval)
 	val := utils.Dist(sg.Center, d.Center) - targetDist
 	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
 		return

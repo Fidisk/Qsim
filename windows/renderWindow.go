@@ -119,8 +119,39 @@ func (rw *RenderWindow) Draw() {
 		int32(contentRect.Height),
 	)
 
-	// 3. Draw components in world space (camera transforms, scissor clips)
+	// 3. Draw grid overlay and components in world space (camera transforms, scissor clips)
 	rl.BeginMode2D(rw.Camera)
+
+	// Grid overlay
+	{
+		contentRect := rw.GetContentRect()
+		topLeft := rl.GetScreenToWorld2D(
+			rl.Vector2{X: contentRect.X, Y: contentRect.Y},
+			rw.Camera,
+		)
+		bottomRight := rl.GetScreenToWorld2D(
+			rl.Vector2{X: contentRect.X + contentRect.Width, Y: contentRect.Y + contentRect.Height},
+			rw.Camera,
+		)
+		interval := config.SnapToGridInterval
+		gridColor := rl.NewColor(80, 80, 80, 60)
+
+		for x := float32(math.Floor(float64(topLeft.X/interval))) * interval; x <= bottomRight.X; x += interval {
+			rl.DrawLineEx(
+				rl.Vector2{X: x, Y: topLeft.Y},
+				rl.Vector2{X: x, Y: bottomRight.Y},
+				1, gridColor,
+			)
+		}
+		for y := float32(math.Floor(float64(topLeft.Y/interval))) * interval; y <= bottomRight.Y; y += interval {
+			rl.DrawLineEx(
+				rl.Vector2{X: topLeft.X, Y: y},
+				rl.Vector2{X: bottomRight.X, Y: y},
+				1, gridColor,
+			)
+		}
+	}
+
 	for _, c := range rw.WComp {
 		circle := c.GetCircle()
 		if circle.IsDragging() {
@@ -308,11 +339,19 @@ func (rw *RenderWindow) OnClick(worldMouse rl.Vector2) {
 	switch {
 	case utils.IsMouseState(glob.MouseStateSpawn):
 		if rw.CanSpawn {
+			// Use the preview's snapped position to match the ghost exactly
+			pos := rl.Vector2{
+				X: utils.SnapToGrid(worldMouse.X, config.SnapToGridInterval),
+				Y: utils.SnapToGrid(worldMouse.Y, config.SnapToGridInterval),
+			}
+			if rw.spawnPreview != nil {
+				pos = rw.spawnPreview.GetCircle().Center
+			}
 			if utils.IsSpawnState(glob.LineDraw) {
-				ld := components.NewLineDraw(worldMouse.X, worldMouse.Y)
+				ld := components.NewLineDraw(pos.X, pos.Y)
 				rw.PushComponent(ld)
 			} else {
-				rw.SpawnObject(worldMouse)
+				rw.SpawnObject(pos)
 			}
 			utils.ToggleMouseState(glob.MouseStateSpawn)
 			utils.SetSpawnState(glob.None)
@@ -320,11 +359,8 @@ func (rw *RenderWindow) OnClick(worldMouse rl.Vector2) {
 	}
 }
 
-func (rw *RenderWindow) SpawnObject(worldMouse rl.Vector2) {
-	snapped := rl.Vector2{
-		X: utils.SnapToGrid(worldMouse.X, config.SnapToGridInterval),
-		Y: utils.SnapToGrid(worldMouse.Y, config.SnapToGridInterval),
-	}
+func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
+	// snapped is already grid-aligned by the caller
 	switch {
 	case utils.IsSpawnState(glob.Qubit):
 		q := components.NewQubitsSystem(snapped.X, snapped.Y, glob.QubitSystemRadius, glob.QubitSystemColor)

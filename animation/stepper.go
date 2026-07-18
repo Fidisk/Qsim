@@ -70,7 +70,101 @@ func GenerateSteps(wComp []components.Component) []GateAnim {
 		gates = append(gates, anim)
 	}
 
-	return gates
+	return orderGates(gates)
+}
+
+// inputSystemID returns the ID of the QubitsSystem feeding a hooked input,
+// whether the hook target is a QubitDeterminator or a QubitsSystem directly.
+func inputSystemID(targetID int32) int32 {
+	switch t := utils.GetObjectFromID(targetID).(type) {
+	case *components.QubitDeterminator:
+		if qp := t.GetQubitParent(); qp != nil {
+			return qp.ID
+		}
+	case *components.QubitsSystem:
+		return t.ID
+	}
+	return 0
+}
+
+// orderGates sorts gate animations in data-flow order: gates fed by a
+// QubitsSystem that is not the output of another gate run first, then each
+// consumer gate follows the gate that produced its input system.
+func orderGates(gates []GateAnim) []GateAnim {
+	// Map each output QubitsSystem to the gate that produces it
+	producedBy := map[int32]int{}
+	for i, ga := range gates {
+		for _, oh := range ga.Gate.OutPutHook {
+			if !oh.IsHooked {
+				continue
+			}
+			if _, ok := utils.GetObjectFromID(oh.TargetID).(*components.QubitsSystem); ok {
+				producedBy[oh.TargetID] = i
+			}
+		}
+	}
+
+	// Edge producer -> consumer when the consumer reads the producer's system
+	inDegree := make([]int, len(gates))
+	adj := make([][]int, len(gates))
+	for j, ga := range gates {
+		seen := map[int]bool{}
+		for _, h := range ga.Gate.HookList {
+			if h.IsOutput || !h.IsHooked {
+				continue
+			}
+			src, ok := producedBy[inputSystemID(h.TargetID)]
+			if !ok || src == j || seen[src] {
+				continue
+			}
+			seen[src] = true
+			adj[src] = append(adj[src], j)
+			inDegree[j]++
+		}
+	}
+
+	// Kahn's algorithm; among ready gates, keep the original panel order
+	var ready []int
+	for i := range gates {
+		if inDegree[i] == 0 {
+			ready = append(ready, i)
+		}
+	}
+	order := make([]int, 0, len(gates))
+	for len(ready) > 0 {
+		i := ready[0]
+		ready = ready[1:]
+		order = append(order, i)
+		for _, j := range adj[i] {
+			inDegree[j]--
+			if inDegree[j] == 0 {
+				k := len(ready)
+				for k > 0 && ready[k-1] > j {
+					k--
+				}
+				ready = append(ready, 0)
+				copy(ready[k+1:], ready[k:])
+				ready[k] = j
+			}
+		}
+	}
+
+	// Cyclic leftovers (feedback wiring), keep them at the end in panel order
+	inOrder := make([]bool, len(gates))
+	for _, i := range order {
+		inOrder[i] = true
+	}
+	for i := range gates {
+		if !inOrder[i] {
+			order = append(order, i)
+		}
+	}
+
+	sorted := make([]GateAnim, 0, len(gates))
+	for _, i := range order {
+		sorted = append(sorted, gates[i])
+	}
+	return sorted
 }
 
 func allInputsConnected(g *components.Gate) bool {
