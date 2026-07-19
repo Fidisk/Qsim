@@ -22,6 +22,13 @@ type GateAnim struct {
 	Inputs    []InputDot
 	OutputPos rl.Vector2
 	Gate      *components.Gate
+
+	// Demo is the precomputed gate-computation visualization. It is built
+	// lazily when the animation reaches the compute sub-step; DemoReady
+	// records that the build was attempted (Demo may still be nil, e.g. for
+	// measurement gates, in which case the legacy compute box is shown).
+	Demo      *ComputeDemo
+	DemoReady bool
 }
 
 type AnimState struct {

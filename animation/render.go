@@ -3,6 +3,7 @@ package animation
 import (
 	"fmt"
 	"qsim/components"
+	"qsim/config"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -18,7 +19,7 @@ func Update() {
 
 	dt := float64(rl.GetFrameTime())
 	Anim.Progress += dt
-	if Anim.Progress >= StepDuration {
+	if Anim.Progress >= stepDuration() {
 		Anim.Progress = 0
 		Anim.SubIdx++
 
@@ -32,6 +33,33 @@ func Update() {
 			}
 		}
 	}
+}
+
+// ensureDemo builds the gate's computation demo the first time the compute
+// sub-step is reached. Demo stays nil for gates without a matrix input.
+func ensureDemo(ga *GateAnim) {
+	if ga == nil || ga.DemoReady {
+		return
+	}
+	ga.Demo = BuildComputeDemo(ga.Gate)
+	ga.DemoReady = true
+}
+
+// stepDuration returns how long the current sub-step takes. The compute
+// sub-step lasts long enough for the input dots to arrive plus the whole
+// computation demo; everything else uses StepDuration.
+func stepDuration() float64 {
+	ga := CurrentAnim()
+	if ga == nil {
+		return StepDuration
+	}
+	if Anim.SubIdx == len(ga.Inputs) {
+		ensureDemo(ga)
+		if ga.Demo != nil {
+			return float64(config.ComputeDotArriveDur) + ga.Demo.Total
+		}
+	}
+	return StepDuration
 }
 
 func CurrentAnim() *GateAnim {
@@ -63,8 +91,13 @@ func Draw() {
 	isAllToGatePhase := Anim.SubIdx == n
 	inputMovingIdx := Anim.SubIdx // the input index currently moving to its hook (when < n)
 
-	// Draw compute label overlay
-	if isAllToGatePhase || isOutputPhase {
+	if isAllToGatePhase {
+		ensureDemo(ga)
+	}
+
+	// Legacy "Compute:" box, only when there is no demo to show
+	// (e.g. measurement gates have no unitary matrix).
+	if ga.Demo == nil && (isAllToGatePhase || isOutputPhase) {
 		opac := float32(0.8)
 		col := rl.Fade(rl.Gold, opac)
 		rect := rl.Rectangle{
@@ -86,6 +119,13 @@ func Draw() {
 
 		if isOutputPhase {
 			continue
+		} else if isAllToGatePhase && ga.Demo != nil {
+			// Dots fly into the gate, then the computation demo takes over
+			if Anim.Progress >= float64(config.ComputeDotArriveDur) {
+				continue
+			}
+			dotT := float32(Anim.Progress / float64(config.ComputeDotArriveDur))
+			pos = rl.Vector2Lerp(ga.Inputs[i].HookPos, gateCenter, dotT)
 		} else if isAllToGatePhase {
 			// All dots move from their hooks to the gate center together
 			p := rl.Vector2Lerp(ga.Inputs[i].HookPos, gateCenter, t)
@@ -102,6 +142,11 @@ func Draw() {
 
 		rl.DrawCircleV(pos, DotRadius, rl.Yellow)
 		rl.DrawCircleLinesV(pos, DotRadius, rl.Orange)
+	}
+
+	// The computation demo replaces the old yellow box
+	if isAllToGatePhase && ga.Demo != nil && Anim.Progress >= float64(config.ComputeDotArriveDur) {
+		DrawCompute(ga, Anim.Progress-float64(config.ComputeDotArriveDur))
 	}
 
 	// Draw output dot
