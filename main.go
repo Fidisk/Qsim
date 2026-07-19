@@ -499,9 +499,38 @@ func main() {
 	AnimButSkip := components.NewButton(10, 0, 70, 25, rl.LightGray, ">>", 20, skipStep)
 	AnimButEnd := components.NewButton(80, 0, 70, 25, rl.LightGray, ">|", 20, finishAnim)
 
-	stepLabel := components.NewLabel(170, -5, "Steps: 0/0", 16, rl.White)
+	stepLabel := components.NewLabel(170, -18, "Steps: 0/0", 16, rl.White)
+	timeLabel := components.NewLabel(170, 2, "0.0 / 0.0 s", 16, rl.White)
 
-	animBar.PushComponent(AnimButReset, AnimButBack, AnimButPlay, AnimButSkip, AnimButEnd, stepLabel)
+	// Timeline scrubber: drag to set the animation time (back and forth).
+	scrubbing := false
+	wasPlaying := false
+	timeline := components.NewSlider(520, 2, 500, 10, rl.LightGray,
+		func(v float32) {
+			if !scrubbing {
+				scrubbing = true
+				wasPlaying = animation.Anim.State == animation.StatePlaying
+			}
+			if len(animation.Anim.Gates) == 0 {
+				animation.Anim.Gates = animation.GenerateSteps(panel.WComp)
+				if len(animation.Anim.Gates) == 0 {
+					return
+				}
+			}
+			animation.SetTime(float64(v) * animation.TotalDuration())
+			if !animation.IsFinished() {
+				animation.Anim.State = animation.StatePaused
+			}
+		},
+		func(v float32) {
+			if scrubbing && wasPlaying && !animation.IsFinished() {
+				animation.Anim.State = animation.StatePlaying
+			}
+			scrubbing = false
+		},
+	)
+
+	animBar.PushComponent(AnimButReset, AnimButBack, AnimButPlay, AnimButSkip, AnimButEnd, stepLabel, timeLabel, timeline)
 
 	winManager = append(winManager, panel, toolBar, spawnBar, animBar)
 
@@ -526,6 +555,21 @@ func main() {
 
 		stepLabel.Text = fmt.Sprintf("Gate: %d/%d", animation.Anim.CurrentIdx+1, len(animation.Anim.Gates))
 
+		total := animation.TotalDuration()
+		timeLabel.Text = fmt.Sprintf("%.1f / %.1f s", animation.CurrentTime(), total)
+		if !scrubbing && total > 0 {
+			timeline.Value = float32(animation.CurrentTime() / total)
+			ticks := []float32{}
+			acc := 0.0
+			for i := range animation.Anim.Gates {
+				acc += animation.GateDuration(&animation.Anim.Gates[i])
+				if acc < total {
+					ticks = append(ticks, float32(acc/total))
+				}
+			}
+			timeline.Ticks = ticks
+		}
+
 		// Draw everything
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
@@ -543,9 +587,7 @@ func main() {
 		shuffleWinManager()
 	}
 
-	for !rl.WindowShouldClose() {
-		update()
+	runMainLoop(update)
 
-		//fmt.Println(toolBar.Camera.Target)
-	}
+	//fmt.Println(toolBar.Camera.Target)
 }

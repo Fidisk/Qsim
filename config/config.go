@@ -27,13 +27,13 @@ var QubitColors = []rl.Color{
 	rl.Green,
 }
 
-const ComputeDotArriveDur = 0.8  // seconds for the input dots to fly into the gate
-const ComputeMergeDur = 1.2      // source columns merging into one Dirac column
-const ComputeReorderDur = 1.0    // gate qubits moving to the top of the column
-const ComputeGateAppearDur = 0.8 // gate matrix fade-in
-const ComputeIterBaseDur = 0.9   // seconds for the first iteration
-const ComputeIterDecay = 0.55    // per-iteration speed-up factor
-const ComputeIterFloorDur = 0.06 // fastest per-iteration duration
+const ComputeDotArriveDur = 1.0  // seconds for the input dots to fly into the gate
+const ComputeMergeDur = 1.6      // source columns merging into one Dirac column
+const ComputeReorderDur = 1.4    // gate qubits moving to the top of the column
+const ComputeGateAppearDur = 1.0 // gate matrix fade-in
+const ComputeIterBaseDur = 1.5   // seconds for the first iteration
+const ComputeIterDecay = 0.7     // per-iteration speed-up factor
+const ComputeIterFloorDur = 0.15 // fastest per-iteration duration
 const ComputeIterCap = 64        // max visualized iterations before fast-forward
-const ComputeCollapseDur = 1.2   // sum columns collapsing into the result column
+const ComputeCollapseDur = 1.6   // sum columns collapsing into the result column
 const ComputeMaxRows = 8         // visible rows per column before "..." is used

@@ -272,10 +272,10 @@ func makeLayout(d *ComputeDemo, ga *GateAnim) demoLayout {
 		height = mh
 	}
 
+	// The demo block is centered on the gate so it appears on top of it.
 	ctr := ga.Gate.GetCenter()
-	r := ga.Gate.GetCircle().Radius
 	l := demoLayout{width: width, height: height, colW: colW}
-	l.top = ctr.Y - r - 24 - height
+	l.top = ctr.Y - height/2
 	x := ctr.X - width/2
 	l.tagX = x
 	l.ampX = x + dTagW + 8
@@ -618,6 +618,22 @@ func DrawCompute(ga *GateAnim, t float64) {
 	m2 := m1 + float32(d.TReorder)
 	m3 := m2 + float32(d.TGate)
 	m4 := float32(d.Total) - float32(d.TCollapse)
+
+	// Backdrop: the demo sits on top of the gate, so give it a panel that
+	// covers the circuit underneath (phase label included). During the
+	// collapse phase the sum columns stack downward, so grow the panel to
+	// keep them covered.
+	pad := float32(14)
+	bgH := l.height
+	if ft >= m4 {
+		stackH := dHeaderH + float32(int32(1)<<uint(d.N))*float32(visCount(int32(1)<<uint(d.Shift)))*dRowH
+		if stackH > bgH {
+			bgH = stackH
+		}
+	}
+	bg := rl.NewRectangle(l.tagX-pad, l.top-30-pad, l.width+2*pad, bgH+30+2*pad)
+	rl.DrawRectangleRec(bg, rl.Fade(rl.Black, 0.88))
+	rl.DrawRectangleLinesEx(bg, 2, rl.Fade(rl.Gold, 0.6))
 
 	switch {
 	case ft < m1:
