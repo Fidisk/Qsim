@@ -1,0 +1,64 @@
+// disable right click context menu
+document.getElementById("canvas").addEventListener(
+  "contextmenu",
+  (e) => e.preventDefault(),
+);
+
+// INITIALIZE RAYLIB
+import Module from "./rl/raylib.js";
+
+const wasmBinary = await fetch("./rl/raylib.wasm")
+  .then((r) => r.arrayBuffer());
+
+const raylib = await Module({
+  canvas: document.getElementById("canvas"),
+  wasmBinary: new Uint8Array(wasmBinary),
+});
+
+// INITIALIZE GO
+const go = new Go();
+let wasm;
+
+async function loadWasm() {
+  // Wait for layout to settle
+  await new Promise(resolve => requestAnimationFrame(resolve));
+  
+  const result = await WebAssembly.instantiateStreaming(fetch("app.wasm"), go.importObject);
+  wasm = result.instance;
+  go.run(wasm);
+}
+
+// Wait for DOM ready
+if (document.readyState === 'complete') {
+  loadWasm();
+} else {
+  window.addEventListener('load', loadWasm);
+}
+// inject raylib
+go.importObject.raylib = raylib;
+go.importObject.globalThis = globalThis;
+globalThis.raylib = raylib;
+// compatibility with old bindings (v1)
+globalThis.mod = raylib;
+
+import { Runtime } from "./runtime.js"; // helper funtions
+//init
+const runtime = new Runtime();
+// inject custom runtime methods
+Object.assign(go.importObject.gojs, {
+  CStringFromGoString: runtime.CStringFromGoString.bind(runtime),
+  CStringGetLength: runtime.CStringGetLength.bind(runtime),
+  CStringArrayGetLength: runtime.CStringArrayGetLength.bind(runtime),
+  CopyToC: runtime.CopyToC.bind(runtime),
+  CopyToGo: runtime.CopyToGo.bind(runtime),
+  Alert: runtime.Alert.bind(runtime),
+});
+
+WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then(
+  (result) => {
+    const instance = result.instance;
+    globalThis.goInstance = instance;
+    go.run(instance);
+  },
+);
+

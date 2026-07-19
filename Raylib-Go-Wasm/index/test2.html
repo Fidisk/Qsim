@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WASM Playground</title>
+  <style>
+    /* ----- Reset & Full-height layout ----- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;           /* Prevents page scrollbars */
+    }
+
+    body {
+      background: #0b0d15;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      color: #f0f2f8;
+    }
+
+    /* ----- Main app container: fills remaining space ----- */
+    .app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 20px;
+      padding: 16px 20px 16px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      min-height: 0;              /* Flex override to allow shrinking */
+    }
+
+    /* ----- Compact header ----- */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #fff 60%, #9aa1b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+
+    .header .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 8px;
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.06);
+      color: #e0e2ed;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: 0.2s ease;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7c6df0, #5b4bd5);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(124, 109, 240, 0.25);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 8px 20px rgba(124, 109, 240, 0.35);
+      filter: brightness(1.08);
+    }
+
+    .btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* ----- Canvas wrapper: takes ALL the remaining vertical space ----- */
+    .canvas-wrap {
+      flex: 1;                    /* Eats up leftover space */
+      min-height: 0;              /* Crucial for Flexbox to shrink properly */
+      background: #0a0c14;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* 
+      The canvas itself:
+      - Stretches to fill the wrapper (width/height 100%)
+      - Maintains 800:600 aspect ratio via object-fit: contain
+      - The internal 800x600 buffer is scaled up smoothly by the browser
+    */
+    .canvas-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;        /* Keeps the 800x600 ratio intact, no stretching */
+      background: #0a0c14;
+      image-rendering: auto;      /* Let the browser pick the best scaling */
+    }
+
+    /* ----- Status bar (always at the bottom) ----- */
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 12px;
+      flex-shrink: 0;
+      font-size: 13px;
+      color: #9aa1b8;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      background: #facc15;
+      box-shadow: 0 0 12px rgba(250, 204, 21, 0.3);
+      transition: 0.3s;
+      vertical-align: middle;
+    }
+
+    .status .dot.running {
+      background: #4ade80;
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.35);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status .right-actions {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .status a, .status .link-btn {
+      color: #9aa1b8;
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .status a:hover, .status .link-btn:hover {
+      color: #f0f2f8;
+    }
+
+    /* ----- Fullscreen overrides ----- */
+    /* When in fullscreen mode, remove padding and make the app fill everything */
+    .app:fullscreen,
+    .app:-webkit-full-screen,
+    .app:-moz-full-screen {
+      max-width: 100%;
+      border-radius: 0;
+      padding: 10px;
+      background: #0b0d15;
+      backdrop-filter: none;
+      border: none;
+      box-shadow: none;
+    }
+
+    /* Optional: hide header/footer in fullscreen for max canvas real estate */
+    .app:fullscreen .header,
+    .app:fullscreen .status,
+    .app:-webkit-full-screen .header,
+    .app:-webkit-full-screen .status,
+    .app:-moz-full-screen .header,
+    .app:-moz-full-screen .status {
+      opacity: 0.6;
+      transition: opacity 0.3s;
+    }
+
+    .app:fullscreen .header:hover,
+    .app:fullscreen .status:hover,
+    .app:-webkit-full-screen .header:hover,
+    .app:-webkit-full-screen .status:hover {
+      opacity: 1;
+    }
+
+    /* Small screens: keep it tidy */
+    @media (max-width: 640px) {
+      body { padding: 8px; }
+      .app { padding: 12px; }
+      .header h1 { font-size: 15px; }
+      .btn { font-size: 11px; padding: 5px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="appContainer">
+    <!-- Header -->
+    <div class="header">
+      <h1>⚡ WASM Playground</h1>
+      <div class="actions">
+        <a href="https://github.com/your-username/your-repo" target="_blank" class="btn">
+          <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <button id="downloadBtn" class="btn btn-primary">
+          <svg viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Canvas wrapper (grows to fill space) -->
+    <div class="canvas-wrap">
+      <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status">
+      <span>
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Loading WASM…</span>
+      </span>
+      <div class="right-actions">
+        <button id="fullscreenBtn" class="link-btn">⛶ Fullscreen</button>
+        <button id="restartBtn" class="link-btn">↻ Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="wasm_exec.js"></script>
+  <script type="module" src="./index.js"></script>
+
+  <!-- UI Controllers -->
+  <script>
+    (function() {
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      const container = document.getElementById('appContainer');
+
+      // ----- WASM status (called from your index.js) -----
+      window.setWasmStatus = (state, msg) => {
+        dot.className = 'dot';
+        if (state === 'running') {
+          dot.classList.add('running');
+          text.textContent = msg || 'App running';
+        } else if (state === 'loading') {
+          text.textContent = msg || 'Loading…';
+        } else if (state === 'error') {
+          dot.style.background = '#f87171';
+          text.textContent = '⚠️ ' + (msg || 'Error');
+        } else {
+          text.textContent = msg || 'Ready';
+        }
+      };
+
+      // ----- Download WASM -----
+      document.getElementById('downloadBtn').addEventListener('click', () => {
+        fetch('app.wasm')
+          .then(r => r.blob())
+          .then(blob => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'app.wasm';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          })
+          .catch(() => window.open('app.wasm', '_blank'));
+      });
+
+      // ----- Restart (reload page) -----
+      document.getElementById('restartBtn').addEventListener('click', () => {
+        window.location.reload();
+      });
+
+      // ----- Fullscreen toggle -----
+      const fsBtn = document.getElementById('fullscreenBtn');
+      fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          // Request fullscreen on the app container
+          container.requestFullscreen?.() ||
+          container.webkitRequestFullscreen?.() ||
+          container.mozRequestFullScreen?.() ||
+          container.msRequestFullscreen?.();
+        } else {
+          document.exitFullscreen?.() ||
+          document.webkitExitFullscreen?.() ||
+          document.mozCancelFullScreen?.() ||
+          document.msExitFullscreen?.();
+        }
+      });
+
+      // Update button text if fullscreen changes externally (e.g., ESC key)
+      document.addEventListener('fullscreenchange', updateFsButton);
+      document.addEventListener('webkitfullscreenchange', updateFsButton);
+      document.addEventListener('mozfullscreenchange', updateFsButton);
+      document.addEventListener('MSFullscreenChange', updateFsButton);
+
+      function updateFsButton() {
+        if (document.fullscreenElement) {
+          fsBtn.textContent = '⛶ Exit Fullscreen';
+        } else {
+          fsBtn.textContent = '⛶ Fullscreen';
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
