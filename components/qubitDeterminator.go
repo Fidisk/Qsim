@@ -15,6 +15,12 @@ type QubitDeterminator struct {
 	ModifierID    int32
 	HookID        int32
 	QubitSystemID int32
+
+	// inline rename state (right-click to edit the qubit's display name)
+	editing     bool
+	editStr     string
+	cursorBlink float32
+	cursorShow  bool
 }
 
 func (c *QubitDeterminator) GetID() int32 {
@@ -54,11 +60,78 @@ func (c *QubitDeterminator) onRelease() {
 
 }
 
+// currentName returns the qubit's display name, or "" when its attribute is
+// not a Name (e.g. polygon or color glyph).
+func (c *QubitDeterminator) currentName() string {
+	if n, ok := attributes.AttributesManager.Get(c.ModifierID).(*attributes.Name); ok {
+		return n.Val
+	}
+	return ""
+}
+
+// processEditing handles the inline rename: type to edit, Enter applies the
+// new name to the qubit's modifier attribute, Escape cancels.
+func (c *QubitDeterminator) processEditing(isCursorAvailable *bool) {
+	c.cursorBlink += rl.GetFrameTime()
+	if c.cursorBlink > 0.5 {
+		c.cursorShow = !c.cursorShow
+		c.cursorBlink = 0
+	}
+
+	key := rl.GetCharPressed()
+	for key > 0 {
+		if key >= 32 && key <= 125 && len(c.editStr) < 24 {
+			c.editStr += string(rune(key))
+		}
+		key = rl.GetCharPressed()
+	}
+	if rl.IsKeyPressed(rl.KeyBackspace) && len(c.editStr) > 0 {
+		c.editStr = c.editStr[:len(c.editStr)-1]
+	}
+	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
+		if c.editStr != "" {
+			attributes.AttributesManager.SetName(c.ModifierID, c.editStr)
+		}
+		c.editing = false
+		c.holdingCursor = false
+		*isCursorAvailable = true
+	}
+	if rl.IsKeyPressed(rl.KeyEscape) {
+		c.editing = false
+		c.holdingCursor = false
+		*isCursorAvailable = true
+	}
+}
+
 func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.editing {
+		c.processEditing(isCursorAvailable)
+		return
+	}
+
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
+		if rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
+			// right-click: rename the qubit inline
+			c.editing = true
+			c.editStr = c.currentName()
+			c.holdingCursor = true
+			*isCursorAvailable = false
+			return
+		}
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.onClick(worldMouse, isCursorAvailable)
+			if utils.IsMouseState(glob.MouseStateNormal) && c.DoubleClicked(worldMouse) {
+				// double-click: detach from the hook (same as detach mode)
+				if c.HookID != 0 {
+					tmp := utils.GetObjectFromID(c.HookID)
+					if h, ok := tmp.(*Hook); ok {
+						h.Disconnect()
+					}
+				}
+				*isCursorAvailable = false
+			} else {
+				c.onClick(worldMouse, isCursorAvailable)
+			}
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -84,7 +157,7 @@ func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, is
 
 func (c *QubitDeterminator) Draw() {
 	rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
-	rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
+	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, c.Color)
 
 	tmp := attributes.AttributesManager.Get(c.ModifierID)
 	switch t := tmp.(type) {
@@ -92,9 +165,26 @@ func (c *QubitDeterminator) Draw() {
 		rl.DrawPoly(c.Center, t.SideCntPositive, c.Radius*0.75, 0, c.Color)
 	case *attributes.Color:
 		rl.DrawCircleV(c.Center, c.Radius, rl.NewColor(uint8(t.R), uint8(t.G), uint8(t.B), uint8(0255)))
-		rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, c.Color)
 	case *attributes.Name:
 		rl.DrawText(t.Val, int32(c.Center.X)-int32(rl.MeasureText(t.Val, 20)/2), int32(c.Center.Y)-10, 20, c.Color)
+	}
+
+	if c.editing {
+		fontSize := int32(14)
+		label := "Name: " + c.editStr
+		w := rl.MeasureText(label, fontSize) + 12
+		if w < 90 {
+			w = 90
+		}
+		box := rl.NewRectangle(c.Center.X-float32(w)/2, c.Center.Y-c.Radius-32, float32(w), 24)
+		rl.DrawRectangleRounded(box, 0.2, 4, rl.NewColor(30, 30, 30, 255))
+		rl.DrawRectangleRoundedLinesEx(box, 0.2, 4, 1.5, rl.SkyBlue)
+		rl.DrawText(label, int32(box.X+6), int32(box.Y+5), fontSize, rl.White)
+		if c.cursorShow {
+			tw := rl.MeasureText(label, fontSize)
+			rl.DrawText("|", int32(box.X+6)+tw, int32(box.Y+5), fontSize, rl.SkyBlue)
+		}
 	}
 }
 

@@ -14,8 +14,10 @@ const PhysicsEnabled bool = false
 
 // Gate-computation demo visualization.
 
-// QubitColors assigns each qubit a color by its modifier ID
-// (modifier ID modulo the number of colors).
+// QubitColors is the demo color palette. In the compute demo each input
+// system gets one palette color shared by all its qubits (indexed by source
+// order); qColor falls back to per-modifier coloring when the source is
+// unknown.
 var QubitColors = []rl.Color{
 	rl.SkyBlue,
 	rl.Orange,

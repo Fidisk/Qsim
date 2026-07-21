@@ -19,9 +19,10 @@ func runMainLoop(update func()) {
 	}
 }
 
-// setWindowFlags makes the desktop OS window resizable.
+// setWindowFlags makes the desktop OS window resizable and enables
+// anti-aliasing for smoother lines and shapes.
 func setWindowFlags() {
-	rl.SetConfigFlags(rl.FlagWindowResizable)
+	rl.SetConfigFlags(rl.FlagWindowResizable | rl.FlagMsaa4xHint)
 }
 
 // UpdateMainWindow checks for edge dragging and resizes the OS window accordingly

@@ -28,6 +28,7 @@ type QubitsSystem struct {
 	cols                  int32
 	startX                float32
 	startY                float32
+	hovered               bool
 
 	//Spagetti
 	InfoHookID int32
@@ -84,6 +85,9 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		d.Update()
 	}
 
+	// Hover state drives the ghost highlight in Draw.
+	c.hovered = !c.dragging && c.CheckCollide(worldMouse)
+
 	// collision check using world coordinates
 	if c.CheckCollide(worldMouse) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
@@ -95,9 +99,21 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		c.holdingCursor = false
 		*isCursorAvailable = true
 
-		c.zipToHook()
+		// Commit the drop position BEFORE zipping: during the drag only
+		// VirtualCenter moved, so zipToHook must look for hooks around the
+		// drop point, not the position the drag started from.
 		c.Center = c.VirtualCenter
+		c.zipToHook()
 		c.ClearForce()
+
+		// Dragging the system carries its determinators along, so give each
+		// free one a chance to auto-connect if it was dropped onto a hook.
+		// Hooked determinators stay anchored to their own hooks.
+		for _, d := range c.QubitDeterminatorList {
+			if d.HookID == 0 {
+				d.zipToHook()
+			}
+		}
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
@@ -115,7 +131,12 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		c.DecayForce()
 		c.ApplyForce()
 	}
+}
 
+// UpdateDeterminators updates the qubit determinators. It runs as a
+// priority pass before the other components so a determinator stays
+// draggable even when it overlaps another component (e.g. a gate).
+func (c *QubitsSystem) UpdateDeterminators(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	for _, d := range c.QubitDeterminatorList {
 		if !c.isDeterminatorVisible(d) {
 			continue
@@ -132,7 +153,7 @@ func (c *QubitsSystem) Draw() {
 	}
 	for _, d := range c.QubitDeterminatorList {
 		if c.isDeterminatorVisible(d) {
-			rl.DrawLineEx(c.Center, d.Center, 4, c.Color)
+			DrawWire(c.Center, d.Center, 4, c.Color)
 		}
 	}
 
@@ -161,13 +182,37 @@ func (c *QubitsSystem) Draw() {
 		glob.ColorBg,
 	)
 
+	// Probability heat-map: brighter cell = larger |amplitude|^2
+	for row := int32(0); row < c.rows; row++ {
+		for col := int32(0); col < c.cols; col++ {
+			index := row*c.cols + col
+			v := c.Origin.Amptitude[index]
+			p := real(v)*real(v) + imag(v)*imag(v)
+			if p > 1 {
+				p = 1
+			}
+			if p > 0.001 {
+				cellRect := rl.NewRectangle(
+					c.startX+float32(col)*n, c.startY+float32(row)*m, n, m,
+				)
+				rl.DrawRectangleRec(cellRect, rl.Fade(rl.SkyBlue, p*0.28))
+			}
+		}
+	}
+
 	// Outer border
 	borderRect := rl.NewRectangle(c.startX, c.startY, totalWidth, totalHeight)
 	borderThickness := float32(4.0)
 	if c.IsFixed {
 		borderThickness = 5.0
 	}
-	rl.DrawRectangleLinesEx(borderRect, borderThickness, c.Color)
+	rl.DrawRectangleRoundedLinesEx(borderRect, 0.03, 6, borderThickness, c.Color)
+
+	// Hover ghost: faint bright outline + wash so the system reads as grabbable
+	if c.hovered {
+		rl.DrawRectangleRec(borderRect, rl.Fade(rl.SkyBlue, 0.08))
+		rl.DrawRectangleRoundedLinesEx(borderRect, 0.03, 6, borderThickness+2, rl.Fade(rl.SkyBlue, 0.45))
+	}
 
 	// Vertical grid lines (between columns)
 	for i := int32(1); i < c.cols; i++ {
@@ -202,6 +247,14 @@ func (c *QubitsSystem) Draw() {
 			img := imag(c.Origin.Amptitude[index])
 			numberStr := fmt.Sprintf("%.2f%+.2fi", r, img)
 
+			// Fade out states with negligible probability
+			p := r*r + img*img
+			textA := float32(0.35)
+			if p > 0 {
+				textA = 0.35 + 0.65*min(p*2, 1)
+			}
+			textCol := rl.Fade(c.Color, textA)
+
 			//Lmao why doesnt the AI just make a temp arr lol
 			var parts []string
 			temp := index
@@ -221,14 +274,18 @@ func (c *QubitsSystem) Draw() {
 
 			nameStr := strings.Join(parts, " + ")
 
-			// Draw number slightly above center
+			// Draw number slightly above center (shrink if it would overflow the cell)
 			numFontSize := int32(20)
 			numWidth := rl.MeasureText(numberStr, numFontSize)
+			if numWidth > int32(n)-10 {
+				numFontSize = 14
+				numWidth = rl.MeasureText(numberStr, numFontSize)
+			}
 			rl.DrawText(numberStr,
 				int32(cellCenterX)-numWidth/2,
 				int32(cellCenterY)-numFontSize-2, // 2px gap
 				numFontSize,
-				c.Color,
+				textCol,
 			)
 
 			// Draw name slightly below center
@@ -238,7 +295,7 @@ func (c *QubitsSystem) Draw() {
 				int32(cellCenterX)-nameWidth/2,
 				int32(cellCenterY)+2,
 				nameFontSize,
-				c.Color,
+				textCol,
 			)
 		}
 	}
@@ -251,7 +308,15 @@ func (c *QubitsSystem) Draw() {
 	       d.Draw(c.Center, c.Radius)
 	   }
 	*/
+}
 
+// DrawDeterminators draws the qubit determinators. It is called after all
+// other components so determinators stay visible (and grabbable) on top of
+// whatever they overlap (e.g. a gate).
+func (c *QubitsSystem) DrawDeterminators() {
+	if c.Origin == nil {
+		return
+	}
 	for _, d := range c.QubitDeterminatorList {
 		if c.isDeterminatorVisible(d) {
 			d.Draw()
@@ -268,6 +333,7 @@ func (c *QubitsSystem) DrawGhost() {
 	for _, d := range c.QubitDeterminatorList {
 		if c.isDeterminatorVisible(d) {
 			rl.DrawLineEx(c.Center, d.Center, 4, ghostColor)
+			rl.DrawCircleLines(int32(d.Center.X), int32(d.Center.Y), d.Radius, ghostColor)
 		}
 	}
 
@@ -325,11 +391,11 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	totalHeight := float32(rows * int32(m))
 	startX := c.Center.X - totalWidth/2
 	startY := c.Center.Y - totalHeight/2
-	rightX := startX + totalWidth + n
+	detX := startX + totalWidth + n
 
 	for i := range p.Size {
 		y := startY + (float32(i)+0.5)*totalHeight/float32(p.Size)
-		q := NewQubitDeterminator(rightX, y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
+		q := NewQubitDeterminator(detX, y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
 
 		q.QubitSystemID = c.ID
 

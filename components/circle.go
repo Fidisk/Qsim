@@ -21,7 +21,22 @@ type Circle struct {
 	curForce      rl.Vector2
 	weight        float32
 
+	// double-click tracking for the detach shortcut
+	lastClickTime float64
+	lastClickPos  rl.Vector2
+
 	IsFixed bool
+}
+
+// DoubleClicked reports whether the current left-press is a double-click
+// (within 0.35s and 10 world units of the previous press) and re-arms the
+// tracker. Call it only when the press actually lands on the component.
+func (c *Circle) DoubleClicked(worldMouse rl.Vector2) bool {
+	now := rl.GetTime()
+	ok := now-c.lastClickTime < 0.35 && utils.Dist(c.lastClickPos, worldMouse) < 10
+	c.lastClickTime = now
+	c.lastClickPos = worldMouse
+	return ok
 }
 
 func (c *Circle) SetWeight(t float32) {
@@ -87,7 +102,7 @@ func (c *Circle) Draw() {
 }
 
 func (c *Circle) DrawGhost() {
-	rl.DrawCircleLinesV(c.Center, c.Radius, rl.Fade(c.Color, 0.3))
+	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, rl.Fade(c.Color, 0.3))
 }
 
 func (c *Circle) GetChildCircles() []*Circle { return nil }

@@ -112,7 +112,16 @@ func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.onClick(worldMouse, isCursorAvailable)
+			if utils.IsMouseState(glob.MouseStateNormal) && c.DoubleClicked(worldMouse) {
+				// double-click: detach everything from the gate
+				c.DestroyOutPut()
+				for _, d := range c.HookList {
+					d.Disconnect()
+				}
+				*isCursorAvailable = false
+			} else {
+				c.onClick(worldMouse, isCursorAvailable)
+			}
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -400,14 +409,17 @@ func (c *Gate) Draw() {
 			continue
 		}
 
-			r := utils.Dist(c.Center, d.Center) - t.GetCircle().Radius
+			r := utils.Dist(start, d.Center) - t.GetCircle().Radius
+			if r < 0 {
+				r = 0
+			}
 			end := rl.Vector2Add(start, rl.Vector2Scale(
 				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),
 				r,
 			))
-			rl.DrawLineEx(start, end, 4, c.Color)
+			DrawWire(start, end, 4, c.Color)
 		} else {
-			rl.DrawLineEx(start, d.Center, 4, c.Color)
+			DrawWire(start, d.Center, 4, c.Color)
 		}
 		d.Draw()
 	}
@@ -417,6 +429,9 @@ func (c *Gate) Draw() {
 			mid := rl.Vector2Scale(rl.Vector2Add(c.Center, oh.Center), 0.5)
 			label := fmt.Sprintf("%s, probability: %.2f", c.OutcomeLabels[i], c.OutcomeProbs[i])
 			textWidth := rl.MeasureText(label, 14)
+			// Backdrop so the label stays readable over wires and the grid
+			bg := rl.NewRectangle(mid.X-float32(textWidth)/2-4, mid.Y-22, float32(textWidth)+8, 18)
+			rl.DrawRectangleRec(bg, rl.Fade(rl.Black, 0.6))
 			rl.DrawText(label, int32(mid.X)-textWidth/2, int32(mid.Y)-20, 14, rl.White)
 		}
 	}
@@ -427,12 +442,12 @@ func (c *Gate) Draw() {
 		Width:  c.Radius * 2,
 		Height: c.Radius * 2,
 	}
-	rl.DrawRectangleRec(rect, glob.ColorBg)
+	rl.DrawRectangleRounded(rect, 0.15, 6, glob.ColorBg)
 	thickness := float32(4.0)
 	if c.IsFixed {
 		thickness = 5.0
 	}
-	rl.DrawRectangleLinesEx(rect, thickness, c.Color)
+	rl.DrawRectangleRoundedLinesEx(rect, 0.15, 6, thickness, c.Color)
 
 	if c.Label != "" {
 		// Choose a font size (adjust as needed)

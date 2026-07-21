@@ -147,8 +147,9 @@ func (tb *TextBox) Draw() {
 	if tb.Active {
 		border = rl.SkyBlue
 	}
-	rl.DrawRectangleRec(rl.NewRectangle(x, y, w, h), bg)
-	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, w, h), 4, border)
+	box := rl.NewRectangle(x, y, w, h)
+	rl.DrawRectangleRounded(box, 0.1, 4, bg)
+	rl.DrawRectangleRoundedLinesEx(box, 0.1, 4, 2, border)
 
 	lines := strings.Split(tb.Text, "\n")
 	lineH := float32(tb.FontSize) + 4

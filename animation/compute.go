@@ -40,6 +40,10 @@ type ComputeDemo struct {
 	SrcMods  [][]int32
 	SrcSizes []int32
 
+	// ModColor colors every qubit by the source system it came from:
+	// qubits of the same input system share one color.
+	ModColor map[int32]rl.Color
+
 	Steps     []computeStep
 	IterStart []float64
 	IterTotal float64
@@ -52,8 +56,8 @@ type ComputeDemo struct {
 }
 
 type computeStep struct {
-	I, L    int32
-	Contrib []complex64 // per output state j: InAmps[(I<<Shift)+L] * Matrix[j][I]
+	I, L, J int32
+	Contrib complex64 // InAmps[(I<<Shift)+L] * Matrix[J][I]
 }
 
 // BuildComputeDemo snapshots the gate's inputs and precomputes the whole
@@ -112,6 +116,16 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 		d.SrcAmps = append(d.SrcAmps, append([]complex64(nil), q.Amptitude...))
 		d.SrcMods = append(d.SrcMods, append([]int32(nil), q.ModifierID...))
 		d.SrcSizes = append(d.SrcSizes, q.Size)
+	}
+
+	// One color per source system: every qubit of the same input system
+	// shares that system's color throughout the demo.
+	d.ModColor = map[int32]rl.Color{}
+	for si, mods := range d.SrcMods {
+		col := config.QubitColors[si%len(config.QubitColors)]
+		for _, m := range mods {
+			d.ModColor[m] = col
+		}
 	}
 
 	merged := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
@@ -183,10 +197,11 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 	d.OutAmps = out.Amptitude
 
 	// Iteration steps: i (gate input state) outer, l (remaining qubits) inner,
-	// each step distributing over all output states j. Speed ramps up.
+	// j innermost - the matrix is walked cell by cell down each column, one
+	// step per cell. Speed ramps up.
 	dimI := int32(1) << uint(n)
 	dimL := int32(1) << uint(d.Shift)
-	count := dimI * dimL
+	count := dimI * dimL * dimI
 	if count > config.ComputeIterCap {
 		count = config.ComputeIterCap
 	}
@@ -194,17 +209,15 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 	dur := float64(config.ComputeIterBaseDur)
 	for i := int32(0); i < dimI && int32(len(d.Steps)) < count; i++ {
 		for l := int32(0); l < dimL && int32(len(d.Steps)) < count; l++ {
-			st := computeStep{I: i, L: l, Contrib: make([]complex64, dimI)}
 			a := d.InAmps[(i<<uint(d.Shift))+l]
-			for j := int32(0); j < dimI; j++ {
-				st.Contrib[j] = a * g.Operation[j][i]
-			}
-			d.Steps = append(d.Steps, st)
-			d.IterStart = append(d.IterStart, t)
-			t += dur
-			dur *= float64(config.ComputeIterDecay)
-			if dur < float64(config.ComputeIterFloorDur) {
-				dur = float64(config.ComputeIterFloorDur)
+			for j := int32(0); j < dimI && int32(len(d.Steps)) < count; j++ {
+				d.Steps = append(d.Steps, computeStep{I: i, L: l, J: j, Contrib: a * g.Operation[j][i]})
+				d.IterStart = append(d.IterStart, t)
+				t += dur
+				dur *= float64(config.ComputeIterDecay)
+				if dur < float64(config.ComputeIterFloorDur) {
+					dur = float64(config.ComputeIterFloorDur)
+				}
 			}
 		}
 	}
@@ -236,8 +249,6 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 const (
 	dRowH    = float32(26)
 	dCellW   = float32(78)
-	dSumColW = float32(124)
-	dPlusW   = float32(26)
 	dHeaderH = float32(30)
 	dTagW    = float32(46)
 	dTagH    = float32(24)
@@ -263,8 +274,8 @@ func makeLayout(d *ComputeDemo, ga *GateAnim) demoLayout {
 	ketW := 26 + float32(d.Size)*dDigitW
 	colW := dAmpW + ketW
 	matW := float32(dim) * dCellW
-	sumW := float32(dim)*dSumColW + float32(dim-1)*dPlusW
-	width := dTagW + 8 + colW + dGap + matW + dGap + sumW
+	// input column + gate matrix + result column (same shape as the input)
+	width := dTagW + 8 + colW + dGap + matW + dGap + colW
 
 	colRows := float32(visCount(int32(1) << uint(d.Size)))
 	height := dHeaderH + colRows*dRowH
@@ -341,6 +352,13 @@ func ease(t float32) float32 {
 	return t * t * (3 - 2*t)
 }
 
+// easeOut decelerates toward the end: fast start, gentle settle.
+func easeOut(t float32) float32 {
+	t = clamp01(t)
+	u := 1 - t
+	return 1 - u*u*u*u
+}
+
 func lerp(a, b, t float32) float32 { return a + (b-a)*t }
 
 func fadeA(c rl.Color, a float32) rl.Color { return rl.Fade(c, clamp01(a)) }
@@ -372,6 +390,50 @@ func qColor(mod int32) rl.Color {
 	return config.QubitColors[m]
 }
 
+// colorOf returns the qubit's color: the color of the source system it came
+// from, falling back to the per-modifier color when unknown.
+func (d *ComputeDemo) colorOf(mod int32) rl.Color {
+	if c, ok := d.ModColor[mod]; ok {
+		return c
+	}
+	return qColor(mod)
+}
+
+func abs32(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// drawBrackets draws a tall "|" left and a tall ">" right of a state column
+// so the whole stack reads as one Dirac ket. Each bracket is segmented per
+// qubit and carries that qubit's (source system) color.
+func drawBrackets(d *ComputeDemo, leftX, rightX, top, height float32, mods []int32, alpha float32) {
+	n := len(mods)
+	if n == 0 || alpha <= 0 {
+		return
+	}
+	const angleW = float32(10)
+	const thick = float32(3)
+	segH := height / float32(n)
+	// right angle bracket: apex points right at the column's middle
+	xAt := func(y float32) float32 {
+		f := (y - top) / height
+		return rightX + angleW*(1-abs32(2*f-1))
+	}
+	for i, m := range mods {
+		col := fadeA(d.colorOf(m), alpha)
+		y0 := top + float32(i)*segH
+		y1 := y0 + segH
+		rl.DrawLineEx(rl.NewVector2(leftX, y0), rl.NewVector2(leftX, y1), thick, col)
+		// split at the midpoint so the apex survives even a single segment
+		ym := (y0 + y1) / 2
+		rl.DrawLineEx(rl.NewVector2(xAt(y0), y0), rl.NewVector2(xAt(ym), ym), thick, col)
+		rl.DrawLineEx(rl.NewVector2(xAt(ym), ym), rl.NewVector2(xAt(y1), y1), thick, col)
+	}
+}
+
 func fmtC(v complex64) string {
 	return fmt.Sprintf("%.2f%+.2fi", real(v), imag(v))
 }
@@ -380,10 +442,20 @@ func drawAmp(x, y float32, v complex64, alpha float32) {
 	s := fmtC(v)
 	w := rl.MeasureText(s, 13)
 	rl.DrawText(s, int32(x+dAmpW-6)-w, int32(y+6), 13, fadeA(rl.White, alpha))
+	// probability bar under the amplitude: width ~ |amp|^2
+	p := real(v)*real(v) + imag(v)*imag(v)
+	if p > 1 {
+		p = 1
+	}
+	if p > 0.001 {
+		bw := (dAmpW - 8) * p
+		rl.DrawRectangleRec(rl.NewRectangle(x+dAmpW-6-bw, y+21, bw, 2.5), rl.Fade(rl.SkyBlue, 0.5*clamp01(alpha)))
+	}
 }
 
 // drawKet draws |digits> with each digit colored by its qubit's color.
-func drawKet(x, y float32, s int32, size int32, mods []int32, alpha float32) {
+// 0 digits are dimmed so the 1s stand out.
+func drawKet(d *ComputeDemo, x, y float32, s int32, size int32, mods []int32, alpha float32) {
 	rl.DrawText("|", int32(x), int32(y+4), 16, fadeA(rl.White, alpha))
 	for p := int32(0); p < size; p++ {
 		bit := (s >> uint(size-1-p)) & 1
@@ -393,15 +465,19 @@ func drawKet(x, y float32, s int32, size int32, mods []int32, alpha float32) {
 		}
 		col := rl.White
 		if int(p) < len(mods) {
-			col = qColor(mods[p])
+			col = d.colorOf(mods[p])
 		}
-		rl.DrawText(ch, int32(x+10+float32(p)*dDigitW), int32(y+4), 16, fadeA(col, alpha))
+		a := alpha
+		if bit == 0 {
+			a = alpha * 0.55
+		}
+		rl.DrawText(ch, int32(x+10+float32(p)*dDigitW), int32(y+4), 16, fadeA(col, a))
 	}
 	rl.DrawText(">", int32(x+10+float32(size)*dDigitW), int32(y+4), 16, fadeA(rl.White, alpha))
 }
 
 // drawKetMix is drawKet with per-position colors crossfading pre -> post.
-func drawKetMix(x, y float32, s int32, size int32, pre, post []int32, e float32) {
+func drawKetMix(d *ComputeDemo, x, y float32, s int32, size int32, pre, post []int32, e float32) {
 	rl.DrawText("|", int32(x), int32(y+4), 16, rl.White)
 	for p := int32(0); p < size; p++ {
 		bit := (s >> uint(size-1-p)) & 1
@@ -411,7 +487,7 @@ func drawKetMix(x, y float32, s int32, size int32, pre, post []int32, e float32)
 		}
 		col := rl.White
 		if int(p) < len(pre) && int(p) < len(post) {
-			col = lerpColor(qColor(pre[p]), qColor(post[p]), e)
+			col = lerpColor(d.colorOf(pre[p]), d.colorOf(post[p]), e)
 		}
 		rl.DrawText(ch, int32(x+10+float32(p)*dDigitW), int32(y+4), 16, col)
 	}
@@ -419,7 +495,7 @@ func drawKetMix(x, y float32, s int32, size int32, pre, post []int32, e float32)
 }
 
 // drawMiniKet draws a small centered ket used for matrix/sum-column headers.
-func drawMiniKet(cx, y float32, val int32, size int32, mods []int32, alpha float32) {
+func drawMiniKet(d *ComputeDemo, cx, y float32, val int32, size int32, mods []int32, alpha float32) {
 	w := 12 + float32(size)*9
 	x := cx - w/2
 	rl.DrawText("|", int32(x), int32(y), 11, fadeA(rl.White, alpha))
@@ -431,15 +507,15 @@ func drawMiniKet(cx, y float32, val int32, size int32, mods []int32, alpha float
 		}
 		col := rl.White
 		if int(p) < len(mods) {
-			col = qColor(mods[p])
+			col = d.colorOf(mods[p])
 		}
 		rl.DrawText(ch, int32(x+7+float32(p)*9), int32(y), 11, fadeA(col, alpha))
 	}
 	rl.DrawText(">", int32(x+7+float32(size)*9), int32(y), 11, fadeA(rl.White, alpha))
 }
 
-func drawTag(x, y float32, m int32, alpha float32, glow bool) {
-	col := qColor(m)
+func drawTag(d *ComputeDemo, x, y float32, m int32, alpha float32, glow bool) {
+	col := d.colorOf(m)
 	rect := rl.NewRectangle(x, y, dTagW-6, dTagH-4)
 	rl.DrawRectangleRec(rect, fadeA(col, 0.25*alpha))
 	thick := float32(1.5)
@@ -454,7 +530,8 @@ func drawTag(x, y float32, m int32, alpha float32, glow bool) {
 	rl.DrawText(name, int32(x+6), int32(y+4), 12, fadeA(rl.White, alpha))
 }
 
-// drawStateColumn draws amplitude + ket rows of a state at (ampX, ketX, top).
+// drawStateColumn draws amplitude + ket rows of a state at (ampX, ketX, top),
+// wrapped in tall Dirac brackets so the stack reads as one ket.
 // hiRow >= 0 highlights that row.
 func drawStateColumn(d *ComputeDemo, ampX, ketX, top float32, amps []complex64, mods []int32, alpha float32, hiRow int32) {
 	rows := visRows(int32(1) << uint(d.Size))
@@ -469,25 +546,40 @@ func drawStateColumn(d *ComputeDemo, ampX, ketX, top float32, amps []complex64, 
 			rect := rl.NewRectangle(ampX-6, y, dAmpW+ketW+6, dRowH)
 			rl.DrawRectangleRec(rect, rl.Fade(rl.White, 0.10*clamp01(alpha)))
 			rl.DrawRectangleLinesEx(rect, 1, rl.Fade(rl.Gold, 0.6*clamp01(alpha)))
+			// underline the top-N (gate) qubit digits: they drive this step
+			for p := int32(0); p < d.N; p++ {
+				col := rl.Gold
+				if int(p) < len(mods) {
+					col = d.colorOf(mods[p])
+				}
+				dx := ketX + 10 + float32(p)*dDigitW
+				rl.DrawRectangleRec(rl.NewRectangle(dx-1, y+22, dDigitW-2, 2.5), fadeA(col, 0.85*alpha))
+			}
 		}
 		drawAmp(ampX, y, amps[r], alpha)
-		drawKet(ketX, y, r, d.Size, mods, alpha)
+		drawKet(d, ketX, y, r, d.Size, mods, alpha)
 	}
+	drawBrackets(d, ampX-16, ketX+ketW+6, top+dHeaderH, float32(len(rows))*dRowH, mods, alpha)
 }
 
-func drawMatrix(d *ComputeDemo, l demoLayout, alpha float32, hiCol int32) {
+func drawMatrix(d *ComputeDemo, l demoLayout, alpha float32, hiRow, hiCol int32) {
 	dim := int32(1) << uint(d.N)
 	for i := int32(0); i < dim; i++ {
-		drawMiniKet(l.matX+float32(i)*dCellW+dCellW/2, l.top+6, i, d.N, d.PostMods, alpha)
+		drawMiniKet(d, l.matX+float32(i)*dCellW+dCellW/2, l.top+6, i, d.N, d.PostMods, alpha)
+	}
+	// underline the active input header
+	if hiCol >= 0 && hiCol < dim {
+		hx := l.matX + float32(hiCol)*dCellW
+		rl.DrawRectangleRec(rl.NewRectangle(hx+4, l.top+22, dCellW-8, 2.5), rl.Fade(rl.Gold, 0.8*clamp01(alpha)))
 	}
 	for j := int32(0); j < dim; j++ {
-		drawMiniKet(l.matX-10-(12+float32(d.N)*9)/2, l.top+dHeaderH+float32(j)*dRowH+7, j, d.N, d.PostMods, alpha)
+		drawMiniKet(d, l.matX-10-(12+float32(d.N)*9)/2, l.top+dHeaderH+float32(j)*dRowH+7, j, d.N, d.PostMods, alpha)
 		for i := int32(0); i < dim; i++ {
 			x := l.matX + float32(i)*dCellW
 			y := l.top + dHeaderH + float32(j)*dRowH
 			rect := rl.NewRectangle(x, y, dCellW, dRowH)
 			bg := rl.Fade(rl.White, 0.05*clamp01(alpha))
-			if i == hiCol {
+			if i == hiCol && j == hiRow {
 				bg = rl.Fade(rl.Gold, 0.18*clamp01(alpha))
 			}
 			rl.DrawRectangleRec(rect, bg)
@@ -499,109 +591,96 @@ func drawMatrix(d *ComputeDemo, l demoLayout, alpha float32, hiCol int32) {
 	}
 }
 
-// drawSumColumnAt draws one sum column (output state j) at (x, colTop).
-// grid/written hold the accumulated values; pend (if non-nil) is the step
-// currently arriving, crossfading into row pend.L with factor pop.
-// headerAlpha controls the mini-ket header independently (collapsed early).
-func drawSumColumnAt(d *ComputeDemo, x, colTop float32, j int32, grid []complex64, written []bool, alpha, headerAlpha float32, pend *computeStep, pop float32) {
-	dimL := int32(1) << uint(d.Shift)
-	rows := visRows(dimL)
-	drawMiniKet(x+dSumColW/2, colTop+6, j, d.N, d.PostMods, headerAlpha)
+// drawResultColumn draws the accumulating output state as a single column -
+// the 1xn input column times the nxn gate matrix gives another 1xn column:
+// result[(j<<shift)+l] += InAmps[(i<<shift)+l] * Matrix[j][i]. Rows that have
+// received no contribution yet are dimmed; pend (if non-nil) is the step
+// currently arriving, crossfading into its target row with factor pop.
+func drawResultColumn(d *ComputeDemo, ampX, ketX, top float32, grid []complex64, written []bool, alpha float32, pend *computeStep, pop float32) {
+	rows := visRows(int32(1) << uint(d.Size))
+	ketW := 26 + float32(d.Size)*dDigitW
 	for slot, r := range rows {
-		y := colTop + dHeaderH + float32(slot)*dRowH
+		y := top + dHeaderH + float32(slot)*dRowH
 		if r < 0 {
-			rl.DrawText("...", int32(x+dSumColW/2-8), int32(y+6), 13, fadeA(rl.White, alpha*0.7))
+			rl.DrawText("...", int32(ampX+dAmpW-20), int32(y+6), 13, fadeA(rl.White, alpha*0.7))
 			continue
 		}
-		idx := j*dimL + r
 		a := alpha
-		if !written[idx] {
+		if !written[r] {
 			a = alpha * 0.25
 		}
-		if pend != nil && r == pend.L && pop > 0 {
-			rect := rl.NewRectangle(x+2, y, dSumColW-4, dRowH)
+		if pend != nil && (pend.J<<uint(d.Shift))+pend.L == r && pop > 0 {
+			rect := rl.NewRectangle(ampX-6, y, dAmpW+ketW+6, dRowH)
 			rl.DrawRectangleRec(rect, rl.Fade(rl.Gold, 0.15*clamp01(pop)))
-			if written[idx] {
-				s := fmtC(grid[idx])
-				w := rl.MeasureText(s, 11)
-				rl.DrawText(s, int32(x+dSumColW/2)-w/2, int32(y+7), 11, fadeA(rl.White, alpha*(1-pop)))
+			rl.DrawRectangleLinesEx(rect, 1.5, rl.Fade(rl.Gold, 0.7*clamp01(pop)))
+			if written[r] {
+				drawAmp(ampX, y, grid[r], alpha*(1-pop))
 			}
-			s := fmtC(grid[idx] + pend.Contrib[j])
-			w := rl.MeasureText(s, 11)
-			rl.DrawText(s, int32(x+dSumColW/2)-w/2, int32(y+7), 11, fadeA(rl.White, alpha*pop))
+			drawAmp(ampX, y, grid[r]+pend.Contrib, alpha*pop)
+			drawKet(d, ketX, y, r, d.Size, d.PostMods, alpha)
 			continue
 		}
-		s := fmtC(grid[idx])
-		w := rl.MeasureText(s, 11)
-		rl.DrawText(s, int32(x+dSumColW/2)-w/2, int32(y+7), 11, fadeA(rl.White, a))
+		drawAmp(ampX, y, grid[r], a)
+		drawKet(d, ketX, y, r, d.Size, d.PostMods, a)
 	}
+	drawBrackets(d, ampX-16, ketX+ketW+6, top+dHeaderH, float32(len(rows))*dRowH, d.PostMods, alpha)
 }
 
-// drawRays draws the light rays for the current iteration step: from the
-// active state row through each row of the gate matrix column I into the
-// sum columns. u in [0,1) is the intra-step progress.
+// drawRays draws the light ray for the current step: from the active state
+// row through the gate matrix cell (J, I) into the result column's row
+// (J<<shift)+L. u in [0,1) is the intra-step progress.
 func drawRays(d *ComputeDemo, l demoLayout, st computeStep, u float32) {
-	dimJ := int32(1) << uint(d.N)
-	dimL := int32(1) << uint(d.Shift)
-	rowsIn := visRows(int32(1) << uint(d.Size))
-	rowsL := visRows(dimL)
+	rows := visRows(int32(1) << uint(d.Size))
 
 	srcIdx := (st.I << uint(d.Shift)) + st.L
-	srcSlot := slotOf(rowsIn, srcIdx)
+	srcSlot := slotOf(rows, srcIdx)
 	y1 := l.top + dHeaderH + float32(srcSlot)*dRowH + dRowH/2
 	p1 := rl.NewVector2(l.ketX+16+float32(d.Size)*dDigitW, y1)
 
-	for j := int32(0); j < dimJ; j++ {
-		v := st.Contrib[j]
-		if real(v) == 0 && imag(v) == 0 {
-			continue
-		}
-		cellX := l.matX + float32(st.I)*dCellW
-		cellY := l.top + dHeaderH + float32(j)*dRowH
-		p2 := rl.NewVector2(cellX, cellY+dRowH/2)
-		mid := rl.NewVector2(cellX+dCellW, cellY+dRowH/2)
-		dstSlot := slotOf(rowsL, st.L)
-		y3 := l.top + dHeaderH + float32(dstSlot)*dRowH + dRowH/2
-		p3 := rl.NewVector2(l.sumX+float32(j)*(dSumColW+dPlusW), y3)
+	cellX := l.matX + float32(st.I)*dCellW
+	cellY := l.top + dHeaderH + float32(st.J)*dRowH
+	p2 := rl.NewVector2(cellX, cellY+dRowH/2)
+	mid := rl.NewVector2(cellX+dCellW, cellY+dRowH/2)
+	dstSlot := slotOf(rows, (st.J<<uint(d.Shift))+st.L)
+	y3 := l.top + dHeaderH + float32(dstSlot)*dRowH + dRowH/2
+	p3 := rl.NewVector2(l.sumX, y3)
 
-		rayCol := rl.Fade(rl.Gold, 0.35)
-		rl.DrawLineEx(p1, p2, 2.5, rayCol)
-		rl.DrawLineEx(mid, p3, 2.5, rayCol)
+	// light beam: wide soft glow, medium halo, bright core
+	rl.DrawLineEx(p1, p2, 7, rl.Fade(rl.Gold, 0.10))
+	rl.DrawLineEx(mid, p3, 7, rl.Fade(rl.Gold, 0.10))
+	rl.DrawLineEx(p1, p2, 3, rl.Fade(rl.Gold, 0.28))
+	rl.DrawLineEx(mid, p3, 3, rl.Fade(rl.Gold, 0.28))
+	rl.DrawLineEx(p1, p2, 1.2, rl.Fade(rl.White, 0.55))
+	rl.DrawLineEx(mid, p3, 1.2, rl.Fade(rl.White, 0.55))
 
-		var pos rl.Vector2
-		if u < 0.5 {
-			pos = rl.Vector2Lerp(p1, p2, u*2)
-		} else {
-			pos = rl.Vector2Lerp(mid, p3, (u-0.5)*2)
-		}
-		rl.DrawCircleV(pos, 5, rl.Fade(rl.White, 0.9))
-		rl.DrawCircleV(pos, 9, rl.Fade(rl.Gold, 0.35))
+	var pos rl.Vector2
+	if u < 0.5 {
+		pos = rl.Vector2Lerp(p1, p2, u*2)
+	} else {
+		pos = rl.Vector2Lerp(mid, p3, (u-0.5)*2)
 	}
+	rl.DrawCircleV(pos, 8, rl.Fade(rl.Gold, 0.25))
+	rl.DrawCircleV(pos, 5, rl.Fade(rl.White, 0.95))
+	rl.DrawCircleLines(int32(pos.X), int32(pos.Y), 8, rl.Fade(rl.Gold, 0.7))
 }
 
 func drawPhaseLabel(l demoLayout, s string) {
 	rl.DrawText(s, int32(l.tagX), int32(l.top-24), 14, rl.Fade(rl.Gold, 0.9))
 }
 
-// fullGrid accumulates every (i, l) contribution, used once iterating ends.
-func fullGrid(d *ComputeDemo) ([]complex64, []bool) {
-	dimI := int32(1) << uint(d.N)
-	dimL := int32(1) << uint(d.Shift)
-	grid := make([]complex64, dimI*dimL)
-	written := make([]bool, dimI*dimL)
-	for i := int32(0); i < dimI; i++ {
-		for l := int32(0); l < dimL; l++ {
-			a := d.InAmps[(i<<uint(d.Shift))+l]
-			for j := int32(0); j < dimI; j++ {
-				v := a * d.Matrix[j][i]
-				grid[j*dimL+l] += v
-				if real(v) != 0 || imag(v) != 0 {
-					written[j*dimL+l] = true
-				}
-			}
-		}
+// drawDemoProgress draws a thin progress bar under the phase label showing
+// how far the demo has played, with tick marks at the phase boundaries.
+func drawDemoProgress(l demoLayout, total, ft float32, bounds []float32, alpha float32) {
+	x := l.tagX
+	y := l.top - 7
+	w := l.width
+	rl.DrawRectangleRec(rl.NewRectangle(x, y, w, 3), rl.Fade(rl.White, 0.12*alpha))
+	frac := clamp01(ft / total)
+	rl.DrawRectangleRec(rl.NewRectangle(x, y, w*frac, 3), rl.Fade(rl.Gold, 0.85*alpha))
+	for _, b := range bounds {
+		tx := x + w*clamp01(b/total)
+		rl.DrawLineEx(rl.NewVector2(tx, y-2), rl.NewVector2(tx, y+5), 1, rl.Fade(rl.White, 0.5*alpha))
 	}
-	return grid, written
 }
 
 // ---------------------------------------------------------------- phases ---
@@ -620,20 +699,14 @@ func DrawCompute(ga *GateAnim, t float64) {
 	m4 := float32(d.Total) - float32(d.TCollapse)
 
 	// Backdrop: the demo sits on top of the gate, so give it a panel that
-	// covers the circuit underneath (phase label included). During the
-	// collapse phase the sum columns stack downward, so grow the panel to
-	// keep them covered.
+	// covers the circuit underneath (phase label included). The panel fades
+	// in over the first 0.3s.
+	panelA := ease(ft / 0.3)
 	pad := float32(14)
-	bgH := l.height
-	if ft >= m4 {
-		stackH := dHeaderH + float32(int32(1)<<uint(d.N))*float32(visCount(int32(1)<<uint(d.Shift)))*dRowH
-		if stackH > bgH {
-			bgH = stackH
-		}
-	}
-	bg := rl.NewRectangle(l.tagX-pad, l.top-30-pad, l.width+2*pad, bgH+30+2*pad)
-	rl.DrawRectangleRec(bg, rl.Fade(rl.Black, 0.88))
-	rl.DrawRectangleLinesEx(bg, 2, rl.Fade(rl.Gold, 0.6))
+	bg := rl.NewRectangle(l.tagX-pad, l.top-30-pad, l.width+2*pad, l.height+30+2*pad)
+	rl.DrawRectangleRounded(bg, 0.06, 6, rl.Fade(rl.Black, 0.88*panelA))
+	rl.DrawRectangleRoundedLinesEx(bg, 0.06, 6, 2, rl.Fade(rl.Gold, 0.6*panelA))
+	drawDemoProgress(l, float32(d.Total), ft, []float32{m1, m2, m3, m4}, panelA)
 
 	switch {
 	case ft < m1:
@@ -646,30 +719,32 @@ func DrawCompute(ga *GateAnim, t float64) {
 		drawPhaseLabel(l, "Gate "+d.Label)
 		drawGatePhase(d, l, ease((ft-m2)/float32(d.TGate)))
 	case ft < m4:
-		drawPhaseLabel(l, "Compute: each state spreads over the gate rows")
+		drawPhaseLabel(l, "Compute: each state flows through the gate, cell by cell")
 		drawIterate(d, l, ft-m3)
 	default:
-		drawPhaseLabel(l, "The sum collapses into the new qubit system")
+		drawPhaseLabel(l, "The result becomes the new qubit system")
 		drawCollapse(d, l, ease((ft-m4)/float32(d.TCollapse)))
 	}
 }
 
 // drawMerge: source system columns slide together into one Dirac column.
+// The slide eases out so the columns slow down as they settle into place.
 func drawMerge(d *ComputeDemo, l demoLayout, u float32) {
-	e := ease(u)
+	e := easeOut(u)
 	if len(d.SrcAmps) <= 1 {
-		drawStateColumn(d, l.ampX, l.ketX, l.top, d.MergedAmps, d.PreMods, e, -1)
+		a := ease(u)
+		drawStateColumn(d, l.ampX, l.ketX, l.top, d.MergedAmps, d.PreMods, a, -1)
 		for p := int32(0); p < d.Size; p++ {
-			drawTag(l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PreMods[p], e, false)
+			drawTag(d, l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PreMods[p], a, false)
 		}
 		return
 	}
 
 	srcAlpha := float32(1)
 	mergeAlpha := float32(0)
-	if e > 0.6 {
-		srcAlpha = 1 - (e-0.6)/0.4
-		mergeAlpha = (e - 0.6) / 0.4
+	if u > 0.6 {
+		srcAlpha = 1 - (u-0.6)/0.4
+		mergeAlpha = (u - 0.6) / 0.4
 	}
 	spread := float32(140)
 	for si := range d.SrcAmps {
@@ -683,12 +758,14 @@ func drawMerge(d *ComputeDemo, l demoLayout, u float32) {
 				continue
 			}
 			drawAmp(l.ampX+off, y, d.SrcAmps[si][r], srcAlpha)
-			drawKet(l.ketX+off, y, r, size, d.SrcMods[si], srcAlpha)
+			drawKet(d, l.ketX+off, y, r, size, d.SrcMods[si], srcAlpha)
 		}
+		srcKetW := 26 + float32(size)*dDigitW
+		drawBrackets(d, l.ampX+off-16, l.ketX+off+srcKetW+6, l.top+dHeaderH, float32(len(rows))*dRowH, d.SrcMods[si], srcAlpha)
 	}
 	drawStateColumn(d, l.ampX, l.ketX, l.top, d.MergedAmps, d.PreMods, mergeAlpha, -1)
 	for p := int32(0); p < d.Size; p++ {
-		drawTag(l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PreMods[p], mergeAlpha, false)
+		drawTag(d, l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PreMods[p], mergeAlpha, false)
 	}
 }
 
@@ -713,12 +790,12 @@ func drawReorder(d *ComputeDemo, l demoLayout, u float32) {
 			rl.DrawText("...", int32(l.ampX+dAmpW-20), int32(y+6), 13, rl.Fade(rl.White, 0.7))
 			continue
 		}
-		drawKetMix(l.ketX, y, r, d.Size, d.PreMods, d.PostMods, e)
+		drawKetMix(d, l.ketX, y, r, d.Size, d.PreMods, d.PostMods, e)
 	}
 	for p := int32(0); p < d.Size; p++ {
 		y1 := l.top + dHeaderH + float32(p)*dTagH
 		y2 := l.top + dHeaderH + float32(d.DigitDest[p])*dTagH
-		drawTag(l.tagX, lerp(y1, y2, e), d.PreMods[p], 1, d.DigitDest[p] < d.N)
+		drawTag(d, l.tagX, lerp(y1, y2, e), d.PreMods[p], 1, d.DigitDest[p] < d.N)
 	}
 }
 
@@ -726,14 +803,15 @@ func drawReorder(d *ComputeDemo, l demoLayout, u float32) {
 func drawGatePhase(d *ComputeDemo, l demoLayout, e float32) {
 	drawStateColumn(d, l.ampX, l.ketX, l.top, d.InAmps, d.PostMods, 1, -1)
 	for p := int32(0); p < d.Size; p++ {
-		drawTag(l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], 1, p < d.N)
+		drawTag(d, l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], 1, p < d.N)
 	}
-	drawMatrix(d, l, e, -1)
+	drawMatrix(d, l, e, -1, -1)
 }
 
 // drawIterate: the main loop visualization. The top qubits iterate i from 0
-// to 2^N-1, the qubits below traverse l; each step fires light rays through
-// the gate matrix into the accumulating sum columns joined by "+".
+// to 2^N-1, the qubits below traverse l; for each (i, l) the gate matrix is
+// walked cell by cell down column i, each cell firing a light ray into the
+// accumulating result column.
 func drawIterate(d *ComputeDemo, l demoLayout, it float32) {
 	dimJ := int32(1) << uint(d.N)
 	dimL := int32(1) << uint(d.Shift)
@@ -762,30 +840,23 @@ func drawIterate(d *ComputeDemo, l demoLayout, it float32) {
 	written := make([]bool, dimJ*dimL)
 	for s := 0; s < k; s++ {
 		prev := d.Steps[s]
-		for j := int32(0); j < dimJ; j++ {
-			v := prev.Contrib[j]
-			grid[j*dimL+prev.L] += v
-			if real(v) != 0 || imag(v) != 0 {
-				written[j*dimL+prev.L] = true
-			}
+		v := prev.Contrib
+		grid[prev.J*dimL+prev.L] += v
+		if real(v) != 0 || imag(v) != 0 {
+			written[prev.J*dimL+prev.L] = true
 		}
 	}
 	pop := clamp01((u - 0.85) / 0.15)
 
 	drawStateColumn(d, l.ampX, l.ketX, l.top, d.InAmps, d.PostMods, 1, (st.I<<uint(d.Shift))+st.L)
 	for p := int32(0); p < d.Size; p++ {
-		drawTag(l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], 1, p < d.N)
+		drawTag(d, l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], 1, p < d.N)
 	}
-	drawMatrix(d, l, 1, st.I)
+	drawMatrix(d, l, 1, st.J, st.I)
 
-	for j := int32(0); j < dimJ; j++ {
-		x := l.sumX + float32(j)*(dSumColW+dPlusW)
-		drawSumColumnAt(d, x, l.top, j, grid, written, 1, 1, &st, pop)
-		if j < dimJ-1 {
-			plusY := l.top + dHeaderH + float32(visCount(dimL))*dRowH/2 - 10
-			rl.DrawText("+", int32(x+dSumColW+dPlusW/2-4), int32(plusY), 20, rl.White)
-		}
-	}
+	// The result builds up as one column: the 1xn input state times the nxn
+	// gate matrix yields another 1xn column.
+	drawResultColumn(d, l.sumX, l.sumX+dAmpW+6, l.top, grid, written, 1, &st, pop)
 	drawRays(d, l, st, u)
 
 	counter := fmt.Sprintf("step %d/%d", k+1, len(d.Steps))
@@ -793,47 +864,38 @@ func drawIterate(d *ComputeDemo, l demoLayout, it float32) {
 	rl.DrawText(counter, int32(l.tagX+l.width)-cw, int32(l.top-24), 12, rl.Fade(rl.White, 0.7))
 }
 
-// drawCollapse: the sum columns slide together and stack into a single
-// column - the new qubit system state.
+// drawCollapse: the input column and gate fade away while the result column
+// slides to the center and settles as the new qubit system state.
 func drawCollapse(d *ComputeDemo, l demoLayout, e float32) {
-	dimJ := int32(1) << uint(d.N)
-	dimL := int32(1) << uint(d.Shift)
-	grid, written := fullGrid(d)
-
 	sceneA := clamp01(1 - e*1.4)
 	if sceneA > 0 {
 		drawStateColumn(d, l.ampX, l.ketX, l.top, d.InAmps, d.PostMods, sceneA, -1)
 		for p := int32(0); p < d.Size; p++ {
-			drawTag(l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], sceneA, false)
+			drawTag(d, l.tagX, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], sceneA, false)
 		}
-		drawMatrix(d, l, sceneA*0.6, -1)
+		drawMatrix(d, l, sceneA*0.6, -1, -1)
 	}
 
 	ketW := 26 + float32(d.Size)*dDigitW
 	colW := dAmpW + ketW
-	matW := float32(dimJ) * dCellW
+	matW := float32(int32(1)<<uint(d.N)) * dCellW
 	finalX := l.matX + matW/2 - colW/2
-	blockH := float32(visCount(dimL)) * dRowH
 
-	colA := clamp01(1 - clamp01((e-0.7)/0.3))
-	headA := colA * clamp01(1-e*2.5)
-	for j := int32(0); j < dimJ; j++ {
-		x := lerp(l.sumX+float32(j)*(dSumColW+dPlusW), finalX, e)
-		yOff := lerp(0, float32(j)*blockH, e)
-		drawSumColumnAt(d, x, l.top+yOff, j, grid, written, colA, headA, nil, 0)
-		if colA > 0 && j < dimJ-1 {
-			plusX := lerp(l.sumX+float32(j)*(dSumColW+dPlusW)+dSumColW+dPlusW/2-4, finalX+colW/2-4, e)
-			plusY := l.top + dHeaderH + float32(visCount(dimL))*dRowH/2 - 10 + yOff
-			rl.DrawText("+", int32(plusX), int32(plusY), 20, fadeA(rl.White, colA))
-		}
-	}
+	// The result column is already a single column; it just slides over.
+	x := lerp(l.sumX, finalX, e)
+	drawStateColumn(d, x, x+dAmpW+6, l.top, d.OutAmps, d.PostMods, 1, -1)
 
 	fa := clamp01((e - 0.7) / 0.3)
 	if fa > 0 {
+		// settle glow that peaks as the new state materializes
+		glow := fa * (1 - fa) * 2
+		if glow > 0.01 {
+			grect := rl.NewRectangle(finalX-8, l.top, colW+16, dHeaderH+float32(visCount(int32(1)<<uint(d.Size)))*dRowH)
+			rl.DrawRectangleRec(grect, rl.Fade(rl.Gold, 0.10*glow))
+		}
 		rl.DrawText("new state", int32(finalX), int32(l.top+4), 13, fadeA(rl.Gold, fa))
-		drawStateColumn(d, finalX, finalX+dAmpW+6, l.top, d.OutAmps, d.PostMods, fa, -1)
 		for p := int32(0); p < d.Size; p++ {
-			drawTag(finalX-dTagW-8, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], fa, false)
+			drawTag(d, finalX-dTagW-8, l.top+dHeaderH+float32(p)*dTagH, d.PostMods[p], fa, false)
 		}
 	}
 }

@@ -338,20 +338,20 @@ func (sg *SourceGate) Draw() {
 			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, edge)),
 			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		rl.DrawLineEx(edge, end, 4, sg.Color)
+		DrawWire(edge, end, 4, sg.Color)
 	} else {
-		rl.DrawLineEx(edge, sg.OutHook.Center, 4, sg.Color)
+		DrawWire(edge, sg.OutHook.Center, 4, sg.Color)
 	}
 	sg.OutHook.Draw()
 
 	// --- Table rectangle ---
 	rect := sg.getTableRect()
-	rl.DrawRectangleRec(rect, glob.ColorBg)
+	rl.DrawRectangleRounded(rect, 0.06, 6, glob.ColorBg)
 	thickness := float32(4.0)
 	if sg.IsFixed {
 		thickness = 5.0
 	}
-	rl.DrawRectangleLinesEx(rect, thickness, sg.Color)
+	rl.DrawRectangleRoundedLinesEx(rect, 0.06, 6, thickness, sg.Color)
 
 	// Column dividers
 	col1Right := rect.X + sgPaddingLeft + sgCol1Width

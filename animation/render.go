@@ -13,11 +13,27 @@ func Update() {
 	if Anim.State != StatePlaying {
 		return
 	}
-	if IsFinished() || CurrentAnim() == nil {
+
+	dt := float64(rl.GetFrameTime())
+
+	if IsFinished() {
+		Anim.EndPause -= dt
+		if Anim.EndPause <= 0 {
+			Anim.State = StateIdle
+		}
+		return
+	}
+	if Anim.EndPause > 0 {
+		Anim.EndPause -= dt
+		if Anim.EndPause <= 0 {
+			Anim.CurrentIdx = len(Anim.Gates)
+		}
+		return
+	}
+	if CurrentAnim() == nil {
 		return
 	}
 
-	dt := float64(rl.GetFrameTime())
 	Anim.Progress += dt
 	if Anim.Progress >= stepDuration() {
 		Anim.Progress = 0
@@ -29,7 +45,11 @@ func Update() {
 			Anim.SubIdx = 0
 			Anim.CurrentIdx++
 			if IsFinished() {
-				Anim.State = StateIdle
+				// Hold the last gate's final frame for a beat before finishing.
+				Anim.EndPause = EndPauseDur
+				Anim.CurrentIdx = len(Anim.Gates) - 1
+				Anim.SubIdx = len(ga.Inputs) + 1
+				Anim.Progress = stepDuration()
 			}
 		}
 	}
@@ -141,7 +161,7 @@ func Draw() {
 		}
 
 		rl.DrawCircleV(pos, DotRadius, rl.Yellow)
-		rl.DrawCircleLinesV(pos, DotRadius, rl.Orange)
+		rl.DrawCircleLines(int32(pos.X), int32(pos.Y), DotRadius, rl.Orange)
 	}
 
 	// The computation demo replaces the old yellow box
@@ -155,7 +175,7 @@ func Draw() {
 		edge := utils.RectEdgePoint(gateCenter, ga.OutputPos, gateRadius, gateRadius)
 		pos := rl.Vector2Lerp(edge, ga.OutputPos, outT)
 		rl.DrawCircleV(pos, DotRadius, rl.Yellow)
-		rl.DrawCircleLinesV(pos, DotRadius, rl.Orange)
+		rl.DrawCircleLines(int32(pos.X), int32(pos.Y), DotRadius, rl.Orange)
 	}
 }
 

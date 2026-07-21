@@ -37,6 +37,9 @@ type AnimState struct {
 	SubIdx     int
 	Progress   float64
 	State      State
+
+	// EndPause is the remaining time in the end-of-animation hold.
+	EndPause float64
 }
 
 var Anim = AnimState{
@@ -46,12 +49,17 @@ var Anim = AnimState{
 const DotRadius float32 = 10
 const StepDuration = 2.0
 
+// EndPauseDur is the hold at the end of the last gate before the animation
+// goes idle.
+const EndPauseDur = 1.2
+
 func Reset() {
 	Anim.Gates = nil
 	Anim.CurrentIdx = 0
 	Anim.SubIdx = 0
 	Anim.Progress = 0
 	Anim.State = StateIdle
+	Anim.EndPause = 0
 }
 
 func IsActive() bool {

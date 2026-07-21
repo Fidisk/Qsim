@@ -279,21 +279,21 @@ func (it *InfoTable) Draw() {
 			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, edge)),
 			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		rl.DrawLineEx(edge, end, 4, globals.HookColor)
+		DrawWire(edge, end, 4, globals.HookColor)
 	} else {
-		rl.DrawLineEx(edge, it.Hook.Center, 4, globals.HookColor)
+		DrawWire(edge, it.Hook.Center, 4, globals.HookColor)
 	}
 	it.Hook.Draw()
 
-	// --- Outer rectangle (sharp corners) ---
+	// --- Outer rectangle ---
 	rect := rl.NewRectangle(
 		it.Center.X-it.Width/2,
 		it.Center.Y-it.Height/2,
 		it.Width,
 		it.Height,
 	)
-	rl.DrawRectangleRec(rect, it.Color)
-	rl.DrawRectangleLinesEx(rect, 4, rl.Black)
+	rl.DrawRectangleRounded(rect, 0.06, 6, it.Color)
+	rl.DrawRectangleRoundedLinesEx(rect, 0.06, 6, 2, rl.Black)
 
 	const paddingLeft = 8
 	const paddingTop = 8

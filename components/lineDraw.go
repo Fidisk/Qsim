@@ -84,6 +84,9 @@ func (ld *LineDraw) Draw() {
 	}
 	if ld.Center.X != ld.End.X || ld.Center.Y != ld.End.Y {
 		rl.DrawLineEx(ld.Center, ld.End, 2, col)
+		// round end caps
+		rl.DrawCircleV(ld.Center, 2, col)
+		rl.DrawCircleV(ld.End, 2, col)
 	}
 }
 

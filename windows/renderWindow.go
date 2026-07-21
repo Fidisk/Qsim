@@ -27,6 +27,8 @@ type RenderWindow struct {
 	IsHorizontalScrolling bool
 	IsVerticalScrolling   bool
 
+	ShowGrid bool
+
 	postEffect []func()
 
 	pinPosition func() rl.Vector2
@@ -42,12 +44,28 @@ type RenderWindow struct {
 	spawnPrevState glob.SpawnType
 }
 
+// shade scales a color's RGB channels by f, clamped to [0,255].
+func shade(c rl.Color, f float32) rl.Color {
+	ch := func(v uint8) uint8 {
+		x := float32(v) * f
+		if x > 255 {
+			x = 255
+		}
+		if x < 0 {
+			x = 0
+		}
+		return uint8(x)
+	}
+	return rl.NewColor(ch(c.R), ch(c.G), ch(c.B), c.A)
+}
+
 func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 	rw := &RenderWindow{
 		Window:            *NewWindow(x, y, width, height),
 		WComp:             nil,
 		CanPan:            true,
 		CanSpawn:          true,
+		ShowGrid:          true,
 		postEffect:        nil,
 		pinPosition:       nil,
 		IsTitleBarVisible: true,
@@ -86,10 +104,15 @@ func (rw *RenderWindow) GetWorldMouse() rl.Vector2 {
 }
 func (rw *RenderWindow) Draw() {
 	// 1. Draw window decorations in screen space (unclipped)
-	rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBg)
+	// Drop shadow for depth
+	rl.DrawRectangle(rw.X+5, rw.Y+7, rw.Width, rw.Height, rl.Fade(rl.Black, 0.3))
+	// Subtle vertical gradient body
+	rl.DrawRectangleGradientV(rw.X, rw.Y, rw.Width, rw.Height, shade(rw.ColorBg, 1.08), shade(rw.ColorBg, 0.9))
 
 	if rw.IsTitleBarVisible {
 		rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.TitleBarHeight, rw.ColorTitleBar)
+		// Accent line under the title bar
+		rl.DrawRectangle(rw.X, rw.Y+rw.TitleBarHeight-2, rw.Width, 2, rl.Fade(rl.SkyBlue, 0.5))
 		if rw.isEditingTitle {
 			editBg := rl.NewColor(30, 30, 30, 255)
 			rl.DrawRectangleRec(rl.NewRectangle(float32(rw.X+4), float32(rw.Y+3), float32(rw.Width-8), float32(rw.TitleBarHeight-6)), editBg)
@@ -123,7 +146,7 @@ func (rw *RenderWindow) Draw() {
 	rl.BeginMode2D(rw.Camera)
 
 	// Grid overlay
-	{
+	if rw.ShowGrid {
 		contentRect := rw.GetContentRect()
 		topLeft := rl.GetScreenToWorld2D(
 			rl.Vector2{X: contentRect.X, Y: contentRect.Y},
@@ -134,20 +157,29 @@ func (rw *RenderWindow) Draw() {
 			rw.Camera,
 		)
 		interval := config.SnapToGridInterval
-		gridColor := rl.NewColor(80, 80, 80, 60)
+		minorColor := rl.NewColor(80, 80, 80, 45)
+		majorColor := rl.NewColor(100, 100, 100, 90)
 
 		for x := float32(math.Floor(float64(topLeft.X/interval))) * interval; x <= bottomRight.X; x += interval {
+			col, thick := minorColor, float32(1)
+			if math.Mod(math.Abs(float64(x)), float64(interval*5)) < 0.01 {
+				col, thick = majorColor, 1.5
+			}
 			rl.DrawLineEx(
 				rl.Vector2{X: x, Y: topLeft.Y},
 				rl.Vector2{X: x, Y: bottomRight.Y},
-				1, gridColor,
+				thick, col,
 			)
 		}
 		for y := float32(math.Floor(float64(topLeft.Y/interval))) * interval; y <= bottomRight.Y; y += interval {
+			col, thick := minorColor, float32(1)
+			if math.Mod(math.Abs(float64(y)), float64(interval*5)) < 0.01 {
+				col, thick = majorColor, 1.5
+			}
 			rl.DrawLineEx(
 				rl.Vector2{X: topLeft.X, Y: y},
 				rl.Vector2{X: bottomRight.X, Y: y},
-				1, gridColor,
+				thick, col,
 			)
 		}
 	}
@@ -170,6 +202,13 @@ func (rw *RenderWindow) Draw() {
 			circle.Center = saved
 		} else {
 			c.Draw()
+		}
+	}
+	// Qubit determinators draw above every other component so they stay
+	// visible (and grabbable) even when overlapping e.g. a gate.
+	for _, c := range rw.WComp {
+		if qs, ok := c.(*components.QubitsSystem); ok {
+			qs.DrawDeterminators()
 		}
 	}
 	if rw.CanSpawn && utils.IsMouseState(glob.MouseStateSpawn) {
@@ -230,6 +269,11 @@ func (rw *RenderWindow) Update() {
 	if !glob.CursorAvailable && !rw.holdingCursor {
 		worldMouse := rw.GetWorldMouse()
 		tmp := false
+		for i := len(rw.WComp) - 1; i >= 0; i-- {
+			if qs, ok := rw.WComp[i].(*components.QubitsSystem); ok {
+				qs.UpdateDeterminators(worldMouse, rw.holdingCursor, &tmp)
+			}
+		}
 		for i := len(rw.WComp) - 1; i >= 0; i-- {
 			rw.WComp[i].Update(worldMouse, rw.holdingCursor, &tmp)
 		}
@@ -310,6 +354,14 @@ func (rw *RenderWindow) Update() {
 	isCursorAvailable := false
 	if rw.holdingCursor {
 		isCursorAvailable = true
+	}
+	// Qubit determinators get first pick of the cursor so they stay
+	// draggable even when they end up on top of another component
+	// (e.g. a gate).
+	for i := len(rw.WComp) - 1; i >= 0; i-- {
+		if qs, ok := rw.WComp[i].(*components.QubitsSystem); ok {
+			qs.UpdateDeterminators(worldMouse, rw.holdingCursor, &isCursorAvailable)
+		}
 	}
 	for i := len(rw.WComp) - 1; i >= 0; i-- {
 		rw.WComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
@@ -411,7 +463,11 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Component {
 	switch {
 	case state&glob.Qubit != 0:
-		return components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, glob.QubitSystemColor)
+		q := components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, glob.QubitSystemColor)
+		// Assign the same 1-qubit state the real spawn uses so DrawGhost
+		// can render the grid and determinator layout.
+		q.Assign(qubits.NewQubitStateManager([]complex64{1, 0}, 1))
+		return q
 	case state&glob.Hadamard != 0:
 		t := complex(float32(1/math.Sqrt(2)), 0)
 		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)

@@ -85,10 +85,12 @@ func (s *Slider) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvail
 func (s *Slider) Draw() {
 	rect := s.trackRect()
 
-	// Track background and filled portion
-	rl.DrawRectangleRec(rect, darken(s.Color, 0.7))
-	fill := rl.NewRectangle(rect.X, rect.Y, rect.Width*s.Value, rect.Height)
-	rl.DrawRectangleRec(fill, rl.Gold)
+	// Track background and filled portion (rounded)
+	rl.DrawRectangleRounded(rect, 0.5, 4, darken(s.Color, 0.7))
+	if s.Value > 0 {
+		fill := rl.NewRectangle(rect.X, rect.Y, rect.Width*s.Value, rect.Height)
+		rl.DrawRectangleRounded(fill, 0.5, 4, rl.Fade(rl.Gold, 0.9))
+	}
 
 	// Tick marks (e.g. gate boundaries)
 	for _, t := range s.Ticks {
@@ -104,14 +106,26 @@ func (s *Slider) Draw() {
 	}
 
 	// Border
-	rl.DrawRectangleLinesEx(rect, 1, darken(s.Color, 0.3))
+	rl.DrawRectangleRoundedLinesEx(rect, 0.5, 4, 1, darken(s.Color, 0.3))
+
+	// Playhead
+	kx := rect.X + rect.Width*s.Value
+	rl.DrawLineEx(
+		rl.NewVector2(kx, rect.Y-4),
+		rl.NewVector2(kx, rect.Y+rect.Height+4),
+		1.5, rl.Fade(rl.Gold, 0.6),
+	)
 
 	// Knob
 	kr := s.Height * 0.9
 	if s.hovered || s.held {
 		kr = s.Height * 1.2
 	}
-	knob := rl.NewVector2(rect.X+rect.Width*s.Value, s.Center.Y)
+	knob := rl.NewVector2(kx, s.Center.Y)
 	rl.DrawCircleV(knob, kr, rl.Gold)
-	rl.DrawCircleLinesV(knob, kr, rl.Fade(rl.White, 0.8))
+	ring := rl.Fade(rl.White, 0.4)
+	if s.hovered || s.held {
+		ring = rl.Fade(rl.White, 0.9)
+	}
+	rl.DrawCircleLines(int32(knob.X), int32(knob.Y), kr, ring)
 }

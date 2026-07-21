@@ -21,6 +21,15 @@ func (a *AttrManager) Get(id int32) attributes {
 	return a.modifier[id]
 }
 
+// SetName replaces the attribute of a qubit modifier with the given display
+// name. Out-of-range ids are ignored.
+func (a *AttrManager) SetName(id int32, val string) {
+	if id < 0 || int(id) >= len(a.modifier) {
+		return
+	}
+	a.modifier[id] = NewName(val)
+}
+
 var QubitModifierID int32 = 0
 
 func GenerateQubitModifierID() int32 {

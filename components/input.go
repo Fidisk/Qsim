@@ -80,8 +80,9 @@ func (in *Input) Draw() {
 	if in.Active {
 		border = rl.SkyBlue
 	}
-	rl.DrawRectangleRec(rl.NewRectangle(x, y, w, h), bg)
-	rl.DrawRectangleLinesEx(rl.NewRectangle(x, y, w, h), 4, border)
+	box := rl.NewRectangle(x, y, w, h)
+	rl.DrawRectangleRounded(box, 0.2, 4, bg)
+	rl.DrawRectangleRoundedLinesEx(box, 0.2, 4, 2, border)
 
 	textX := int32(x + 8)
 	textY := int32(y + (h-float32(in.FontSize))/2)

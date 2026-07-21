@@ -17,11 +17,16 @@ type Hook struct {
 	IsOutput         bool
 	Label            string
 	AllowQubitSystem bool
+
+	// justSpawned triggers a one-shot auto-connect attempt on the first
+	// Update, so a hook spawned on top of a qubit determinator hooks up.
+	justSpawned bool
 }
 
 func NewHook(x, y, radius float32, color rl.Color) *Hook {
 	tmp := Hook{
-		Circle: *NewCircle(x, y, radius, color),
+		Circle:      *NewCircle(x, y, radius, color),
+		justSpawned: true,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight((globals.HookWeight))
@@ -30,8 +35,9 @@ func NewHook(x, y, radius float32, color rl.Color) *Hook {
 
 func NewOutputHook(x, y, radius float32, color rl.Color) *Hook {
 	tmp := Hook{
-		Circle:   *NewCircle(x, y, radius, color),
-		IsOutput: true,
+		Circle:      *NewCircle(x, y, radius, color),
+		IsOutput:    true,
+		justSpawned: true,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight((globals.HookWeight))
@@ -60,6 +66,10 @@ func (c *Hook) onRelease() {
 }
 
 func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.justSpawned {
+		c.justSpawned = false
+		c.zipToDeterminator()
+	}
 	if c.IsHooked {
 		if utils.GetObjectFromID(c.TargetID) == nil {
 			c.Disconnect()
@@ -83,7 +93,15 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.onClick(worldMouse, isCursorAvailable)
+			if utils.IsMouseState(glob.MouseStateNormal) && c.DoubleClicked(worldMouse) {
+				// double-click: detach (same rule as detach mode)
+				if !c.IsOutput {
+					c.Disconnect()
+				}
+				*isCursorAvailable = false
+			} else {
+				c.onClick(worldMouse, isCursorAvailable)
+			}
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -91,6 +109,7 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		c.holdingCursor = false
 		*isCursorAvailable = true
 		c.Center = c.VirtualCenter
+		c.zipToDeterminator()
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
@@ -121,6 +140,9 @@ func (c *Hook) Draw() {
 	// Define how bold you want the cross to be (in pixels)
 	thickness := float32(4.0)
 
+	// Port outline, then the "+" cross
+	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, rl.Fade(c.Color, 0.6))
+
 	// Draw the horizontal bar
 	rl.DrawLineEx(left, right, thickness, c.Color)
 
@@ -133,6 +155,10 @@ func (c *Hook) Draw() {
 	textX := int32(c.Center.X - c.Radius - offsetX)
 	textY := int32(c.Center.Y - c.Radius - offsetY - float32(fontSize))
 
+	// Backdrop so the label stays readable over wires and the grid
+	labelW := rl.MeasureText(c.Label, fontSize)
+	bg := rl.NewRectangle(float32(textX)-3, float32(textY)-2, float32(labelW)+6, float32(fontSize)+4)
+	rl.DrawRectangleRec(bg, rl.Fade(rl.Black, 0.55))
 	rl.DrawText(c.Label, textX, textY, fontSize, c.Color)
 }
 
@@ -141,6 +167,8 @@ func (c *Hook) DrawGhost() {
 		return
 	}
 	ghostColor := rl.Fade(c.Color, 0.3)
+
+	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, ghostColor)
 
 	left := rl.Vector2{X: c.Center.X - c.Radius, Y: c.Center.Y}
 	right := rl.Vector2{X: c.Center.X + c.Radius, Y: c.Center.Y}
@@ -158,11 +186,52 @@ func (c *Hook) DrawGhost() {
 	rl.DrawText(c.Label, textX, textY, fontSize, ghostColor)
 }
 
+// zipToDeterminator connects the hook to a nearby free qubit determinator.
+// It mirrors QubitDeterminator.zipToHook from the hook side and runs when the
+// hook is released after a drag or right after it spawns. Output-style hooks
+// (IsOutput or AllowQubitSystem) are skipped: those connect to qubit systems.
+func (c *Hook) zipToDeterminator() {
+	if c.IsOutput || c.AllowQubitSystem || c.IsHooked {
+		return
+	}
+	for _, obj := range utils.ObjectList {
+		d, ok := obj.(*QubitDeterminator)
+		if !ok || d == nil {
+			continue
+		}
+		if d.HookID != 0 && d.HookID != c.ID {
+			continue
+		}
+		// Skip determinators that are hidden or not placed in a window
+		// (e.g. spawn previews, which never get a parent).
+		qp := d.GetQubitParent()
+		if qp == nil || qp.GetParent() == nil || !qp.isDeterminatorVisible(d) {
+			continue
+		}
+		if utils.Dist(d.Center, c.Center) <= glob.HookDist {
+			c.Connect(d)
+			return
+		}
+	}
+}
+
 func (v *Hook) Connect(val Component) {
 	switch c := val.(type) {
 	case *QubitsSystem:
 		c.removeFromHook()
+		delta := v.Center.Subtract(c.Center)
 		c.Center = v.Center
+		c.VirtualCenter = v.Center
+		// Move the determinators along with the system so they keep their
+		// layout (right of the state grid) relative to the new position.
+		// Hooked determinators stay anchored to their own hooks.
+		for _, d := range c.QubitDeterminatorList {
+			if d.HookID != 0 {
+				continue
+			}
+			d.Center = d.Center.Add(delta)
+			d.VirtualCenter = d.Center
+		}
 		v.IsHooked = true
 		v.TargetID = c.ID
 		c.HookID = v.ID

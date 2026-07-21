@@ -27,8 +27,10 @@ func main() {
 
 	//panel := windows.NewWindow(200, 150, 400, 300)
 	panel := windows.NewRenderWindow(0, 0, 1500, 800)
+	panel.Rename("Circuit")
 	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
 	toolBar := windows.NewRenderWindow(0, 800, 1600, 50)
+	toolBar.ShowGrid = false
 
 	/*
 		var create = func(p *windows.RenderWindow) {
@@ -158,6 +160,7 @@ func main() {
 			fileWin.Rename("File Browser")
 			fileWin.SetPriority(200)
 			fileWin.IsSpawnAllow(false)
+			fileWin.ShowGrid = false
 
 			savesDir := "saves"
 			_ = os.MkdirAll(savesDir, 0755)
@@ -238,6 +241,7 @@ func main() {
 			fileWin.IsPanAllow(false)
 			fileWin.IsZoomAllow(false)
 			fileWin.IsResizeAllow(false)
+			fileWin.ShowGrid = false
 
 			input := components.NewInput(0, 0, 400, 25, 16, 64, func(text string) {
 				os.MkdirAll("saves", 0755)
@@ -261,6 +265,7 @@ func main() {
 	spawnBar.IsZoomAllow(false)
 	spawnBar.IsDragAllow(true)
 	spawnBar.IsSpawnAllow(false)
+	spawnBar.ShowGrid = false
 	spawnBar.SetPriority(100)
 	spawnBar.AddEffect(func() {
 		effect.ConstSize(spawnBar, 100, 800)
@@ -419,6 +424,7 @@ func main() {
 	animBar.IsZoomAllow(false)
 	animBar.IsDragAllow(true)
 	animBar.IsSpawnAllow(false)
+	animBar.ShowGrid = false
 	animBar.SetPriority(100)
 	animBar.EnableTitleBar(false)
 	animBar.Rename("Animation")
@@ -499,13 +505,12 @@ func main() {
 	AnimButSkip := components.NewButton(10, 0, 70, 25, rl.LightGray, ">>", 20, skipStep)
 	AnimButEnd := components.NewButton(80, 0, 70, 25, rl.LightGray, ">|", 20, finishAnim)
 
-	stepLabel := components.NewLabel(170, -18, "Steps: 0/0", 16, rl.White)
-	timeLabel := components.NewLabel(170, 2, "0.0 / 0.0 s", 16, rl.White)
+	stepLabel := components.NewLabel(170, -7, "Gate: 0/0", 16, rl.White)
 
 	// Timeline scrubber: drag to set the animation time (back and forth).
 	scrubbing := false
 	wasPlaying := false
-	timeline := components.NewSlider(520, 2, 500, 10, rl.LightGray,
+	timeline := components.NewSlider(590, 2, 360, 10, rl.LightGray,
 		func(v float32) {
 			if !scrubbing {
 				scrubbing = true
@@ -530,7 +535,7 @@ func main() {
 		},
 	)
 
-	animBar.PushComponent(AnimButReset, AnimButBack, AnimButPlay, AnimButSkip, AnimButEnd, stepLabel, timeLabel, timeline)
+	animBar.PushComponent(AnimButReset, AnimButBack, AnimButPlay, AnimButSkip, AnimButEnd, stepLabel, timeline)
 
 	winManager = append(winManager, panel, toolBar, spawnBar, animBar)
 
@@ -553,10 +558,12 @@ func main() {
 			AnimButPlay.Label = ">"
 		}
 
-		stepLabel.Text = fmt.Sprintf("Gate: %d/%d", animation.Anim.CurrentIdx+1, len(animation.Anim.Gates))
-
+		gateNum := animation.Anim.CurrentIdx + 1
+		if gateNum > len(animation.Anim.Gates) {
+			gateNum = len(animation.Anim.Gates)
+		}
 		total := animation.TotalDuration()
-		timeLabel.Text = fmt.Sprintf("%.1f / %.1f s", animation.CurrentTime(), total)
+		stepLabel.Text = fmt.Sprintf("Gate: %d/%d   %.1f / %.1f s", gateNum, len(animation.Anim.Gates), animation.CurrentTime(), total)
 		if !scrubbing && total > 0 {
 			timeline.Value = float32(animation.CurrentTime() / total)
 			ticks := []float32{}
