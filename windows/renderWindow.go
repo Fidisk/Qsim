@@ -7,10 +7,18 @@ import (
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/qubits/attributes"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
+
+// previewModID is a single qubit modifier ID registered once and shared by
+// every qubit-system spawn preview. Previews need a real, registered ID
+// because Assign resolves it while building the qubit visuals (a dummy ID
+// crashes AttrManager.Get), but creating a fresh one per preview would burn
+// a qubit name each time and make spawned-qubit IDs skip every other number.
+var previewModID int32 = -1
 
 type RenderWindow struct {
 	Window
@@ -422,6 +430,8 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 		q.Assign(qState)
 
 		rw.PushComponent(q)
+		// A determinator spawned on top of a hook auto-connects.
+		q.ZipDeterminatorsToHooks()
 	case utils.IsSpawnState(glob.Hadamard):
 		t := complex(float32(1/math.Sqrt(2)), 0)
 		H1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
@@ -464,9 +474,13 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 	switch {
 	case state&glob.Qubit != 0:
 		q := components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, glob.QubitSystemColor)
-		// Assign the same 1-qubit state the real spawn uses so DrawGhost
-		// can render the grid and determinator layout.
-		q.Assign(qubits.NewQubitStateManager([]complex64{1, 0}, 1))
+		// Assign the same 1-qubit layout the real spawn uses so DrawGhost
+		// can render the grid and determinator, with the shared registered
+		// preview modifier ID (see previewModID).
+		if previewModID < 0 {
+			previewModID = attributes.GenerateQubitModifierID()
+		}
+		q.Assign(qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{previewModID}))
 		return q
 	case state&glob.Hadamard != 0:
 		t := complex(float32(1/math.Sqrt(2)), 0)

@@ -127,7 +127,7 @@ func main() {
 	toolBar.AddEffect(func() {
 		effect.ScaleWidthToScreen(toolBar)
 		toolBar.Height = 50
-		//effect.PinToBottom(toolBar, 50)
+		effect.PinToBottom(toolBar, 50)
 	})
 	toolBar.IsSpawnAllow(false)
 	toolBar.SetPriority(100)
@@ -270,6 +270,12 @@ func main() {
 	spawnBar.AddEffect(func() {
 		effect.ConstSize(spawnBar, 100, 800)
 		effect.PinToRight(spawnBar)
+	})
+	// Keep the buttons at their designed screen positions when the bar is
+	// clamped below its 800px design height, so the top buttons don't slide
+	// under the title bar and get clipped.
+	spawnBar.PinCamera(func() rl.Vector2 {
+		return rl.Vector2{X: 0, Y: (float32(spawnBar.Height) - 800) / 2}
 	})
 	spawnBar.Rename("Object")
 
@@ -430,6 +436,7 @@ func main() {
 	animBar.Rename("Animation")
 	animBar.AddEffect(func() {
 		effect.ScaleWidthToScreen(animBar)
+		effect.PinToBottom(animBar, 0)
 	})
 
 	resetAnim := func() {

@@ -241,6 +241,7 @@ func (c *Gate) MeasureOutput() {
 				parent.PushComponent(tmp)
 			}
 			hook.Connect(tmp)
+			tmp.ZipDeterminatorsToHooks()
 			continue
 		}
 
@@ -275,6 +276,7 @@ func (c *Gate) MeasureOutput() {
 				parent.PushComponent(tmp)
 			}
 			hook.Connect(tmp)
+			tmp.ZipDeterminatorsToHooks()
 		}
 	}
 }
@@ -345,6 +347,7 @@ func (c *Gate) CalculateOutPut() bool {
 	}
 
 	c.OutPutHook[0].Connect(tmp)
+	tmp.ZipDeterminatorsToHooks()
 	return true
 }
 

@@ -21,6 +21,11 @@ func (a *AttrManager) Get(id int32) attributes {
 	return a.modifier[id]
 }
 
+// Len reports the number of registered modifiers, for bounds checks before Get.
+func (a *AttrManager) Len() int {
+	return len(a.modifier)
+}
+
 // SetName replaces the attribute of a qubit modifier with the given display
 // name. Out-of-range ids are ignored.
 func (a *AttrManager) SetName(id int32, val string) {

@@ -247,6 +247,7 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 		}
 
 		sg.OutHook.Connect(tmp)
+		tmp.ZipDeterminatorsToHooks()
 	}
 }
 

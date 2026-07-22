@@ -121,16 +121,21 @@ func (w *Window) Update() {
 	}
 }
 
+// clampToMainWindow keeps the window's position and size inside the main
+// window. Position is clamped BEFORE size so the size clamp can never go
+// negative — a negative width/height made windows vanish entirely when the
+// main window was shorter than their Y position (e.g. toolbar at Y=800 on a
+// 705px-tall screen).
+func (w *Window) clampToMainWindow() {
+	w.X = max(0, min(w.X, int32(glob.MainWindowWidth)-w.Width))
+	w.Y = max(0, min(w.Y, int32(glob.MainWindowHeight)-w.Height))
+	w.Width = max(0, min(w.Width, int32(glob.MainWindowWidth)-w.X))
+	w.Height = max(0, min(w.Height, int32(glob.MainWindowHeight)-w.Y))
+}
+
 func (w *Window) handleResize(mousePos rl.Vector2) {
 	if !w.CanResize {
-		w.Height = max(0, w.Height)
-		w.Width = max(0, w.Width)
-
-		w.Height = min(w.Height, int32(glob.MainWindowHeight))
-		w.Width = min(w.Width, int32(glob.MainWindowWidth))
-
-		w.Height = min(w.Height, int32(glob.MainWindowHeight)-w.Y)
-		w.Width = min(w.Width, int32(glob.MainWindowWidth)-w.X)
+		w.clampToMainWindow()
 		return
 	}
 
@@ -186,14 +191,7 @@ func (w *Window) handleResize(mousePos rl.Vector2) {
 
 	// --- Dragging is handled in its own method --
 
-	w.Height = max(0, w.Height)
-	w.Width = max(0, w.Width)
-
-	w.Height = min(w.Height, int32(glob.MainWindowHeight))
-	w.Width = min(w.Width, int32(glob.MainWindowWidth))
-
-	w.Height = min(w.Height, int32(glob.MainWindowHeight)-w.Y)
-	w.Width = min(w.Width, int32(glob.MainWindowWidth)-w.X)
+	w.clampToMainWindow()
 }
 
 // handleDrag manages the title‑bar dragging logic
@@ -235,8 +233,8 @@ func (w *Window) handleDrag(mousePos rl.Vector2) {
 	w.X = max(0, w.X)
 	w.Y = max(0, w.Y)
 
-	w.Y = min(w.Y, int32(glob.MainWindowHeight)-w.Height)
-	w.X = min(w.X, int32(glob.MainWindowWidth)-w.Width)
+	w.Y = max(0, min(w.Y, int32(glob.MainWindowHeight)-w.Height))
+	w.X = max(0, min(w.X, int32(glob.MainWindowWidth)-w.Width))
 }
 
 // Draw renders the window

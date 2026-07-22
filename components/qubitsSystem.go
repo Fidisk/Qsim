@@ -8,6 +8,7 @@ import (
 	"qsim/config"
 	glob "qsim/globals"
 	qub "qsim/qubits"
+	"qsim/qubits/attributes"
 	"qsim/utils"
 	"sort"
 	"strconv"
@@ -103,17 +104,14 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		// VirtualCenter moved, so zipToHook must look for hooks around the
 		// drop point, not the position the drag started from.
 		c.Center = c.VirtualCenter
+
+		// Dragging the system carries its determinators along, so let them
+		// auto-connect first, from the positions they were dropped at. Then
+		// the system zips; its snap shifts only the still-free determinators,
+		// leaving freshly hooked ones anchored to their hooks.
+		c.ZipDeterminatorsToHooks()
 		c.zipToHook()
 		c.ClearForce()
-
-		// Dragging the system carries its determinators along, so give each
-		// free one a chance to auto-connect if it was dropped onto a hook.
-		// Hooked determinators stay anchored to their own hooks.
-		for _, d := range c.QubitDeterminatorList {
-			if d.HookID == 0 {
-				d.zipToHook()
-			}
-		}
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
@@ -137,14 +135,41 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 // priority pass before the other components so a determinator stays
 // draggable even when it overlaps another component (e.g. a gate).
 func (c *QubitsSystem) UpdateDeterminators(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
-	for _, d := range c.QubitDeterminatorList {
+	for i, d := range c.QubitDeterminatorList {
 		if !c.isDeterminatorVisible(d) {
 			continue
 		}
-		c.pullToQubitSystem(d)
+		c.pullToQubitSystem(d, i)
 
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
 	}
+}
+
+// ZipDeterminatorsToHooks gives every free, visible determinator a chance to
+// auto-connect when it sits on top of a hook. Used when a system spawns or is
+// dropped. Visibility is snapshotted up front: connecting one determinator
+// hides the others, and each visible one on a hook should still connect.
+func (c *QubitsSystem) ZipDeterminatorsToHooks() {
+	visible := make([]bool, len(c.QubitDeterminatorList))
+	for i, d := range c.QubitDeterminatorList {
+		visible[i] = d.HookID == 0 && c.isDeterminatorVisible(d)
+	}
+	for i, d := range c.QubitDeterminatorList {
+		if visible[i] {
+			d.zipToHook()
+		}
+	}
+}
+
+// modifierLabel returns the display label for a qubit modifier: the renamed
+// display name when one is set, otherwise the raw numeric ID.
+func modifierLabel(id int32) string {
+	if id >= 0 && int(id) < attributes.AttributesManager.Len() {
+		if n, ok := attributes.AttributesManager.Get(id).(*attributes.Name); ok {
+			return n.Val
+		}
+	}
+	return strconv.Itoa(int(id))
 }
 
 func (c *QubitsSystem) Draw() {
@@ -256,21 +281,22 @@ func (c *QubitsSystem) Draw() {
 			textCol := rl.Fade(c.Color, textA)
 
 			//Lmao why doesnt the AI just make a temp arr lol
-			var parts []string
+			var mods []int32
 			temp := index
 			for i := 0; temp > 0; i++ {
 				if temp&1 == 1 {
-					parts = append(parts, strconv.Itoa(int(c.Origin.ModifierID[i])))
+					mods = append(mods, c.Origin.ModifierID[i])
 				}
 				temp >>= 1
 			}
 
-			// Sort numerically, not alphabetically
-			sort.Slice(parts, func(i, j int) bool {
-				a, _ := strconv.Atoi(parts[i])
-				b, _ := strconv.Atoi(parts[j])
-				return a < b
-			})
+			// Sort numerically by modifier ID, not by label text
+			sort.Slice(mods, func(a, b int) bool { return mods[a] < mods[b] })
+
+			parts := make([]string, len(mods))
+			for i, id := range mods {
+				parts[i] = modifierLabel(id)
+			}
 
 			nameStr := strings.Join(parts, " + ")
 
@@ -382,19 +408,13 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	// Compute grid layout for right-side determinator placement
 	exp := p.Size
 	n := glob.QubitSystemCellWidth
-	m := glob.QubitSystemCellHeight
 	widthExp := (exp + 1) / 2
-	heightExp := exp / 2
 	cols := int32(1 << widthExp)
-	rows := int32(1 << heightExp)
 	totalWidth := float32(cols * int32(n))
-	totalHeight := float32(rows * int32(m))
-	startX := c.Center.X - totalWidth/2
-	startY := c.Center.Y - totalHeight/2
-	detX := startX + totalWidth + n
+	detX := determinatorColumnX(c.Center.X, totalWidth)
 
 	for i := range p.Size {
-		y := startY + (float32(i)+0.5)*totalHeight/float32(p.Size)
+		y := determinatorSlotY(c.Center.Y, int(i), int(p.Size))
 		q := NewQubitDeterminator(detX, y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
 
 		q.QubitSystemID = c.ID
@@ -475,7 +495,17 @@ func (c *QubitsSystem) zipToHook() {
 		}
 	}
 	if !gotHooked && c.HookID != 0 {
-		c.removeFromHook()
+		// Dragging away from an output hook (gate/source) only repositions
+		// the system — the link must survive, otherwise the gate sees a free
+		// output hook and respawns a duplicate system. Standalone hooks
+		// release normally.
+		keep := false
+		if h, ok := utils.GetObjectFromID(c.HookID).(*Hook); ok && h.IsOutput {
+			keep = true
+		}
+		if !keep {
+			c.removeFromHook()
+		}
 	}
 }
 
@@ -512,7 +542,44 @@ func (c *QubitsSystem) PostUpdate() {
 	}
 }
 
-func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
+// determinatorColumnX returns the grid-snapped X of the determinator column:
+// one cell to the right of the state grid.
+func determinatorColumnX(centerX, totalWidth float32) float32 {
+	return utils.SnapToGrid(centerX+totalWidth/2+glob.QubitSystemCellWidth, config.SnapToGridInterval)
+}
+
+// determinatorSlotY returns the grid-snapped Y of the i-th determinator slot.
+// Slots are spaced one snap interval apart, centered on the system, so a
+// determinator always rests on a grid point.
+func determinatorSlotY(centerY float32, i, size int) float32 {
+	stride := config.SnapToGridInterval
+	return utils.SnapToGrid(centerY+(float32(i)-float32(size-1)/2)*stride, stride)
+}
+
+// determinatorHome returns the laid-out position for the i-th determinator:
+// a column one cell to the right of the state grid, matching Assign.
+func (c *QubitsSystem) determinatorHome(i int) rl.Vector2 {
+	exp := int32(1)
+	if c.Origin != nil {
+		exp = c.Origin.Size
+	}
+	widthExp := (exp + 1) / 2
+	cols := int32(1 << widthExp)
+	totalWidth := float32(cols * int32(glob.QubitSystemCellWidth))
+	size := len(c.QubitDeterminatorList)
+	if size < 1 {
+		size = 1
+	}
+	return rl.Vector2{
+		X: determinatorColumnX(c.Center.X, totalWidth),
+		Y: determinatorSlotY(c.Center.Y, i, size),
+	}
+}
+
+// pullToQubitSystem springs a free determinator back toward its laid-out
+// home slot next to the grid, so determinators keep their column instead of
+// drifting off at random angles.
+func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator, i int) {
 	if !config.PhysicsEnabled {
 		return
 	}
@@ -522,16 +589,16 @@ func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator) {
 	if d.HookID != 0 {
 		return
 	}
-	val := utils.Dist(c.Center, d.Center) - glob.GateToHookDist*float32(c.cols)
+	disp := c.determinatorHome(i).Subtract(d.Center)
+	dist := disp.Length()
 
-	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
+	if dist <= glob.GateToHookGraceDist {
 		return
 	}
 
-	val = float32(math.Max(float64(val), float64(-100)))
-	val = float32(math.Min(float64(val), float64(100)))
+	val := float32(math.Min(float64(dist), 100))
 
-	tmp := c.Center.Subtract(d.Center).Normalize().Scale(val * glob.GateToHookPullCoeff)
+	tmp := disp.Normalize().Scale(val * glob.GateToHookPullCoeff)
 
 	d.AddForce(tmp)
 	c.AddForce(tmp.Scale(-1))
