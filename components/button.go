@@ -2,6 +2,8 @@ package components
 
 import (
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	glob "qsim/globals"
 )
 
 // Button is a clickable rectangle with a label and an optional drag ability.
@@ -11,8 +13,11 @@ type Button struct {
 	Label         string
 	FontSize      int32
 	OnClick       func()
-	held          bool
-	hovered       bool
+	// Tooltip is shown in the floating tooltip window while the button is
+	// hovered. Leave empty for no tooltip.
+	Tooltip string
+	held    bool
+	hovered bool
 }
 
 // NewButton creates a rectangular button.
@@ -41,6 +46,10 @@ func (b *Button) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvail
 
 	over := rl.CheckCollisionPointRec(worldMouse, rect)
 	b.hovered = over && !b.held
+
+	if b.hovered && b.Tooltip != "" {
+		glob.TooltipText = b.Tooltip
+	}
 
 	if over {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (b.held || *isCursorAvailable) {

@@ -544,7 +544,36 @@ func main() {
 
 	animBar.PushComponent(AnimButReset, AnimButBack, AnimButPlay, AnimButSkip, AnimButEnd, stepLabel, timeline)
 
-	winManager = append(winManager, panel, toolBar, spawnBar, animBar)
+	// Hover tooltips for the bar buttons (shown by the passive tooltip window).
+	ToolBut1.Tooltip = "Normal mode: drag components, right-click a qubit to rename"
+	ToolBut2.Tooltip = "Detach mode: click a hook or qubit to disconnect it"
+	ToolBut3.Tooltip = "Fix mode: click a component to pin/unpin it"
+	ToolBut4.Tooltip = "Spawn mode: click in the circuit to place the selected object"
+	ToolBut5.Tooltip = "Erase mode: click a component to delete it"
+	ToolButLoad.Tooltip = "Load a saved circuit"
+	ToolButSave.Tooltip = "Save the circuit to saves/"
+
+	SpawnBut1.Tooltip = "Qubit system: a |0> qubit with its state grid"
+	SpawnBut2.Tooltip = "Hadamard gate (1 qubit)"
+	SpawnBut3.Tooltip = "Pauli-X / NOT gate (1 qubit)"
+	SpawnBut4.Tooltip = "Pauli-Y gate (1 qubit)"
+	SpawnBut5.Tooltip = "Pauli-Z gate (1 qubit)"
+	SpawnBut6.Tooltip = "Controlled-X / CNOT gate (2 qubits)"
+	SpawnBut7.Tooltip = "Controlled-Y gate (2 qubits)"
+	SpawnBut8.Tooltip = "Controlled-Z gate (2 qubits)"
+	SpawnBut9.Tooltip = "Measurement gate: |0> and |1> outcome branches"
+	SpawnBut10.Tooltip = "Info table: amplitudes of a hooked system"
+	SpawnBut11.Tooltip = "Source gate: continuously emits a custom qubit state"
+	SpawnBut12.Tooltip = "Text box"
+	SpawnBut13.Tooltip = "Line draw"
+
+	AnimButReset.Tooltip = "Reset animation"
+	AnimButBack.Tooltip = "Previous step"
+	AnimButPlay.Tooltip = "Play / pause the gate animation"
+	AnimButSkip.Tooltip = "Skip to next step"
+	AnimButEnd.Tooltip = "Jump to the end"
+
+	winManager = append(winManager, panel, toolBar, spawnBar, animBar, windows.NewTooltipWindow())
 
 	update := func() {
 		// Update main window resize

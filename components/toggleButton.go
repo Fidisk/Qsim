@@ -2,6 +2,8 @@ package components
 
 import (
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	glob "qsim/globals"
 )
 
 type ToggleButton struct {
@@ -12,8 +14,11 @@ type ToggleButton struct {
 	OnClick       func()      // called when toggled ON
 	OffClick      func()      // called when toggled OFF
 	toggled       func() bool // current state: true = pressed/down
-	held          bool        // mouse is currently pressed inside the button
-	hovered       bool
+	// Tooltip is shown in the floating tooltip window while the button is
+	// hovered. Leave empty for no tooltip.
+	Tooltip string
+	held    bool // mouse is currently pressed inside the button
+	hovered bool
 }
 
 func NewToggleButton(x, y, width, height float32, color rl.Color, label string, state func() bool, fontsize int32, onClick, offClick func()) *ToggleButton {
@@ -43,6 +48,10 @@ func (tb *ToggleButton) Update(worldMouse rl.Vector2, holdingCursor bool, isCurs
 
 	over := rl.CheckCollisionPointRec(worldMouse, rect)
 	tb.hovered = over && !tb.held
+
+	if tb.hovered && tb.Tooltip != "" {
+		glob.TooltipText = tb.Tooltip
+	}
 
 	if over {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (tb.held || *isCursorAvailable) {

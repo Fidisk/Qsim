@@ -14,6 +14,10 @@ var CurrentID int32 = 0
 var ForceDecay float32 = 0.85
 var FrictionDelta float32 = 1
 
+// TooltipText carries the hover tooltip for the current frame. Buttons write
+// it while hovered; the tooltip window reads and clears it once per frame.
+var TooltipText string = ""
+
 var QubitSystemWeight float32 = 100
 var HookWeight float32 = 100
 var GateWeight float32 = 100
