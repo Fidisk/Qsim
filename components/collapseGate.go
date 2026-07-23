@@ -50,19 +50,20 @@ func NewCollapseGate(x, y, radius float32, color rl.Color, label string) *Collap
 	tmp.SetWeight(glob.GateWeight)
 	tmp.Tooltip = "Collapse measurement: outputs the measured qubit and remaining state; click to force 0 or 1"
 	snappedDist := utils.SnapToGrid(glob.GateToHookDist, config.SnapToGridInterval)
-	newHook := NewHook(x-snappedDist, y, glob.HookRadius, glob.HookColor)
+	newHook := NewHook(x-snappedDist, y, glob.HookRadius, config.HookColor)
 	newHook.Label = "I"
 	newHook.Tooltip = "Measure input: plug a qubit determinator"
 	tmp.HookList = append(tmp.HookList, newHook)
 
-	outCollapsed := NewOutputHook(x+snappedDist, y-glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
+	outCollapsed := NewOutputHook(x+snappedDist, y-glob.HookRadius, glob.OutputHookRadius, config.OutputHookColor)
 	outCollapsed.Label = "C"
-	outCollapsed.AllowQubitSystem = true
-	outCollapsed.Tooltip = "Collapsed qubit output (|0> or |1>)"
+	outCollapsed.AllowQubitSystem = false
+	outCollapsed.AllowLogicalBit = true
+	outCollapsed.Tooltip = "Measured logical bit (|0> or |1>)"
 	tmp.HookList = append(tmp.HookList, outCollapsed)
 	tmp.OutPutHook = append(tmp.OutPutHook, outCollapsed)
 
-	outRest := NewOutputHook(x+snappedDist, y+glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
+	outRest := NewOutputHook(x+snappedDist, y+glob.HookRadius, glob.OutputHookRadius, config.OutputHookColor)
 	outRest.Label = "R"
 	outRest.AllowQubitSystem = true
 	outRest.Tooltip = "Remaining state output (multi-qubit inputs only)"
@@ -233,11 +234,6 @@ func (c *CollapseGate) MeasureOutput() {
 	c.Result = k
 	p := c.OutcomeProbs[k]
 
-	// --- the measured qubit, collapsed to |k> ---
-	qubitAmps := []complex64{0, 0}
-	qubitAmps[k] = 1
-	collapsed := qubits.NewQubitStateManagerFrom(qubitAmps, []int32{QD.ModifierID})
-
 	// --- the remaining (n-1)-qubit state, conditioned on the same outcome ---
 	restMods := make([]int32, 0, QSM.Size-1)
 	for i, d := range QSM.ModifierID {
@@ -259,7 +255,7 @@ func (c *CollapseGate) MeasureOutput() {
 	}
 	rest := qubits.NewQubitStateManagerFrom(restAmps, restMods)
 
-	c.spawnOrUpdate(0, collapsed)
+	c.spawnOrUpdateLogicalBit(0, int(k))
 	if QSM.Size > 1 {
 		c.HasRemainder = true
 		c.OutPutHook[1].Hidden = false
@@ -286,7 +282,7 @@ func (c *CollapseGate) spawnOrUpdate(hookIdx int, state *qubits.QubitStateManage
 			return
 		}
 	}
-	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 	tmp.IsLogical = true
 	tmp.Assign(state)
 	parent := c.GetParent()
@@ -296,6 +292,24 @@ func (c *CollapseGate) spawnOrUpdate(hookIdx int, state *qubits.QubitStateManage
 	}
 	hook.Connect(tmp)
 	tmp.ZipDeterminatorsToHooks()
+}
+
+func (c *CollapseGate) spawnOrUpdateLogicalBit(hookIdx int, value int) {
+	hook := c.OutPutHook[hookIdx]
+	if hook.IsHooked {
+		tmp := utils.GetObjectFromID(hook.TargetID)
+		if lb, ok := tmp.(*LogicalBit); ok {
+			lb.SetValue(int32(value))
+			return
+		}
+	}
+	tmp := NewLogicalBit(c.Center.X, c.Center.Y, glob.QubitSystemRadius, int32(value))
+	parent := c.GetParent()
+	if parent != nil {
+		tmp.SetParent(parent)
+		parent.PushComponent(tmp)
+	}
+	hook.Connect(tmp)
 }
 
 func (c *CollapseGate) DestroyOutPut() {
@@ -378,7 +392,11 @@ func (c *CollapseGate) Draw() {
 				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),
 				r,
 			))
-			DrawWire(start, end, 4, c.Color)
+			if _, isLogicalBit := tmp.(*LogicalBit); isLogicalBit {
+				DrawLogicalBitWire(start, end, 4, c.Color)
+			} else {
+				DrawWire(start, end, 4, c.Color)
+			}
 		} else {
 			DrawWire(start, d.Center, 4, c.Color)
 		}
@@ -406,7 +424,7 @@ func (c *CollapseGate) Draw() {
 		Width:  c.Radius * 2,
 		Height: c.Radius * 2,
 	}
-	rl.DrawRectangleRounded(rect, 0.15, 6, glob.ColorBg)
+	rl.DrawRectangleRounded(rect, 0.15, 6, config.ColorBg)
 	thickness := float32(4.0)
 	if c.IsFixed {
 		thickness = 5.0
@@ -428,7 +446,7 @@ func (c *CollapseGate) Draw() {
 
 func (c *CollapseGate) DrawGhost() {
 	ghostColor := rl.Fade(c.Color, 0.3)
-	ghostBg := rl.Fade(glob.ColorBg, 0.3)
+	ghostBg := rl.Fade(config.ColorBg, 0.3)
 
 	rect := rl.Rectangle{
 		X:      c.Center.X - c.Radius,

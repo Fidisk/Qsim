@@ -5,6 +5,7 @@ import (
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/config"
 	glob "qsim/globals"
 	"qsim/utils"
 )
@@ -62,8 +63,8 @@ func NewWindow(x, y, width, height int32) *Window {
 		TitleBarHeight:   25,
 		ResizeMinW:       100,
 		ResizeMinH:       25,
-		ColorBg:          rl.NewColor(50, 50, 50, 255),
-		ColorTitleBar:    rl.NewColor(70, 70, 70, 255),
+		ColorBg:          config.ColorBg,
+		ColorTitleBar:    config.ColorTitleBar,
 		ColorText:        rl.White,
 		ColorResize:      rl.Black,
 		ColorResizeHover: rl.White,

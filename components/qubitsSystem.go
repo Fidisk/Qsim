@@ -208,7 +208,7 @@ func (c *QubitsSystem) Draw() {
 	rl.DrawRectangle(
 		int32(c.startX), int32(c.startY),
 		int32(totalWidth), int32(totalHeight),
-		glob.ColorBg,
+		config.ColorBg,
 	)
 
 	// Probability heat-map: brighter cell = larger |amplitude|^2
@@ -332,7 +332,7 @@ func (c *QubitsSystem) Draw() {
 
 	// (Commented‑out old drawing code remains unchanged)
 	/*
-	   rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
+	   rl.DrawCircleV(c.Center, c.Radius, config.ColorBg)
 	   rl.DrawCircleLinesV(c.Center, c.Radius, c.Color)
 	   for _, d := range c.QubitList {
 	       d.Draw(c.Center, c.Radius)
@@ -471,13 +471,36 @@ func (c *QubitsSystem) zipToHook() {
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && v.AllowQubitSystem && !v.Hidden {
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && v.AllowQubitSystem && !v.Hidden && !v.AllowLogicalBit {
 				gotHooked = true
 				v.Connect(c)
 			}
+		case *CompareGate:
+			// Compare inputs only read the state: attach via InfoHookID so the
+			// system's source connection (HookID) survives, like InfoTable and
+			// CopyGate. Pick the closest available input hook.
+			var closest *Hook
+			closestDist := float32(math.MaxFloat32)
+			for _, h := range []*Hook{v.InA, v.InB} {
+				if h.Hidden || !h.AllowQubitSystem || h.AllowLogicalBit {
+					continue
+				}
+				if h.IsHooked && h.TargetID != c.ID {
+					continue
+				}
+				d := utils.Dist(h.Center, c.Center)
+				if d <= glob.HookDist && d < closestDist {
+					closest = h
+					closestDist = d
+				}
+			}
+			if closest != nil {
+				gotHooked = true
+				closest.ConnectInfo(c)
+			}
 		case hookOwner:
 			for _, d2 := range v.GetHooks() {
-				if d2.Hidden {
+				if d2.Hidden || !d2.AllowQubitSystem || d2.AllowLogicalBit {
 					continue
 				}
 				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && d2.AllowQubitSystem {
@@ -487,19 +510,19 @@ func (c *QubitsSystem) zipToHook() {
 			}
 		case *InfoTable:
 			tmp := v.Hook
-			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem {
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem && !tmp.AllowLogicalBit {
 				gotHooked = true
 				tmp.ConnectInfo(c)
 			}
 		case *CopyGate:
 			tmp := v.InHook
-			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem {
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem && !tmp.AllowLogicalBit {
 				gotHooked = true
 				tmp.ConnectInfo(c)
 			}
 		case *SourceGate:
 			tmp := v.OutHook
-			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && !gotHooked && tmp.AllowQubitSystem {
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && !gotHooked && tmp.AllowQubitSystem && !tmp.AllowLogicalBit {
 				gotHooked = true
 				tmp.ConnectInfo(c)
 			}

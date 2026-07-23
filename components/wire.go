@@ -1,8 +1,18 @@
 package components
 
 import (
+	"qsim/config"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
+
+// DrawLogicalBitWire draws a double parallel line: a thick line in col and a
+// thinner line in the background color centered on top, so the wire looks like
+// two colored rails with a gap between them.
+func DrawLogicalBitWire(a, b rl.Vector2, thick float32, col rl.Color) {
+	DrawWire(a, b, thick+3, col)
+	DrawWire(a, b, thick, config.ColorBg)
+}
 
 // DrawWire draws a connection line as a smooth cubic bezier that leaves its
 // endpoints horizontally. It reads much better than a straight line for

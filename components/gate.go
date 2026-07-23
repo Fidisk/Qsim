@@ -47,13 +47,13 @@ func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]c
 	snappedDist := utils.SnapToGrid(glob.GateToHookDist, config.SnapToGridInterval)
 	for i := 0; i < int(inputCount); i++ {
 		offY := utils.SnapToGrid((float32(i)-float32(inputCount-1)/2)*config.SnapToGridInterval, config.SnapToGridInterval)
-		newHook := NewHook(x-snappedDist, y+offY, glob.HookRadius, glob.HookColor)
+		newHook := NewHook(x-snappedDist, y+offY, glob.HookRadius, config.HookColor)
 		newHook.Label = "I" + strconv.Itoa(i)
 		newHook.Tooltip = "Gate input: plug a qubit determinator"
 		tmp.HookList = append(tmp.HookList, newHook)
 	}
 	tmp.OutPutHook = nil
-	outputHook := NewOutputHook(x+snappedDist, y, glob.OutputHookRadius, glob.OutputHookColor)
+	outputHook := NewOutputHook(x+snappedDist, y, glob.OutputHookRadius, config.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook)
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
 	tmp.OutPutHook[0].Label = "O"
@@ -74,12 +74,12 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 	tmp.SetWeight(glob.GateWeight)
 	tmp.Tooltip = "Measurement gate: outputs both the |0> and |1> outcome branches with their probabilities"
 	snappedDist := utils.SnapToGrid(glob.GateToHookDist, config.SnapToGridInterval)
-	newHook := NewHook(x-snappedDist, y, glob.HookRadius, glob.HookColor)
+	newHook := NewHook(x-snappedDist, y, glob.HookRadius, config.HookColor)
 	newHook.Label = "I"
 	newHook.Tooltip = "Measure input: plug a qubit determinator"
 	tmp.HookList = append(tmp.HookList, newHook)
 
-	outputHook := NewOutputHook(x+snappedDist, y-glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
+	outputHook := NewOutputHook(x+snappedDist, y-glob.HookRadius, glob.OutputHookRadius, config.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook)
 	tmp.OutPutHook = nil
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
@@ -87,7 +87,7 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 	tmp.OutPutHook[0].AllowQubitSystem = true
 	tmp.OutPutHook[0].Tooltip = "|0> outcome branch"
 
-	outputHook2 := NewOutputHook(x+snappedDist, y+glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
+	outputHook2 := NewOutputHook(x+snappedDist, y+glob.HookRadius, glob.OutputHookRadius, config.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook2)
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook2)
 	tmp.OutPutHook[1].Label = "O"
@@ -235,7 +235,7 @@ func (c *Gate) MeasureOutput() {
 					}
 				}
 			}
-			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 			tmp.Assign(result)
 			parent := c.GetParent()
 			if parent != nil {
@@ -270,7 +270,7 @@ func (c *Gate) MeasureOutput() {
 				qs.Origin.CopyFrom(result)
 			}
 		} else {
-			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 			tmp.Assign(result)
 			parent := c.GetParent()
 			if parent != nil {
@@ -340,7 +340,7 @@ func (c *Gate) CalculateOutPut() bool {
 		}
 	}
 
-	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 	tmp.Assign(result)
 	parent := c.GetParent()
 	if parent != nil {
@@ -450,7 +450,7 @@ func (c *Gate) Draw() {
 		Width:  c.Radius * 2,
 		Height: c.Radius * 2,
 	}
-	rl.DrawRectangleRounded(rect, 0.15, 6, glob.ColorBg)
+	rl.DrawRectangleRounded(rect, 0.15, 6, config.ColorBg)
 	thickness := float32(4.0)
 	if c.IsFixed {
 		thickness = 5.0
@@ -478,7 +478,7 @@ func (c *Gate) Draw() {
 
 func (c *Gate) DrawGhost() {
 	ghostColor := rl.Fade(c.Color, 0.3)
-	ghostBg := rl.Fade(glob.ColorBg, 0.3)
+	ghostBg := rl.Fade(config.ColorBg, 0.3)
 
 	rect := rl.Rectangle{
 		X:      c.Center.X - c.Radius,

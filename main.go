@@ -34,9 +34,9 @@ func main() {
 
 	/*
 		var create = func(p *windows.RenderWindow) {
-			q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
-			q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
-			q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, glob.QubitSystemColor)
+			q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, config.QubitSystemColor)
+			q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, config.QubitSystemColor)
+			q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, config.QubitSystemColor)
 
 			q1State := qubits.NewQubitStateManagerFrom([]complex64{0.6, 0.8}, []int32{0})
 			q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
@@ -49,17 +49,17 @@ func main() {
 			p.PushComponent(q1, q2, q3)
 
 			t := complex(float32(1/math.Sqrt(2)), 0)
-			H1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-			H2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-			H3 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-			CNOT1 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-			CNOT2 := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+			H1 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+			H2 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+			H3 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+			CNOT1 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+			CNOT2 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
 
-			M1 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
-			M2 := components.NewMeasurementGate(100, 100, glob.GateRadius, glob.GateColor, "M")
+			M1 := components.NewMeasurementGate(100, 100, glob.GateRadius, config.GateColor, "M")
+			M2 := components.NewMeasurementGate(100, 100, glob.GateRadius, config.GateColor, "M")
 
-			CX := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-			CZ := components.NewGate(100, 100, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+			CX := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+			CZ := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
 
 			p.PushComponent(H1, H2, H3, CNOT1, CNOT2, M1, M2, CX, CZ)
 		}
@@ -70,16 +70,16 @@ func main() {
 			{"Speed and Something that burn my retina", 0.75, 3 + 4i},
 			{"Power", 0.2, -1 + 2i},
 		}
-		table := components.NewInfoTable(400, 200, 260, 100, glob.ColorBg, rows)
+		table := components.NewInfoTable(400, 200, 260, 100, config.ColorBg, rows)
 
-		t1 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-		t2 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-		t3 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-		t4 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-		t5 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
-		t6 := components.NewInfoTable(400, 200, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t1 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
+		t2 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
+		t3 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
+		t4 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
+		t5 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
+		t6 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
 
-		testSource := components.NewSourceGate(300, 300, 100, glob.GateColor, "Test", []complex64{0, 1}, 4)
+		testSource := components.NewSourceGate(300, 300, 100, config.GateColor, "Test", []complex64{0, 1}, 4)
 		panel.PushComponent(testSource)
 
 		panel.PushComponent(table, t1, t2, t3, t4, t5, t6)\
@@ -444,7 +444,73 @@ func main() {
 			utils.ToggleSpawnState(glob.Copy)
 		})
 
-	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13, SpawnBut14, SpawnBut15)
+	SpawnBut16 := components.NewToggleButton(25, -12.5, 50, 50, rl.LightGray, "==",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Compare) }, 20,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Compare)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Compare)
+		})
+
+	SpawnBut17 := components.NewToggleButton(-25, 37.5, 50, 50, rl.LightGray, "0/1",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicButton) }, 20,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.LogicButton)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.LogicButton)
+		})
+
+	SpawnBut18 := components.NewToggleButton(25, 37.5, 50, 50, rl.LightGray, "!",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicNot) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.LogicNot)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.LogicNot)
+		})
+
+	SpawnBut19 := components.NewToggleButton(-25, 87.5, 50, 50, rl.LightGray, "&",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicAnd) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.LogicAnd)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.LogicAnd)
+		})
+
+	SpawnBut20 := components.NewToggleButton(25, 87.5, 50, 50, rl.LightGray, "|",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicOr) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.LogicOr)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.LogicOr)
+		})
+
+	SpawnBut21 := components.NewToggleButton(-25, 137.5, 50, 50, rl.LightGray, "LT",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Light) }, 20,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Light)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Light)
+		})
+
+	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13, SpawnBut14, SpawnBut15, SpawnBut16, SpawnBut17, SpawnBut18, SpawnBut19, SpawnBut20, SpawnBut21)
 
 	animBar := windows.NewRenderWindow(0, 850, 1600, 50)
 	animBar.IsResizeAllow(false)
@@ -590,6 +656,7 @@ func main() {
 	SpawnBut13.Tooltip = "Line draw"
 	SpawnBut14.Tooltip = "Collapse measurement: outputs the measured qubit and the remaining state; click to force 0/1"
 	SpawnBut15.Tooltip = "Copy gate: create a logical copy of a hooked qubit system"
+	SpawnBut16.Tooltip = "Compare gate: outputs 1 if two qubit systems are equal, 0 otherwise"
 
 	AnimButReset.Tooltip = "Reset animation"
 	AnimButBack.Tooltip = "Previous step"

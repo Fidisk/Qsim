@@ -156,7 +156,7 @@ func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, is
 }
 
 func (c *QubitDeterminator) Draw() {
-	rl.DrawCircleV(c.Center, c.Radius, glob.ColorBg)
+	rl.DrawCircleV(c.Center, c.Radius, config.ColorBg)
 	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, c.Color)
 
 	tmp := attributes.AttributesManager.Get(c.ModifierID)
@@ -217,13 +217,13 @@ func (c *QubitDeterminator) zipToHook() {
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && !v.Hidden {
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && !v.Hidden && !v.AllowLogicalBit {
 				gotHooked = true
 				v.Connect(c)
 			}
 		case hookOwner:
 			for _, d2 := range v.GetHooks() {
-				if d2.Hidden {
+				if d2.Hidden || d2.AllowLogicalBit {
 					continue
 				}
 				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && !gotHooked {

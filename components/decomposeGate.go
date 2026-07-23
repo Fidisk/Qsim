@@ -1,6 +1,7 @@
 package components
 
 import (
+	"qsim/config"
 	glob "qsim/globals"
 	"qsim/utils"
 	"strconv"
@@ -26,13 +27,13 @@ func NewDecomposeGate(x, y, radius float32, color rl.Color, label string) *Decom
 	vertSpacing := glob.HookRadius * 1.5
 	for i := 0; i < int(tmp.InputCount); i++ {
 		offY := (float32(i) - float32(tmp.InputCount-1)/2) * vertSpacing
-		newHook := NewHook(x-glob.GateToHookDist, y+offY, glob.HookRadius, glob.HookColor)
+		newHook := NewHook(x-glob.GateToHookDist, y+offY, glob.HookRadius, config.HookColor)
 		newHook.Label = "I" + strconv.Itoa(i)
 		tmp.HookList = append(tmp.HookList, newHook)
 	}
 	for i := 0; i < int(tmp.OutputCount); i++ {
 		offY := (float32(i) - float32(tmp.OutputCount-1)/2) * vertSpacing
-		outputHook := NewOutputHook(x+glob.GateToHookDist, y+offY, glob.OutputHookRadius, glob.OutputHookColor)
+		outputHook := NewOutputHook(x+glob.GateToHookDist, y+offY, glob.OutputHookRadius, config.OutputHookColor)
 		tmp.HookList = append(tmp.HookList, outputHook)
 		tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
 		tmp.OutPutHook[i].Label = "O" + strconv.Itoa(i)

@@ -53,12 +53,12 @@ func NewCopyGate(x, y, radius float32, color rl.Color, label string) *CopyGate {
 	halfH := h / 2
 	off := utils.SnapToGrid(glob.QubitSystemCellWidth/2, config.SnapToGridInterval)
 
-	cg.InHook = NewHook(x, y-halfH-off, glob.HookRadius, glob.HookColor)
+	cg.InHook = NewHook(x, y-halfH-off, glob.HookRadius, config.HookColor)
 	cg.InHook.Label = "I"
 	cg.InHook.AllowQubitSystem = true
 	cg.InHook.Tooltip = "Copy input: connect a qubit system"
 
-	cg.OutHook = NewOutputHook(x+halfW+off, y, glob.OutputHookRadius, glob.OutputHookColor)
+	cg.OutHook = NewOutputHook(x+halfW+off, y, glob.OutputHookRadius, config.OutputHookColor)
 	cg.OutHook.Label = "O"
 	cg.OutHook.AllowQubitSystem = true
 	cg.OutHook.Tooltip = "Copy output: logical copy of the input"
@@ -181,7 +181,7 @@ func (cg *CopyGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAv
 			}
 		} else if cg.CopyID == 0 || utils.GetObjectFromID(cg.CopyID) == nil {
 			// Spawn a fresh logical copy when there is no surviving copy.
-			tmp := NewQubitsSystem(cg.OutHook.Center.X, cg.OutHook.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+			tmp := NewQubitsSystem(cg.OutHook.Center.X, cg.OutHook.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 			tmp.IsLogical = true
 			tmp.Assign(state)
 			parent := cg.GetParent()
@@ -211,10 +211,10 @@ func (cg *CopyGate) Draw() {
 				rl.Vector2Normalize(rl.Vector2Subtract(cg.InHook.Center, inEdge)),
 				utils.Dist(inEdge, t.GetCircle().Center)-t.GetCircle().Radius,
 			))
-			DrawWire(inEdge, end, 4, glob.HookColor)
+			DrawWire(inEdge, end, 4, config.HookColor)
 		}
 	} else {
-		DrawWire(inEdge, cg.InHook.Center, 4, glob.HookColor)
+		DrawWire(inEdge, cg.InHook.Center, 4, config.HookColor)
 	}
 	cg.InHook.Draw()
 
@@ -229,7 +229,11 @@ func (cg *CopyGate) Draw() {
 				rl.Vector2Normalize(rl.Vector2Subtract(cg.OutHook.Center, outEdge)),
 				utils.Dist(outEdge, t.GetCircle().Center)-t.GetCircle().Radius,
 			))
-			DrawWire(outEdge, end, 4, cg.Color)
+			if qs, isQubit := target.(*QubitsSystem); isQubit && qs.IsLogical {
+				DrawLogicalBitWire(outEdge, end, 4, cg.Color)
+			} else {
+				DrawWire(outEdge, end, 4, cg.Color)
+			}
 		}
 	} else {
 		DrawWire(outEdge, cg.OutHook.Center, 4, cg.Color)
@@ -242,7 +246,7 @@ func (cg *CopyGate) Draw() {
 		Width:  cg.Width,
 		Height: cg.Height,
 	}
-	rl.DrawRectangleRec(rect, glob.ColorBg)
+	rl.DrawRectangleRec(rect, config.ColorBg)
 	thickness := float32(4.0)
 	if cg.IsFixed {
 		thickness = 5.0

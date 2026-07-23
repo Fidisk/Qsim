@@ -7,6 +7,8 @@ import (
 	"qsim/config"
 	"strconv"
 	"syscall/js"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 // devtools exposes runtime-tweakable config values to the page's dev bar as
@@ -35,6 +37,18 @@ func init() {
 			return f32(config.MaxZoom)
 		case "QubitSystemStatePause":
 			return b(config.QubitSystemStatePause)
+		case "ColorBg":
+			return config.ColorToHex(config.ColorBg)
+		case "ColorTitleBar":
+			return config.ColorToHex(config.ColorTitleBar)
+		case "HookColor":
+			return config.ColorToHex(config.HookColor)
+		case "OutputHookColor":
+			return config.ColorToHex(config.OutputHookColor)
+		case "QubitSystemColor":
+			return config.ColorToHex(config.QubitSystemColor)
+		case "GateColor":
+			return config.ColorToHex(config.GateColor)
 		case "ComputeDotArriveDur":
 			return f64(config.ComputeDotArriveDur)
 		case "ComputeMergeDur":
@@ -98,6 +112,14 @@ func init() {
 			*p = b
 			return "ok"
 		}
+		setColor := func(p *rl.Color) string {
+			c, err := config.ParseColor(raw)
+			if err != nil {
+				return err.Error()
+			}
+			*p = c
+			return "ok"
+		}
 
 		switch key {
 		case "SnapToGridInterval":
@@ -110,6 +132,18 @@ func init() {
 			return setF32(&config.MaxZoom)
 		case "QubitSystemStatePause":
 			return setBool(&config.QubitSystemStatePause)
+		case "ColorBg":
+			return setColor(&config.ColorBg)
+		case "ColorTitleBar":
+			return setColor(&config.ColorTitleBar)
+		case "HookColor":
+			return setColor(&config.HookColor)
+		case "OutputHookColor":
+			return setColor(&config.OutputHookColor)
+		case "QubitSystemColor":
+			return setColor(&config.QubitSystemColor)
+		case "GateColor":
+			return setColor(&config.GateColor)
 		case "ComputeDotArriveDur":
 			return setF64(&config.ComputeDotArriveDur)
 		case "ComputeMergeDur":

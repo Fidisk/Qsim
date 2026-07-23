@@ -423,7 +423,7 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 	// snapped is already grid-aligned by the caller
 	switch {
 	case utils.IsSpawnState(glob.Qubit):
-		q := components.NewQubitsSystem(snapped.X, snapped.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+		q := components.NewQubitsSystem(snapped.X, snapped.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 
 		qState := qubits.NewQubitStateManager([]complex64{1, 0}, 1)
 
@@ -434,41 +434,59 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 		q.ZipDeterminatorsToHooks()
 	case utils.IsSpawnState(glob.Hadamard):
 		t := complex(float32(1/math.Sqrt(2)), 0)
-		H1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		H1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
 		rw.PushComponent(H1)
 	case utils.IsSpawnState(glob.X):
-		X1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+		X1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
 		rw.PushComponent(X1)
 	case utils.IsSpawnState(glob.Y):
-		Y1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+		Y1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
 		rw.PushComponent(Y1)
 	case utils.IsSpawnState(glob.Z):
-		Z1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+		Z1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
 		rw.PushComponent(Z1)
 	case utils.IsSpawnState(glob.CX):
-		CX := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		CX := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
 		rw.PushComponent(CX)
 	case utils.IsSpawnState(glob.CY):
 		t := complex64(complex(0, 1))
-		CY := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+		CY := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
 		rw.PushComponent(CY)
 	case utils.IsSpawnState(glob.CZ):
-		CZ := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+		CZ := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
 		rw.PushComponent(CZ)
 	case utils.IsSpawnState(glob.Measurement):
-		m := components.NewMeasurementGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "M")
+		m := components.NewMeasurementGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "M")
 		rw.PushComponent(m)
 	case utils.IsSpawnState(glob.Measure2):
-		m := components.NewCollapseGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "M2")
+		m := components.NewCollapseGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "M2")
 		rw.PushComponent(m)
 	case utils.IsSpawnState(glob.Copy):
-		cg := components.NewCopyGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "Get")
+		cg := components.NewCopyGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Get")
 		rw.PushComponent(cg)
+	case utils.IsSpawnState(glob.Compare):
+		cmp := components.NewCompareGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "==")
+		rw.PushComponent(cmp)
+	case utils.IsSpawnState(glob.LogicButton):
+		lb := components.NewLogicButton(snapped.X, snapped.Y, config.GateColor)
+		rw.PushComponent(lb)
+	case utils.IsSpawnState(glob.LogicNot):
+		lg := components.NewLogicGate(snapped.X, snapped.Y, config.GateColor, components.LogicNot)
+		rw.PushComponent(lg)
+	case utils.IsSpawnState(glob.LogicAnd):
+		lg := components.NewLogicGate(snapped.X, snapped.Y, config.GateColor, components.LogicAnd)
+		rw.PushComponent(lg)
+	case utils.IsSpawnState(glob.LogicOr):
+		lg := components.NewLogicGate(snapped.X, snapped.Y, config.GateColor, components.LogicOr)
+		rw.PushComponent(lg)
+	case utils.IsSpawnState(glob.Light):
+		l := components.NewLight(snapped.X, snapped.Y, config.GateColor)
+		rw.PushComponent(l)
 	case utils.IsSpawnState(glob.Info):
-		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, glob.ColorBg, []components.InfoRow{})
+		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, config.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
 	case utils.IsSpawnState(glob.GQubit):
-		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, glob.GateColor, "Test", []complex64{0, 1})
+		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, config.GateColor, "Test", []complex64{0, 1})
 		rw.PushComponent(testSource)
 	case utils.IsSpawnState(glob.TextBox):
 		tb := components.NewTextBox(snapped.X, snapped.Y, 200, 30, 16)
@@ -479,7 +497,7 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Component {
 	switch {
 	case state&glob.Qubit != 0:
-		q := components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, glob.QubitSystemColor)
+		q := components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, config.QubitSystemColor)
 		// Assign the same 1-qubit layout the real spawn uses so DrawGhost
 		// can render the grid and determinator, with the shared registered
 		// preview modifier ID (see previewModID).
@@ -490,30 +508,42 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		return q
 	case state&glob.Hadamard != 0:
 		t := complex(float32(1/math.Sqrt(2)), 0)
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
 	case state&glob.X != 0:
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
 	case state&glob.Y != 0:
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
 	case state&glob.Z != 0:
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
 	case state&glob.CX != 0:
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
 	case state&glob.CY != 0:
 		t := complex64(complex(0, 1))
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
 	case state&glob.CZ != 0:
-		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
 	case state&glob.Measurement != 0:
-		return components.NewMeasurementGate(0, 0, glob.GateRadius, glob.GateColor, "M")
+		return components.NewMeasurementGate(0, 0, glob.GateRadius, config.GateColor, "M")
 	case state&glob.Measure2 != 0:
-		return components.NewCollapseGate(0, 0, glob.GateRadius, glob.GateColor, "M2")
+		return components.NewCollapseGate(0, 0, glob.GateRadius, config.GateColor, "M2")
 	case state&glob.Copy != 0:
-		return components.NewCopyGate(0, 0, glob.GateRadius, glob.GateColor, "Copy")
+		return components.NewCopyGate(0, 0, glob.GateRadius, config.GateColor, "Copy")
+	case state&glob.Compare != 0:
+		return components.NewCompareGate(0, 0, glob.GateRadius, config.GateColor, "==")
+	case state&glob.LogicButton != 0:
+		return components.NewLogicButton(0, 0, config.GateColor)
+	case state&glob.LogicNot != 0:
+		return components.NewLogicGate(0, 0, config.GateColor, components.LogicNot)
+	case state&glob.LogicAnd != 0:
+		return components.NewLogicGate(0, 0, config.GateColor, components.LogicAnd)
+	case state&glob.LogicOr != 0:
+		return components.NewLogicGate(0, 0, config.GateColor, components.LogicOr)
+	case state&glob.Light != 0:
+		return components.NewLight(0, 0, config.GateColor)
 	case state&glob.Info != 0:
-		return components.NewInfoTable(0, 0, 260, 40, glob.ColorBg, []components.InfoRow{})
+		return components.NewInfoTable(0, 0, 260, 40, config.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:
-		return components.NewSourceGate(0, 0, 100, glob.GateColor, "Test", []complex64{0, 1})
+		return components.NewSourceGate(0, 0, 100, config.GateColor, "Test", []complex64{0, 1})
 	case state&glob.TextBox != 0:
 		return components.NewTextBox(0, 0, 200, 30, 16)
 	case state&glob.LineDraw != 0:

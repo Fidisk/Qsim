@@ -59,7 +59,7 @@ func NewInfoTable(x, y, width, height float32, color rl.Color, rows []InfoRow) *
 	}
 	tmp.ID = utils.GenerateID(tmp)
 	// The hook rides one grid cell above the top edge of the box, like a port.
-	tmp.Hook = NewHook(x, y-height/2-config.SnapToGridInterval, globals.HookRadius, globals.HookColor)
+	tmp.Hook = NewHook(x, y-height/2-config.SnapToGridInterval, globals.HookRadius, config.HookColor)
 	tmp.Hook.Label = "Input"
 	tmp.Hook.AllowQubitSystem = true
 	tmp.Hook.Tooltip = "Info input: connect a qubit system to inspect its state"
@@ -287,9 +287,9 @@ func (it *InfoTable) Draw() {
 			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, edge)),
 			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
 		))
-		DrawWire(edge, end, 4, globals.HookColor)
+		DrawWire(edge, end, 4, config.HookColor)
 	} else {
-		DrawWire(edge, it.Hook.Center, 4, globals.HookColor)
+		DrawWire(edge, it.Hook.Center, 4, config.HookColor)
 	}
 	it.Hook.Draw()
 

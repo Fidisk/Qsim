@@ -11,12 +11,13 @@ import (
 
 type Hook struct {
 	Circle
-	IsHooked         bool
-	ID               int32
-	TargetID         int32
-	IsOutput         bool
-	Label            string
-	AllowQubitSystem bool
+	IsHooked          bool
+	ID                int32
+	TargetID          int32
+	IsOutput          bool
+	Label             string
+	AllowQubitSystem  bool
+	AllowLogicalBit   bool
 
 	// Hidden hooks are not drawn and cannot be interacted with (e.g. the
 	// collapse gate's unused remainder output).
@@ -82,6 +83,7 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		c.justSpawned = false
 		c.zipToDeterminator()
 		c.zipToQubitSystem()
+		c.zipToLogicalBit()
 	}
 
 	// Guide tooltip: hovering an empty hook with nothing held explains
@@ -104,8 +106,12 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 			c.Disconnect()
 			return
 		}
-		c.Center = t.GetCircle().Center
-		//c.ClearForce()
+		// Logical bits are normally anchored to their hook so they move with the
+		// gate, but when the user is actively dragging the bit, the hook follows
+		// the bit instead so the wire stays connected.
+		if _, isLogicalBit := tmp.(*LogicalBit); !isLogicalBit || t.GetCircle().IsDragging() {
+			c.Center = t.GetCircle().Center
+		}
 		t.AddForce(c.GetCircle().GetForce())
 		c.GetCircle().ClearForce()
 		return
@@ -136,6 +142,7 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		if !c.skipNextZip {
 			c.zipToDeterminator()
 			c.zipToQubitSystem()
+			c.zipToLogicalBit()
 		} else {
 			c.skipNextZip = false
 		}
@@ -232,7 +239,7 @@ type hookOwner interface {
 // hook is released after a drag or right after it spawns. Output-style hooks
 // (IsOutput or AllowQubitSystem) are skipped: those connect to qubit systems.
 func (c *Hook) zipToDeterminator() {
-	if c.IsOutput || c.AllowQubitSystem || c.IsHooked {
+	if c.IsOutput || c.AllowQubitSystem || c.AllowLogicalBit || c.IsHooked {
 		return
 	}
 	for _, obj := range utils.ObjectList {
@@ -261,7 +268,7 @@ func (c *Hook) zipToDeterminator() {
 // the hook side and runs when the hook is released after a drag or right
 // after it spawns, so dragging the hook onto a system auto-connects.
 func (c *Hook) zipToQubitSystem() {
-	if !c.AllowQubitSystem || c.IsOutput || c.IsHooked {
+	if !c.AllowQubitSystem || c.AllowLogicalBit || c.IsOutput || c.IsHooked {
 		return
 	}
 	for _, obj := range utils.ObjectList {
@@ -279,6 +286,29 @@ func (c *Hook) zipToQubitSystem() {
 		}
 		if utils.Dist(qs.Center, c.Center) <= glob.HookDist {
 			c.ConnectInfo(qs)
+			return
+		}
+	}
+}
+
+// zipToLogicalBit connects this hook to a nearby free logical bit.
+func (c *Hook) zipToLogicalBit() {
+	if !c.AllowLogicalBit || c.IsHooked {
+		return
+	}
+	for _, obj := range utils.ObjectList {
+		lb, ok := obj.(*LogicalBit)
+		if !ok || lb == nil {
+			continue
+		}
+		if lb.HookID != 0 && lb.HookID != c.ID {
+			continue
+		}
+		if lb.GetParent() == nil {
+			continue
+		}
+		if utils.Dist(lb.Center, c.Center) <= glob.HookDist {
+			c.Connect(lb)
 			return
 		}
 	}
@@ -306,6 +336,13 @@ func (v *Hook) Connect(val Component) {
 		c.HookID = v.ID
 		c.SetWeight(0)
 	case *QubitDeterminator:
+		c.removeFromHook()
+		c.Center = v.Center
+		v.IsHooked = true
+		v.TargetID = c.ID
+		c.HookID = v.ID
+		c.SetWeight(0)
+	case *LogicalBit:
 		c.removeFromHook()
 		c.Center = v.Center
 		v.IsHooked = true
@@ -346,6 +383,9 @@ func (v *Hook) Disconnect() {
 	case *QubitDeterminator:
 		c.HookID = 0
 		c.SetWeight(glob.QubitDeterminatorWeight)
+	case *LogicalBit:
+		c.HookID = 0
+		c.SetWeight(glob.QubitDeterminatorWeight)
 	default:
 	}
 }
@@ -363,6 +403,10 @@ func (v *Hook) DisconnectAndKill() {
 		c.SetWeight(glob.QubitDeterminatorWeight)
 		c.Kill()
 	case *QubitDeterminator:
+		c.HookID = 0
+		c.SetWeight(glob.QubitDeterminatorWeight)
+		c.Kill()
+	case *LogicalBit:
 		c.HookID = 0
 		c.SetWeight(glob.QubitDeterminatorWeight)
 		c.Kill()

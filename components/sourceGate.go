@@ -83,7 +83,7 @@ func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []com
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
 	// Output hook on the right edge of the table
-	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, glob.OutputHookColor)
+	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, config.OutputHookColor)
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
@@ -109,7 +109,7 @@ func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
 	// Output hook on the right edge of the table
-	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, glob.OutputHookColor)
+	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, config.OutputHookColor)
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
@@ -240,7 +240,7 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 	} else {
 		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.getModifierID()})
 
-		tmp := NewQubitsSystem(sg.Center.X, sg.Center.Y, glob.QubitSystemRadius, glob.QubitSystemColor)
+		tmp := NewQubitsSystem(sg.Center.X, sg.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 		tmp.Assign(state)
 		parent := sg.GetParent()
 		if parent != nil {
@@ -349,7 +349,7 @@ func (sg *SourceGate) Draw() {
 
 	// --- Table rectangle ---
 	rect := sg.getTableRect()
-	rl.DrawRectangleRounded(rect, 0.06, 6, glob.ColorBg)
+	rl.DrawRectangleRounded(rect, 0.06, 6, config.ColorBg)
 	thickness := float32(4.0)
 	if sg.IsFixed {
 		thickness = 5.0

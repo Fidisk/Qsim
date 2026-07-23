@@ -17,21 +17,21 @@ func (rw *RenderWindow) SaveState() string {
 		}
 	}
 	data := map[string]interface{}{
-		"type":                   "RenderWindow",
-		"window":                 json.RawMessage(rw.Window.SaveState()),
-		"cameraZoom":             rw.Camera.Zoom,
-		"cameraTargetX":          rw.Camera.Target.X,
-		"cameraTargetY":          rw.Camera.Target.Y,
-		"cameraOffsetX":          rw.Camera.Offset.X,
-		"cameraOffsetY":          rw.Camera.Offset.Y,
-		"cameraRotation":         rw.Camera.Rotation,
-		"canPan":                 rw.CanPan,
-		"canSpawn":               rw.CanSpawn,
-		"isHorizontalScrolling":  rw.IsHorizontalScrolling,
-		"isVerticalScrolling":    rw.IsVerticalScrolling,
-		"isTitleBarVisible":      rw.IsTitleBarVisible,
-		"isTitleEditable":        rw.IsTitleEditable,
-		"components":             compList,
+		"type":                  "RenderWindow",
+		"window":                json.RawMessage(rw.Window.SaveState()),
+		"cameraZoom":            rw.Camera.Zoom,
+		"cameraTargetX":         rw.Camera.Target.X,
+		"cameraTargetY":         rw.Camera.Target.Y,
+		"cameraOffsetX":         rw.Camera.Offset.X,
+		"cameraOffsetY":         rw.Camera.Offset.Y,
+		"cameraRotation":        rw.Camera.Rotation,
+		"canPan":                rw.CanPan,
+		"canSpawn":              rw.CanSpawn,
+		"isHorizontalScrolling": rw.IsHorizontalScrolling,
+		"isVerticalScrolling":   rw.IsVerticalScrolling,
+		"isTitleBarVisible":     rw.IsTitleBarVisible,
+		"isTitleEditable":       rw.IsTitleEditable,
+		"components":            compList,
 	}
 	b, _ := json.Marshal(data)
 	return string(b)
@@ -47,12 +47,22 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeCollapseGate(v)
 	case *components.CopyGate:
 		return serializeCopyGate(v)
+	case *components.CompareGate:
+		return serializeCompareGate(v)
+	case *components.LogicButton:
+		return serializeLogicButton(v)
+	case *components.LogicGate:
+		return serializeLogicGate(v)
+	case *components.Light:
+		return serializeLight(v)
 	case *components.Hook:
 		return serializeHook(v)
 	case *components.InfoTable:
 		return serializeInfoTable(v)
 	case *components.SourceGate:
 		return serializeSourceGate(v)
+	case *components.LogicalBit:
+		return serializeLogicalBit(v)
 	case *components.Button:
 		return serializeButton(v)
 	case *components.ToggleButton:
@@ -206,19 +216,86 @@ func serializeCollapseGate(g *components.CollapseGate) map[string]interface{} {
 
 func serializeCopyGate(cg *components.CopyGate) map[string]interface{} {
 	return map[string]interface{}{
-		"type":   "CopyGate",
-		"id":     cg.ID,
-		"center": vec2Map(cg.Center),
-		"radius": cg.Radius,
-		"color":  colorMap(cg.Color),
+		"type":    "CopyGate",
+		"id":      cg.ID,
+		"center":  vec2Map(cg.Center),
+		"radius":  cg.Radius,
+		"color":   colorMap(cg.Color),
 		"isFixed": cg.IsFixed,
-		"weight": cg.GetWeight(),
-		"label":  cg.Label,
-		"width":  cg.Width,
-		"height": cg.Height,
+		"weight":  cg.GetWeight(),
+		"label":   cg.Label,
+		"width":   cg.Width,
+		"height":  cg.Height,
 		"inHook":  serializeHook(cg.InHook),
 		"outHook": serializeHook(cg.OutHook),
 		"copyID":  cg.CopyID,
+	}
+}
+
+func serializeCompareGate(cg *components.CompareGate) map[string]interface{} {
+	return map[string]interface{}{
+		"type":     "CompareGate",
+		"id":       cg.ID,
+		"center":   vec2Map(cg.Center),
+		"radius":   cg.Radius,
+		"color":    colorMap(cg.Color),
+		"isFixed":  cg.IsFixed,
+		"weight":   cg.GetWeight(),
+		"label":    cg.Label,
+		"width":    cg.Width,
+		"height":   cg.Height,
+		"inA":      serializeHook(cg.InA),
+		"inB":      serializeHook(cg.InB),
+		"outHook":  serializeHook(cg.OutHook),
+		"outputID": cg.OutputID,
+	}
+}
+
+func serializeLogicButton(lb *components.LogicButton) map[string]interface{} {
+	return map[string]interface{}{
+		"type":     "LogicButton",
+		"id":       lb.ID,
+		"center":   vec2Map(lb.Center),
+		"radius":   lb.Radius,
+		"color":    colorMap(lb.Color),
+		"isFixed":  lb.IsFixed,
+		"weight":   lb.GetWeight(),
+		"value":    lb.Value,
+		"outHook":  serializeHook(lb.OutHook),
+		"outputID": lb.OutputID,
+	}
+}
+
+func serializeLogicGate(lg *components.LogicGate) map[string]interface{} {
+	m := map[string]interface{}{
+		"type":     "LogicGate",
+		"id":       lg.ID,
+		"center":   vec2Map(lg.Center),
+		"radius":   lg.Radius,
+		"color":    colorMap(lg.Color),
+		"isFixed":  lg.IsFixed,
+		"weight":   lg.GetWeight(),
+		"kind":     lg.Kind,
+		"inA":      serializeHook(lg.InA),
+		"outHook":  serializeHook(lg.OutHook),
+		"outputID": lg.OutputID,
+	}
+	if lg.InB != nil {
+		m["inB"] = serializeHook(lg.InB)
+	}
+	return m
+}
+
+func serializeLight(l *components.Light) map[string]interface{} {
+	return map[string]interface{}{
+		"type":    "Light",
+		"id":      l.ID,
+		"center":  vec2Map(l.Center),
+		"radius":  l.Radius,
+		"color":   colorMap(l.Color),
+		"isFixed": l.IsFixed,
+		"weight":  l.GetWeight(),
+		"inHook":  serializeHook(l.InHook),
 	}
 }
 
@@ -236,6 +313,7 @@ func serializeHook(h *components.Hook) map[string]interface{} {
 		"isOutput":         h.IsOutput,
 		"label":            h.Label,
 		"allowQubitSystem": h.AllowQubitSystem,
+		"allowLogicalBit":  h.AllowLogicalBit,
 	}
 }
 
@@ -269,6 +347,18 @@ func serializeSourceGate(sg *components.SourceGate) map[string]interface{} {
 		"amplitude":  amps,
 		"modifierID": sg.ModifierID,
 		"outHook":    serializeHook(sg.OutHook),
+	}
+}
+
+func serializeLogicalBit(lb *components.LogicalBit) map[string]interface{} {
+	return map[string]interface{}{
+		"type":   "LogicalBit",
+		"id":     lb.ID,
+		"center": vec2Map(lb.Center),
+		"radius": lb.Radius,
+		"color":  colorMap(lb.Color),
+		"value":  lb.Value,
+		"hookID": lb.HookID,
 	}
 }
 
@@ -335,10 +425,10 @@ func serializeTextBox(tb *components.TextBox) map[string]interface{} {
 
 func serializeLineDraw(ld *components.LineDraw) map[string]interface{} {
 	return map[string]interface{}{
-		"type":   "LineDraw",
-		"start":  vec2Map(ld.Center),
-		"end":    vec2Map(ld.End),
-		"lineColor":  colorMap(ld.LineColor),
-		"placed": !ld.Placing,
+		"type":      "LineDraw",
+		"start":     vec2Map(ld.Center),
+		"end":       vec2Map(ld.End),
+		"lineColor": colorMap(ld.LineColor),
+		"placed":    !ld.Placing,
 	}
 }
