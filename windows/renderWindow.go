@@ -114,8 +114,9 @@ func (rw *RenderWindow) Draw() {
 	// 1. Draw window decorations in screen space (unclipped)
 	// Drop shadow for depth
 	rl.DrawRectangle(rw.X+5, rw.Y+7, rw.Width, rw.Height, rl.Fade(rl.Black, 0.3))
-	// Subtle vertical gradient body
-	rl.DrawRectangleGradientV(rw.X, rw.Y, rw.Width, rw.Height, shade(rw.ColorBg, 1.08), shade(rw.ColorBg, 0.9))
+	// Subtle vertical gradient body. The color is read live from config so
+	// qsimSetConfig("ColorBg", ...) repaints the window on the next frame.
+	rl.DrawRectangleGradientV(rw.X, rw.Y, rw.Width, rw.Height, shade(config.ColorBg, 1.08), shade(config.ColorBg, 0.9))
 
 	if rw.IsTitleBarVisible {
 		rl.DrawRectangle(rw.X, rw.Y, rw.Width, rw.TitleBarHeight, rw.ColorTitleBar)
