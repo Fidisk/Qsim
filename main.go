@@ -422,7 +422,29 @@ func main() {
 			utils.ToggleSpawnState(glob.LineDraw)
 		})
 
-	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13)
+	SpawnBut14 := components.NewToggleButton(25, -62.5, 50, 50, rl.LightGray, "M2",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Measure2) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Measure2)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Measure2)
+		})
+
+	SpawnBut15 := components.NewToggleButton(-25, -12.5, 50, 50, rl.LightGray, "CP",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Copy) }, 30,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Copy)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Copy)
+		})
+
+	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13, SpawnBut14, SpawnBut15)
 
 	animBar := windows.NewRenderWindow(0, 850, 1600, 50)
 	animBar.IsResizeAllow(false)
@@ -566,6 +588,8 @@ func main() {
 	SpawnBut11.Tooltip = "Source gate: continuously emits a custom qubit state"
 	SpawnBut12.Tooltip = "Text box"
 	SpawnBut13.Tooltip = "Line draw"
+	SpawnBut14.Tooltip = "Collapse measurement: outputs the measured qubit and the remaining state; click to force 0/1"
+	SpawnBut15.Tooltip = "Copy gate: create a logical copy of a hooked qubit system"
 
 	AnimButReset.Tooltip = "Reset animation"
 	AnimButBack.Tooltip = "Previous step"

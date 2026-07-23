@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	tablePaddingTop  = 8.0
-	tableRowHeight   = 24.0
-	tableFontSize    = 14
-	tablePaddingLeft = 8.0
+	tablePaddingTop   = 8.0
+	tableRowHeight    = 24.0
+	tableHeaderHeight = 24.0
+	tableFontSize     = 14
+	tablePaddingLeft  = 8.0
 )
 
 // InfoRow holds one line of the table.
@@ -41,11 +42,6 @@ type InfoTable struct {
 
 	Hook *Hook
 
-	// dragging state (same as QubitsSystem/Button)
-	dragging      bool
-	holdingCursor bool
-	offset        rl.Vector2
-
 	isResizing     bool
 	resizeTL       rl.Vector2 // fixed top‑left corner during resize
 	cursorOnResize bool
@@ -62,21 +58,28 @@ func NewInfoTable(x, y, width, height float32, color rl.Color, rows []InfoRow) *
 		Rows:   rows,
 	}
 	tmp.ID = utils.GenerateID(tmp)
-	tmp.Hook = NewHook(utils.SnapToGrid(x+width/2+10, config.SnapToGridInterval), y, globals.HookRadius, globals.HookColor)
+	// The hook rides one grid cell above the top edge of the box, like a port.
+	tmp.Hook = NewHook(x, y-height/2-config.SnapToGridInterval, globals.HookRadius, globals.HookColor)
 	tmp.Hook.Label = "Input"
 	tmp.Hook.AllowQubitSystem = true
+	tmp.Hook.Tooltip = "Info input: connect a qubit system to inspect its state"
 	return &tmp
 }
 
+// hookAnchor returns the point the hook is pulled toward: one grid cell above
+// the top-center edge of the box.
+func (it *InfoTable) hookAnchor() rl.Vector2 {
+	return rl.Vector2{X: it.Center.X, Y: it.Center.Y - it.Height/2 - config.SnapToGridInterval}
+}
+
 func (it *InfoTable) pullToHook() {
-	margin := float32(math.Max(math.Max(float64(it.Width), float64(it.Height)), float64((it.Width+it.Height)/2)))
-	val := utils.Dist(it.Center, it.Hook.Center) - utils.SnapToGrid(glob.InfoCardToHookDist+margin, config.SnapToGridInterval)
-	if math.Abs(float64(val)) <= float64(glob.GateToHookGraceDist) {
+	disp := it.hookAnchor().Subtract(it.Hook.Center)
+	dist := disp.Length()
+	if dist <= float32(glob.GateToHookGraceDist) {
 		return
 	}
-	val = float32(math.Max(float64(val), float64(-100)))
-	val = float32(math.Min(float64(val), float64(100)))
-	dir := it.Center.Subtract(it.Hook.Center).Normalize().Scale(val * glob.GateToHookPullCoeff)
+	val := float32(math.Min(float64(dist), 100))
+	dir := disp.Normalize().Scale(val * glob.GateToHookPullCoeff)
 	if it.Hook.IsHooked {
 		target := utils.GetObjectFromID(it.Hook.TargetID)
 		if target == nil {
@@ -177,7 +180,12 @@ func (it *InfoTable) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorA
 		it.dragging = false
 		it.holdingCursor = false
 		*isCursorAvailable = true
-		it.Center = it.VirtualCenter
+		// Land exactly on the grid: the drag lerp can stop between points.
+		it.Center = rl.Vector2{
+			X: utils.SnapToGrid(it.VirtualCenter.X, config.SnapToGridInterval),
+			Y: utils.SnapToGrid(it.VirtualCenter.Y, config.SnapToGridInterval),
+		}
+		it.VirtualCenter = it.Center
 		it.ClearForce()
 	}
 	if it.dragging {
@@ -205,7 +213,7 @@ func (it *InfoTable) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorA
 		}
 		it.RebuildRowsFromStateManager(qs.Origin)
 
-		it.Height = 2*tablePaddingTop + float32(len(it.Rows))*tableRowHeight
+		it.Height = 2*tablePaddingTop + tableHeaderHeight + float32(len(it.Rows))*tableRowHeight
 	}
 }
 
@@ -285,15 +293,20 @@ func (it *InfoTable) Draw() {
 	}
 	it.Hook.Draw()
 
-	// --- Outer rectangle ---
+	// --- Outer rectangle (sharp corners) ---
 	rect := rl.NewRectangle(
 		it.Center.X-it.Width/2,
 		it.Center.Y-it.Height/2,
 		it.Width,
 		it.Height,
 	)
-	rl.DrawRectangleRounded(rect, 0.06, 6, it.Color)
-	rl.DrawRectangleRoundedLinesEx(rect, 0.06, 6, 2, rl.Black)
+	rl.DrawRectangleRec(rect, it.Color)
+	borderColor := rl.Fade(rl.Gray, 0.8)
+	if it.Hook.IsHooked {
+		// Accent border while a system is being measured
+		borderColor = rl.Fade(rl.SkyBlue, 0.8)
+	}
+	rl.DrawRectangleLinesEx(rect, 2, borderColor)
 
 	const paddingLeft = 8
 	const paddingTop = 8
@@ -308,10 +321,33 @@ func (it *InfoTable) Draw() {
 	rl.DrawLineEx(rl.Vector2{X: col1Right, Y: rect.Y}, rl.Vector2{X: col1Right, Y: rect.Y + rect.Height}, 4, rl.Black)
 	rl.DrawLineEx(rl.Vector2{X: col2Right, Y: rect.Y}, rl.Vector2{X: col2Right, Y: rect.Y + rect.Height}, 4, rl.Black)
 
+	// --- Header row: column names in an accent color ---
+	headerY := it.Center.Y - it.Height/2 + tablePaddingTop
+	headerTextY := int32(headerY + (rowHeight-float32(fontSize))/2)
+
+	stateW := rl.MeasureText("State", fontSize)
+	rl.DrawText("State", int32(col1Right-paddingLeft)-stateW, headerTextY, fontSize, rl.SkyBlue)
+
+	barX := col1Right + paddingLeft
+	barW := col2Right - barX - paddingLeft
+	probW := rl.MeasureText("Prob", fontSize)
+	rl.DrawText("Prob", int32(barX+(barW-float32(probW))/2), headerTextY, fontSize, rl.SkyBlue)
+
+	remainingWidth := (it.Center.X + it.Width/2) - col2Right - 2*paddingLeft
+	ampW := rl.MeasureText("Amp", fontSize)
+	rl.DrawText("Amp", int32(col2Right+paddingLeft+(remainingWidth-float32(ampW))/2), headerTextY, fontSize, rl.SkyBlue)
+
+	// Underline the header
+	rl.DrawLineEx(
+		rl.Vector2{X: rect.X, Y: headerY + rowHeight},
+		rl.Vector2{X: rect.X + rect.Width, Y: headerY + rowHeight},
+		4, rl.Black,
+	)
+
 	// Available width for the label column
 	labelMaxWidth := col1Right - (it.Center.X - it.Width/2) - paddingLeft
 
-	visibleRows := int((it.Height - 2*tablePaddingTop) / tableRowHeight)
+	visibleRows := int((it.Height - 2*tablePaddingTop - tableHeaderHeight) / tableRowHeight)
 	if visibleRows < 0 {
 		visibleRows = 0
 	}
@@ -320,7 +356,7 @@ func (it *InfoTable) Draw() {
 		if i >= visibleRows {
 			break
 		}
-		rowY := it.Center.Y - it.Height/2 + tablePaddingTop + float32(i)*tableRowHeight
+		rowY := it.Center.Y - it.Height/2 + tablePaddingTop + tableHeaderHeight + float32(i)*tableRowHeight
 
 		// Column 1 – label (truncated if needed, original data stays intact)
 		label := truncateText(row.Label, fontSize, labelMaxWidth)
@@ -366,7 +402,7 @@ func (it *InfoTable) Draw() {
 }
 
 func (it *InfoTable) DrawGhost() {
-	ghostColor := rl.Fade(it.Color, 0.3)
+	ghostColor := rl.Fade(rl.SkyBlue, 0.4)
 	rect := rl.NewRectangle(
 		it.Center.X-it.Width/2,
 		it.Center.Y-it.Height/2,
@@ -374,6 +410,7 @@ func (it *InfoTable) DrawGhost() {
 		it.Height,
 	)
 	rl.DrawRectangleLinesEx(rect, 4, ghostColor)
+	rl.DrawLineEx(it.hookAnchor(), it.Hook.Center, 4, ghostColor)
 	it.Hook.DrawGhost()
 }
 

@@ -33,6 +33,10 @@ type QubitsSystem struct {
 
 	//Spagetti
 	InfoHookID int32
+
+	// IsLogical marks systems that should not expose individual qubit
+	// determinators (e.g. collapsed outputs or copies of a system).
+	IsLogical bool
 }
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
@@ -413,13 +417,15 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 	totalWidth := float32(cols * int32(n))
 	detX := determinatorColumnX(c.Center.X, totalWidth)
 
-	for i := range p.Size {
-		y := determinatorSlotY(c.Center.Y, int(i), int(p.Size))
-		q := NewQubitDeterminator(detX, y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
+	if !c.IsLogical {
+		for i := range p.Size {
+			y := determinatorSlotY(c.Center.Y, int(i), int(p.Size))
+			q := NewQubitDeterminator(detX, y, c.Radius/float32(2), rl.Purple, p.ModifierID[i])
 
-		q.QubitSystemID = c.ID
+			q.QubitSystemID = c.ID
 
-		c.QubitDeterminatorList = append(c.QubitDeterminatorList, q)
+			c.QubitDeterminatorList = append(c.QubitDeterminatorList, q)
+		}
 	}
 
 	for i := range p.Amptitude {
@@ -465,12 +471,15 @@ func (c *QubitsSystem) zipToHook() {
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && v.AllowQubitSystem {
+			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && v.AllowQubitSystem && !v.Hidden {
 				gotHooked = true
 				v.Connect(c)
 			}
-		case *Gate:
-			for _, d2 := range v.HookList {
+		case hookOwner:
+			for _, d2 := range v.GetHooks() {
+				if d2.Hidden {
+					continue
+				}
 				if utils.Dist(d2.Center, c.Center) <= glob.HookDist && (!d2.IsHooked || d2.TargetID == c.ID) && d2.AllowQubitSystem {
 					gotHooked = true
 					d2.Connect(c)
@@ -478,6 +487,12 @@ func (c *QubitsSystem) zipToHook() {
 			}
 		case *InfoTable:
 			tmp := v.Hook
+			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem {
+				gotHooked = true
+				tmp.ConnectInfo(c)
+			}
+		case *CopyGate:
+			tmp := v.InHook
 			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem {
 				gotHooked = true
 				tmp.ConnectInfo(c)

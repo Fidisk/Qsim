@@ -248,6 +248,10 @@ func unmarshalComponent(raw map[string]interface{}, ctx *loadCtx) components.Com
 		return unmarshalQubitsSystem(raw, ctx)
 	case "Gate":
 		return unmarshalGate(raw, ctx)
+	case "CollapseGate":
+		return unmarshalCollapseGate(raw, ctx)
+	case "CopyGate":
+		return unmarshalCopyGate(raw, ctx)
 	case "Hook":
 		return unmarshalHook(raw, ctx)
 	case "InfoTable":
@@ -302,6 +306,10 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 	qs.Center = center
 	qs.Color = color
 	ctx.oldToNew[oldID] = qs
+
+	if v, ok := raw["isLogical"]; ok {
+		qs.IsLogical = v.(bool)
+	}
 
 	if v, ok := raw["isFixed"]; ok {
 		qs.IsFixed = v.(bool)
@@ -412,6 +420,71 @@ func unmarshalQubitStateManager(raw map[string]interface{}) *qubits.QubitStateMa
 		}
 	}
 	return qubits.NewQubitStateManagerFrom(amps, modIDs)
+}
+
+func unmarshalCollapseGate(raw map[string]interface{}, ctx *loadCtx) *components.CollapseGate {
+	center := parseVec2(raw["center"].(map[string]interface{}))
+	radius := float32(raw["radius"].(float64))
+	color := parseColor(raw["color"].(map[string]interface{}))
+	label, _ := raw["label"].(string)
+
+	g := components.NewCollapseGate(center.X, center.Y, radius, color, label)
+	g.Center = center
+	g.Color = color
+	ctx.oldToNew[int32(raw["id"].(float64))] = g
+
+	if v, ok := raw["isFixed"]; ok {
+		g.IsFixed = v.(bool)
+	}
+	if v, ok := raw["weight"]; ok {
+		g.SetWeight(float32(v.(float64)))
+	}
+	if v, ok := raw["forceMode"]; ok {
+		g.ForceMode = int32(v.(float64))
+	}
+
+	hooksRaw, ok := raw["hooks"].([]interface{})
+	if ok {
+		for i, hRaw := range hooksRaw {
+			if i >= len(g.HookList) {
+				continue
+			}
+			unmarshalHookInto(g.HookList[i], hRaw.(map[string]interface{}), ctx)
+		}
+	}
+
+	return g
+}
+
+func unmarshalCopyGate(raw map[string]interface{}, ctx *loadCtx) *components.CopyGate {
+	center := parseVec2(raw["center"].(map[string]interface{}))
+	radius := float32(raw["radius"].(float64))
+	color := parseColor(raw["color"].(map[string]interface{}))
+	label, _ := raw["label"].(string)
+
+	cg := components.NewCopyGate(center.X, center.Y, radius, color, label)
+	cg.Center = center
+	cg.Color = color
+	ctx.oldToNew[int32(raw["id"].(float64))] = cg
+
+	if v, ok := raw["isFixed"]; ok {
+		cg.IsFixed = v.(bool)
+	}
+	if v, ok := raw["weight"]; ok {
+		cg.SetWeight(float32(v.(float64)))
+	}
+	if v, ok := raw["copyID"]; ok {
+		cg.CopyID = int32(v.(float64))
+	}
+
+	if hookRaw, ok := raw["inHook"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.InHook, hookRaw, ctx)
+	}
+	if hookRaw, ok := raw["outHook"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.OutHook, hookRaw, ctx)
+	}
+
+	return cg
 }
 
 func unmarshalGate(raw map[string]interface{}, ctx *loadCtx) *components.Gate {
@@ -658,6 +731,8 @@ func remapReferences(comps []components.Component, ctx *loadCtx) {
 			remapInfoTableRefs(v, ctx)
 		case *components.SourceGate:
 			remapSourceGateRefs(v, ctx)
+		case *components.CopyGate:
+			remapCopyGateRefs(v, ctx)
 		}
 	}
 }
@@ -755,6 +830,18 @@ func remapSourceGateRefs(sg *components.SourceGate, ctx *loadCtx) {
 				qs.InfoHookID = h.ID
 				qs.SetWeight(0)
 			}
+		}
+	}
+}
+
+func remapCopyGateRefs(cg *components.CopyGate, ctx *loadCtx) {
+	if cg.CopyID != 0 {
+		if newObj, found := ctx.oldToNew[cg.CopyID]; found {
+			if qs, ok := newObj.(*components.QubitsSystem); ok {
+				cg.CopyID = qs.ID
+			}
+		} else {
+			cg.CopyID = 0
 		}
 	}
 }

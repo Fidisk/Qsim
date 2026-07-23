@@ -87,6 +87,7 @@ func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []com
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
+	sg.OutHook.Tooltip = "Source output: emits the configured qubit state"
 	// Cache table size
 	sg.tableWidth = sgTableWidth
 	sg.tableHeight = sgTableHeight
@@ -112,6 +113,7 @@ func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
+	sg.OutHook.Tooltip = "Source output: emits the configured qubit state"
 	// Cache table size
 	sg.tableWidth = sgTableWidth
 	sg.tableHeight = sgTableHeight

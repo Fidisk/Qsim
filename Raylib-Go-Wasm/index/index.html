@@ -48,7 +48,7 @@
   }
 
   #dev-bar button,
-  #dev-bar label {
+  #dev-bar input {
     pointer-events: auto;
   }
 
@@ -66,17 +66,27 @@
     background: #2563eb;
   }
 
-  #dev-bar label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
+  #dev-bar input[type="text"] {
+    padding: 5px 8px;
+    font-size: 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 5px;
+    outline: none;
+    font-family: ui-monospace, Consolas, monospace;
   }
 
-  #dev-bar input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
+  #cfg-key {
+    width: 170px;
+  }
+
+  #cfg-val {
+    width: 80px;
+  }
+
+  #dev-bar input[type="text"]:focus {
+    border-color: #3b82f6;
   }
 </style>
 
@@ -85,10 +95,26 @@
 
   <div id="dev-bar" title="Dev controls">
     <button id="reload-btn">↻ Reload</button>
-    <label>
-      <input type="checkbox" id="dev-mode" />
-      Dev mode
-    </label>
+    <input type="text" id="cfg-key" list="cfg-keys" placeholder="key" spellcheck="false" autocomplete="off" />
+    <datalist id="cfg-keys">
+      <option value="SnapToGridInterval"></option>
+      <option value="PhysicsEnabled"></option>
+      <option value="MinZoom"></option>
+      <option value="MaxZoom"></option>
+      <option value="QubitSystemStatePause"></option>
+      <option value="ComputeDotArriveDur"></option>
+      <option value="ComputeMergeDur"></option>
+      <option value="ComputeReorderDur"></option>
+      <option value="ComputeGateAppearDur"></option>
+      <option value="ComputeIterBaseDur"></option>
+      <option value="ComputeIterDecay"></option>
+      <option value="ComputeIterFloorDur"></option>
+      <option value="ComputeIterCap"></option>
+      <option value="ComputeCollapseDur"></option>
+      <option value="ComputeMaxRows"></option>
+    </datalist>
+    <input type="text" id="cfg-val" placeholder="value" spellcheck="false" autocomplete="off" />
+    <button id="cfg-apply">Set</button>
   </div>
 
   <script>
@@ -118,46 +144,54 @@
     window.addEventListener("load", fitCanvas);
     fitCanvas();
 
-    // Dev-mode reload widget: manual reload button + optional auto-refresh.
+    // Dev bar: manual reload button + runtime config editor. qsimSetConfig
+    // is registered by the wasm app (see devtools_wasm.go).
     const reloadBtn = document.getElementById("reload-btn");
-    const devModeCheckbox = document.getElementById("dev-mode");
-
     reloadBtn.addEventListener("click", () => location.reload(true));
 
-    const urlParams = new URLSearchParams(location.search);
-    if (urlParams.get("dev") === "1") {
-      devModeCheckbox.checked = true;
+    const cfgKey = document.getElementById("cfg-key");
+    const cfgVal = document.getElementById("cfg-val");
+    const cfgApply = document.getElementById("cfg-apply");
+
+    function flashCfg(el, msg) {
+      el.value = "";
+      el.placeholder = msg;
+      setTimeout(() => {
+        el.placeholder = el === cfgKey ? "key" : "value";
+      }, 1500);
     }
 
-    const WASM_FILE = "./main.wasm";
-    const POLL_INTERVAL_MS = 2000;
-    let lastSignature = null;
-
-    async function pollWasm() {
-      if (!devModeCheckbox.checked) return;
-      try {
-        const res = await fetch(WASM_FILE, {
-          method: "HEAD",
-          cache: "no-store",
-        });
-        const signature = res.headers.get("Last-Modified") || res.headers.get("ETag") || "";
-        if (lastSignature && signature && signature !== lastSignature) {
-          location.reload(true);
-          return;
-        }
-        lastSignature = signature;
-      } catch (err) {
-        // Network/server not ready yet; ignore and try again.
+    function applyCfg() {
+      const key = cfgKey.value.trim();
+      const val = cfgVal.value.trim();
+      if (!key) { flashCfg(cfgKey, "key?"); return; }
+      if (!val) { flashCfg(cfgVal, "value?"); return; }
+      if (typeof qsimSetConfig !== "function") { flashCfg(cfgVal, "wasm not ready"); return; }
+      const res = String(qsimSetConfig(key, val));
+      if (res === "ok") {
+        flashCfg(cfgVal, "ok");
+      } else {
+        flashCfg(cfgVal, res);
       }
     }
 
-    if (devModeCheckbox.checked) {
-      pollWasm();
-    }
-    devModeCheckbox.addEventListener("change", () => {
-      if (devModeCheckbox.checked) pollWasm();
+    cfgApply.addEventListener("click", applyCfg);
+    cfgKey.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") applyCfg();
     });
-    setInterval(pollWasm, POLL_INTERVAL_MS);
+    cfgVal.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") applyCfg();
+    });
+
+    // Load the current value into the value field when a key is chosen.
+    function loadCfgValue() {
+      const key = cfgKey.value.trim();
+      if (!key || typeof qsimGetConfig !== "function") return;
+      const cur = qsimGetConfig(key);
+      if (typeof cur === "string") cfgVal.value = cur;
+    }
+    cfgKey.addEventListener("input", loadCfgValue);
+    cfgKey.addEventListener("change", loadCfgValue);
   </script>
   <script type="module" src="./index.js"></script>
 </body>

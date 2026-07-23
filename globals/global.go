@@ -71,4 +71,6 @@ const (
 	GQubit
 	TextBox
 	LineDraw
+	Measure2
+	Copy
 )

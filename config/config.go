@@ -4,13 +4,15 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-const MaxZoom float32 = 10.0
-const MinZoom float32 = 0.1
+// These are vars (not consts) so the dev bar on the web build can tweak them
+// at runtime via window.qsimSetConfig(key, value).
+var MaxZoom float32 = 10.0
+var MinZoom float32 = 0.1
 
-const QubitSystemStatePause bool = true
+var QubitSystemStatePause bool = true
 
-const SnapToGridInterval float32 = 100.0
-const PhysicsEnabled bool = false
+var SnapToGridInterval float32 = 100.0
+var PhysicsEnabled bool = false
 
 // Gate-computation demo visualization.
 
@@ -29,13 +31,13 @@ var QubitColors = []rl.Color{
 	rl.Green,
 }
 
-const ComputeDotArriveDur = 1.0  // seconds for the input dots to fly into the gate
-const ComputeMergeDur = 1.6      // source columns merging into one Dirac column
-const ComputeReorderDur = 1.4    // gate qubits moving to the top of the column
-const ComputeGateAppearDur = 1.0 // gate matrix fade-in
-const ComputeIterBaseDur = 1.5   // seconds for the first iteration
-const ComputeIterDecay = 0.7     // per-iteration speed-up factor
-const ComputeIterFloorDur = 0.15 // fastest per-iteration duration
-const ComputeIterCap = 64        // max visualized iterations before fast-forward
-const ComputeCollapseDur = 1.6   // sum columns collapsing into the result column
-const ComputeMaxRows = 8         // visible rows per column before "..." is used
+var ComputeDotArriveDur = 1.0  // seconds for the input dots to fly into the gate
+var ComputeMergeDur = 1.6      // source columns merging into one Dirac column
+var ComputeReorderDur = 1.4    // gate qubits moving to the top of the column
+var ComputeGateAppearDur = 1.0 // gate matrix fade-in
+var ComputeIterBaseDur = 1.5   // seconds for the first iteration
+var ComputeIterDecay = 0.7     // per-iteration speed-up factor
+var ComputeIterFloorDur = 0.15 // fastest per-iteration duration
+var ComputeIterCap int32 = 64   // max visualized iterations before fast-forward
+var ComputeCollapseDur = 1.6    // sum columns collapsing into the result column
+var ComputeMaxRows int32 = 8    // visible rows per column before "..." is used

@@ -43,6 +43,10 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeQubitsSystem(v)
 	case *components.Gate:
 		return serializeGate(v)
+	case *components.CollapseGate:
+		return serializeCollapseGate(v)
+	case *components.CopyGate:
+		return serializeCopyGate(v)
 	case *components.Hook:
 		return serializeHook(v)
 	case *components.InfoTable:
@@ -114,6 +118,7 @@ func serializeQubitsSystem(qs *components.QubitsSystem) map[string]interface{} {
 		"weight":             qs.GetWeight(),
 		"hookID":             qs.HookID,
 		"infoHookID":         qs.InfoHookID,
+		"isLogical":          qs.IsLogical,
 		"origin":             serializeQubitStateManager(qs.Origin),
 		"qubitDeterminators": dets,
 	}
@@ -176,6 +181,44 @@ func serializeGate(g *components.Gate) map[string]interface{} {
 		"measureResult":     g.MeasureResult,
 		"operation":         op,
 		"hooks":             hooks,
+	}
+}
+
+func serializeCollapseGate(g *components.CollapseGate) map[string]interface{} {
+	hooks := make([]map[string]interface{}, len(g.HookList))
+	for i, h := range g.HookList {
+		hooks[i] = serializeHook(h)
+	}
+	return map[string]interface{}{
+		"type":       "CollapseGate",
+		"id":         g.ID,
+		"center":     vec2Map(g.Center),
+		"radius":     g.Radius,
+		"color":      colorMap(g.Color),
+		"isFixed":    g.IsFixed,
+		"weight":     g.GetWeight(),
+		"label":      g.Label,
+		"inputCount": g.InputCount,
+		"forceMode":  g.ForceMode,
+		"hooks":      hooks,
+	}
+}
+
+func serializeCopyGate(cg *components.CopyGate) map[string]interface{} {
+	return map[string]interface{}{
+		"type":   "CopyGate",
+		"id":     cg.ID,
+		"center": vec2Map(cg.Center),
+		"radius": cg.Radius,
+		"color":  colorMap(cg.Color),
+		"isFixed": cg.IsFixed,
+		"weight": cg.GetWeight(),
+		"label":  cg.Label,
+		"width":  cg.Width,
+		"height": cg.Height,
+		"inHook":  serializeHook(cg.InHook),
+		"outHook": serializeHook(cg.OutHook),
+		"copyID":  cg.CopyID,
 	}
 }
 

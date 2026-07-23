@@ -20,6 +20,7 @@ type Gate struct {
 	Circle
 	ID                int32
 	Label             string
+	Tooltip           string
 	HookList          []*Hook
 	Operation         [][]complex64
 	InputCount        int32
@@ -42,11 +43,13 @@ func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]c
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
+	tmp.Tooltip = "Gate: plug qubit determinators into the inputs; the output is the transformed system"
 	snappedDist := utils.SnapToGrid(glob.GateToHookDist, config.SnapToGridInterval)
 	for i := 0; i < int(inputCount); i++ {
 		offY := utils.SnapToGrid((float32(i)-float32(inputCount-1)/2)*config.SnapToGridInterval, config.SnapToGridInterval)
 		newHook := NewHook(x-snappedDist, y+offY, glob.HookRadius, glob.HookColor)
 		newHook.Label = "I" + strconv.Itoa(i)
+		newHook.Tooltip = "Gate input: plug a qubit determinator"
 		tmp.HookList = append(tmp.HookList, newHook)
 	}
 	tmp.OutPutHook = nil
@@ -55,6 +58,7 @@ func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]c
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
 	tmp.OutPutHook[0].Label = "O"
 	tmp.OutPutHook[0].AllowQubitSystem = true
+	tmp.OutPutHook[0].Tooltip = "Gate output: the transformed qubit system"
 	return &tmp
 }
 
@@ -68,9 +72,11 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
+	tmp.Tooltip = "Measurement gate: outputs both the |0> and |1> outcome branches with their probabilities"
 	snappedDist := utils.SnapToGrid(glob.GateToHookDist, config.SnapToGridInterval)
 	newHook := NewHook(x-snappedDist, y, glob.HookRadius, glob.HookColor)
 	newHook.Label = "I"
+	newHook.Tooltip = "Measure input: plug a qubit determinator"
 	tmp.HookList = append(tmp.HookList, newHook)
 
 	outputHook := NewOutputHook(x+snappedDist, y-glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
@@ -79,12 +85,14 @@ func NewMeasurementGate(x, y, radius float32, color rl.Color, label string) *Gat
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook)
 	tmp.OutPutHook[0].Label = "O"
 	tmp.OutPutHook[0].AllowQubitSystem = true
+	tmp.OutPutHook[0].Tooltip = "|0> outcome branch"
 
 	outputHook2 := NewOutputHook(x+snappedDist, y+glob.HookRadius, glob.OutputHookRadius, glob.OutputHookColor)
 	tmp.HookList = append(tmp.HookList, outputHook2)
 	tmp.OutPutHook = append(tmp.OutPutHook, outputHook2)
 	tmp.OutPutHook[1].Label = "O"
 	tmp.OutPutHook[1].AllowQubitSystem = true
+	tmp.OutPutHook[1].Tooltip = "|1> outcome branch"
 	return &tmp
 }
 
@@ -111,17 +119,11 @@ func (c *Gate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
+		if !rl.IsMouseButtonDown(rl.MouseButtonLeft) && c.Tooltip != "" {
+			glob.TooltipText = c.Tooltip
+		}
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			if utils.IsMouseState(glob.MouseStateNormal) && c.DoubleClicked(worldMouse) {
-				// double-click: detach everything from the gate
-				c.DestroyOutPut()
-				for _, d := range c.HookList {
-					d.Disconnect()
-				}
-				*isCursorAvailable = false
-			} else {
-				c.onClick(worldMouse, isCursorAvailable)
-			}
+			c.onClick(worldMouse, isCursorAvailable)
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -399,6 +401,9 @@ func (c *Gate) pullToHook(d *Hook) {
 
 func (c *Gate) Draw() {
 	for _, d := range c.HookList {
+		if d.Hidden {
+			continue
+		}
 		start := utils.RectEdgePoint(c.Center, d.Center, c.Radius, c.Radius)
 		if d.IsHooked {
 			tmp := utils.GetObjectFromID(d.TargetID)
@@ -519,6 +524,11 @@ func (c *Gate) PostUpdate() {
 
 func (c *Gate) GetID() int32 {
 	return c.ID
+}
+
+// GetHooks exposes the hook list to the zip helpers (hookOwner interface).
+func (c *Gate) GetHooks() []*Hook {
+	return c.HookList
 }
 
 func (c *Gate) Destroy() {

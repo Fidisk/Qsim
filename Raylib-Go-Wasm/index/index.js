@@ -54,7 +54,7 @@ Object.assign(go.importObject.gojs, {
   Alert: runtime.Alert.bind(runtime),
 });
 
-WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then(
+WebAssembly.instantiateStreaming(fetch("main.wasm", { cache: "no-store" }), go.importObject).then(
   (result) => {
     const instance = result.instance;
     globalThis.goInstance = instance;

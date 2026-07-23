@@ -458,6 +458,12 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 	case utils.IsSpawnState(glob.Measurement):
 		m := components.NewMeasurementGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "M")
 		rw.PushComponent(m)
+	case utils.IsSpawnState(glob.Measure2):
+		m := components.NewCollapseGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "M2")
+		rw.PushComponent(m)
+	case utils.IsSpawnState(glob.Copy):
+		cg := components.NewCopyGate(snapped.X, snapped.Y, glob.GateRadius, glob.GateColor, "Get")
+		rw.PushComponent(cg)
 	case utils.IsSpawnState(glob.Info):
 		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, glob.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
@@ -500,6 +506,10 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		return components.NewGate(0, 0, glob.GateRadius, glob.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
 	case state&glob.Measurement != 0:
 		return components.NewMeasurementGate(0, 0, glob.GateRadius, glob.GateColor, "M")
+	case state&glob.Measure2 != 0:
+		return components.NewCollapseGate(0, 0, glob.GateRadius, glob.GateColor, "M2")
+	case state&glob.Copy != 0:
+		return components.NewCopyGate(0, 0, glob.GateRadius, glob.GateColor, "Copy")
 	case state&glob.Info != 0:
 		return components.NewInfoTable(0, 0, 260, 40, glob.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:

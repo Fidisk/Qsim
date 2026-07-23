@@ -18,9 +18,18 @@ type Hook struct {
 	Label            string
 	AllowQubitSystem bool
 
+	// Hidden hooks are not drawn and cannot be interacted with (e.g. the
+	// collapse gate's unused remainder output).
+	Hidden bool
+	// Tooltip shows in the tooltip window when an empty hook is hovered
+	// with nothing held. Leave empty for no tooltip.
+	Tooltip string
+
 	// justSpawned triggers a one-shot auto-connect attempt on the first
 	// Update, so a hook spawned on top of a qubit determinator hooks up.
 	justSpawned bool
+	// skipNextZip prevents auto-reconnection after a double-click detach.
+	skipNextZip bool
 }
 
 func NewHook(x, y, radius float32, color rl.Color) *Hook {
@@ -66,9 +75,21 @@ func (c *Hook) onRelease() {
 }
 
 func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.Hidden {
+		return
+	}
 	if c.justSpawned {
 		c.justSpawned = false
 		c.zipToDeterminator()
+		c.zipToQubitSystem()
+	}
+
+	// Guide tooltip: hovering an empty hook with nothing held explains
+	// what to plug in.
+	if !c.IsHooked && c.Tooltip != "" && !rl.IsMouseButtonDown(rl.MouseButtonLeft) {
+		if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
+			glob.TooltipText = c.Tooltip
+		}
 	}
 	if c.IsHooked {
 		if utils.GetObjectFromID(c.TargetID) == nil {
@@ -94,14 +115,17 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
 			if utils.IsMouseState(glob.MouseStateNormal) && c.DoubleClicked(worldMouse) {
-				// double-click: detach (same rule as detach mode)
-				if !c.IsOutput {
-					c.Disconnect()
+				// double-click: detach only if this hook is connected to a QubitDeterminator
+				if c.IsHooked && !c.IsOutput {
+					if _, ok := utils.GetObjectFromID(c.TargetID).(*QubitDeterminator); ok {
+						c.Disconnect()
+						c.skipNextZip = true
+						*isCursorAvailable = false
+						return
+					}
 				}
-				*isCursorAvailable = false
-			} else {
-				c.onClick(worldMouse, isCursorAvailable)
 			}
+			c.onClick(worldMouse, isCursorAvailable)
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -109,7 +133,12 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		c.holdingCursor = false
 		*isCursorAvailable = true
 		c.Center = c.VirtualCenter
-		c.zipToDeterminator()
+		if !c.skipNextZip {
+			c.zipToDeterminator()
+			c.zipToQubitSystem()
+		} else {
+			c.skipNextZip = false
+		}
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)
@@ -127,6 +156,9 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 }
 
 func (c *Hook) Draw() {
+	if c.Hidden {
+		return
+	}
 	if c.IsHooked {
 		return
 	}
@@ -163,6 +195,9 @@ func (c *Hook) Draw() {
 }
 
 func (c *Hook) DrawGhost() {
+	if c.Hidden {
+		return
+	}
 	if c.IsHooked {
 		return
 	}
@@ -184,6 +219,12 @@ func (c *Hook) DrawGhost() {
 	textX := int32(c.Center.X - c.Radius - offsetX)
 	textY := int32(c.Center.Y - c.Radius - offsetY - float32(fontSize))
 	rl.DrawText(c.Label, textX, textY, fontSize, ghostColor)
+}
+
+// hookOwner is any component that owns a set of hooks (Gate, CollapseGate),
+// so the zip helpers can treat them uniformly.
+type hookOwner interface {
+	GetHooks() []*Hook
 }
 
 // zipToDeterminator connects the hook to a nearby free qubit determinator.
@@ -210,6 +251,34 @@ func (c *Hook) zipToDeterminator() {
 		}
 		if utils.Dist(d.Center, c.Center) <= glob.HookDist {
 			c.Connect(d)
+			return
+		}
+	}
+}
+
+// zipToQubitSystem connects an info-style hook (AllowQubitSystem, not an
+// output) to a nearby qubit system. It mirrors QubitsSystem.zipToHook from
+// the hook side and runs when the hook is released after a drag or right
+// after it spawns, so dragging the hook onto a system auto-connects.
+func (c *Hook) zipToQubitSystem() {
+	if !c.AllowQubitSystem || c.IsOutput || c.IsHooked {
+		return
+	}
+	for _, obj := range utils.ObjectList {
+		qs, ok := obj.(*QubitsSystem)
+		if !ok || qs == nil {
+			continue
+		}
+		// One info link per system; re-connecting to the same hook is fine.
+		if qs.InfoHookID != 0 && qs.InfoHookID != c.ID {
+			continue
+		}
+		// Skip systems that are not placed in a window (spawn previews).
+		if qs.GetParent() == nil {
+			continue
+		}
+		if utils.Dist(qs.Center, c.Center) <= glob.HookDist {
+			c.ConnectInfo(qs)
 			return
 		}
 	}
@@ -268,6 +337,11 @@ func (v *Hook) Disconnect() {
 	switch c := tmp.(type) {
 	case *QubitsSystem:
 		c.HookID = 0
+		// Also drop any info link (e.g. InfoTable hook) so the system can be
+		// auto-connected again later.
+		if c.InfoHookID == v.ID {
+			c.InfoHookID = 0
+		}
 		c.SetWeight(glob.QubitDeterminatorWeight)
 	case *QubitDeterminator:
 		c.HookID = 0
