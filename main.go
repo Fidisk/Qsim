@@ -510,7 +510,18 @@ func main() {
 			utils.ToggleSpawnState(glob.Light)
 		})
 
-	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13, SpawnBut14, SpawnBut15, SpawnBut16, SpawnBut17, SpawnBut18, SpawnBut19, SpawnBut20, SpawnBut21)
+	SpawnButM3 := components.NewToggleButton(25, 137.5, 50, 50, rl.LightGray, "M3",
+		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Measure3) }, 20,
+		func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(glob.Measure3)
+		},
+		func() {
+			utils.ToggleMouseState(glob.MouseStateSpawn)
+			utils.ToggleSpawnState(glob.Measure3)
+		})
+
+	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13, SpawnBut14, SpawnBut15, SpawnBut16, SpawnBut17, SpawnBut18, SpawnBut19, SpawnBut20, SpawnBut21, SpawnButM3)
 
 	animBar := windows.NewRenderWindow(0, 850, 1600, 50)
 	animBar.IsResizeAllow(false)

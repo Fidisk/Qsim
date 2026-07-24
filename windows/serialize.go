@@ -207,10 +207,11 @@ func serializeCollapseGate(g *components.CollapseGate) map[string]interface{} {
 		"color":      colorMap(g.Color),
 		"isFixed":    g.IsFixed,
 		"weight":     g.GetWeight(),
-		"label":      g.Label,
-		"inputCount": g.InputCount,
-		"forceMode":  g.ForceMode,
-		"hooks":      hooks,
+		"label":        g.Label,
+		"inputCount":   g.InputCount,
+		"forceMode":    g.ForceMode,
+		"normalSystem": g.NormalSystem,
+		"hooks":        hooks,
 	}
 }
 

@@ -93,7 +93,7 @@
 <body>
   <canvas id="canvas" width="1600" height="900"></canvas>
 
-  <div id="dev-bar" title="Dev controls">
+  <div id="dev-bar" title="Dev controls" style="display: none;">
     <button id="reload-btn">↻ Reload</button>
     <input type="text" id="cfg-key" list="cfg-keys" placeholder="key" spellcheck="false" autocomplete="off" />
     <datalist id="cfg-keys">
@@ -151,7 +151,13 @@
     fitCanvas();
 
     // Dev bar: manual reload button + runtime config editor. qsimSetConfig
-    // is registered by the wasm app (see devtools_wasm.go).
+    // is registered by the wasm app (see devtools_wasm.go). The bar stays
+    // hidden unless the page is opened with ?dev=true.
+    const devEnabled = new URLSearchParams(window.location.search).get("dev") === "true";
+    if (devEnabled) {
+      document.getElementById("dev-bar").style.display = "flex";
+    }
+
     const reloadBtn = document.getElementById("reload-btn");
     reloadBtn.addEventListener("click", () => location.reload(true));
 

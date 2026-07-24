@@ -437,8 +437,14 @@ func unmarshalCollapseGate(raw map[string]interface{}, ctx *loadCtx) *components
 	radius := float32(raw["radius"].(float64))
 	color := parseColor(raw["color"].(map[string]interface{}))
 	label, _ := raw["label"].(string)
+	normalSystem, _ := raw["normalSystem"].(bool)
 
-	g := components.NewCollapseGate(center.X, center.Y, radius, color, label)
+	var g *components.CollapseGate
+	if normalSystem {
+		g = components.NewCollapseGate3(center.X, center.Y, radius, color, label)
+	} else {
+		g = components.NewCollapseGate(center.X, center.Y, radius, color, label)
+	}
 	g.Center = center
 	g.Color = color
 	ctx.oldToNew[int32(raw["id"].(float64))] = g

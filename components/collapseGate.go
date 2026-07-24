@@ -37,6 +37,11 @@ type CollapseGate struct {
 	ForceMode   int32 // 0 = random, 1 = force 0, 2 = force 1
 	OutcomeProbs [2]float64
 
+	// NormalSystem (M3): output the collapsed full state as a normal qubit
+	// system (with determinators) instead of a logical bit + logical
+	// remainder.
+	NormalSystem bool
+
 	pressPos rl.Vector2 // mouse position at drag start, for click detection
 }
 
@@ -70,6 +75,35 @@ func NewCollapseGate(x, y, radius float32, color rl.Color, label string) *Collap
 	outRest.Hidden = true
 	tmp.HookList = append(tmp.HookList, outRest)
 	tmp.OutPutHook = append(tmp.OutPutHook, outRest)
+	return &tmp
+}
+
+// NewCollapseGate3 creates the M3 measurement gate: like CollapseGate it
+// realizes a single outcome, but its only output is the collapsed full state
+// as a normal qubit system (determinators exposed, so the result can be used
+// as a regular system), not a logical one.
+func NewCollapseGate3(x, y, radius float32, color rl.Color, label string) *CollapseGate {
+	tmp := CollapseGate{
+		Circle:       *NewCircle(x, y, radius, color),
+		Label:        label,
+		InputCount:   1,
+		NormalSystem: true,
+	}
+	tmp.ID = utils.GenerateID(&tmp)
+	tmp.SetWeight(glob.GateWeight)
+	tmp.Tooltip = "Collapse measurement: outputs the collapsed qubit system; click to force 0 or 1"
+	snappedDist := utils.SnapToGrid(glob.GateToHookDist, config.SnapToGridInterval)
+	in := NewHook(x-snappedDist, y, glob.HookRadius, config.HookColor)
+	in.Label = "I"
+	in.Tooltip = "Measure input: plug a qubit determinator"
+	tmp.HookList = append(tmp.HookList, in)
+
+	out := NewOutputHook(x+snappedDist, y, glob.OutputHookRadius, config.OutputHookColor)
+	out.Label = "O"
+	out.AllowQubitSystem = true
+	out.Tooltip = "Collapsed system output (normal qubit system)"
+	tmp.HookList = append(tmp.HookList, out)
+	tmp.OutPutHook = append(tmp.OutPutHook, out)
 	return &tmp
 }
 
@@ -167,6 +201,9 @@ func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		if !c.Measured {
 			c.MeasureOutput()
 		}
+	} else if c.NormalSystem && c.Measured {
+		// M3: drop the collapsed system when the input is removed.
+		c.DestroyOutPut()
 	} else if len(c.OutPutHook) > 1 && (c.OutPutHook[0].IsHooked || c.OutPutHook[1].IsHooked) && cnt != int(c.InputCount) {
 		c.DestroyOutPut()
 	}
@@ -232,6 +269,18 @@ func (c *CollapseGate) MeasureOutput() {
 	c.Result = k
 	p := c.OutcomeProbs[k]
 
+	if c.NormalSystem {
+		// M3: spit the collapsed measured qubit out as its own normal
+		// single-qubit system (|0> or |1> on the realized outcome), so it
+		// exposes its determinator and can be used as a regular system.
+		amps := make([]complex64, 2)
+		amps[k] = 1
+		state := qubits.NewQubitStateManagerFrom(amps, []int32{QSM.ModifierID[pos]})
+		c.spawnOrUpdateNormal(0, state)
+		c.Measured = true
+		return
+	}
+
 	// --- the remaining (n-1)-qubit state, conditioned on the same outcome ---
 	restMods := make([]int32, 0, QSM.Size-1)
 	for i, d := range QSM.ModifierID {
@@ -282,6 +331,29 @@ func (c *CollapseGate) spawnOrUpdate(hookIdx int, state *qubits.QubitStateManage
 	}
 	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 	tmp.IsLogical = true
+	tmp.Assign(state)
+	parent := c.GetParent()
+	if parent != nil {
+		tmp.SetParent(parent)
+		parent.PushComponent(tmp)
+	}
+	hook.Connect(tmp)
+	tmp.ZipDeterminatorsToHooks()
+}
+
+// spawnOrUpdateNormal is spawnOrUpdate for M3: the collapsed state goes into
+// a normal qubit system (no IsLogical), so it exposes its determinators and
+// can be used as a regular system.
+func (c *CollapseGate) spawnOrUpdateNormal(hookIdx int, state *qubits.QubitStateManager) {
+	hook := c.OutPutHook[hookIdx]
+	if hook.IsHooked {
+		tmp := utils.GetObjectFromID(hook.TargetID)
+		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
+			qs.Origin.CopyFrom(state)
+			return
+		}
+	}
+	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 	tmp.Assign(state)
 	parent := c.GetParent()
 	if parent != nil {

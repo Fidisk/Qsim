@@ -60,6 +60,7 @@ const (
 	TextBox
 	LineDraw
 	Measure2
+	Measure3
 	Copy
 	Compare
 	LogicButton
