@@ -804,9 +804,8 @@ func unmarshalLogicalBit(raw map[string]interface{}, ctx *loadCtx) *components.L
 	lb.Center = center
 	ctx.oldToNew[int32(raw["id"].(float64))] = lb
 
-	if v, ok := raw["hookID"]; ok {
-		lb.HookID = int32(v.(float64))
-	}
+	// The serialized hookID is not restored: hook links are rebuilt from the
+	// hook side during remapReferences (a bit may fan out to several hooks).
 
 	return lb
 }
@@ -961,11 +960,10 @@ func remapGateRefs(g *components.Gate, ctx *loadCtx) {
 					t.HookID = h.ID
 					t.SetWeight(0)
 				case *components.LogicalBit:
-					t.HookID = 0
 					t.Center = h.Center
 					h.IsHooked = true
 					h.TargetID = t.ID
-					t.HookID = h.ID
+					t.AddHook(h.ID)
 					t.SetWeight(0)
 				}
 			}
@@ -994,11 +992,10 @@ func remapCollapseGateRefs(g *components.CollapseGate, ctx *loadCtx) {
 					t.HookID = h.ID
 					t.SetWeight(0)
 				case *components.LogicalBit:
-					t.HookID = 0
 					t.Center = h.Center
 					h.IsHooked = true
 					h.TargetID = t.ID
-					t.HookID = h.ID
+					t.AddHook(h.ID)
 					t.SetWeight(0)
 				}
 			}
@@ -1083,11 +1080,10 @@ func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 					t.HookID = h.ID
 					t.SetWeight(0)
 				case *components.LogicalBit:
-					t.HookID = 0
 					t.Center = h.Center
 					h.IsHooked = true
 					h.TargetID = t.ID
-					t.HookID = h.ID
+					t.AddHook(h.ID)
 					t.SetWeight(0)
 				}
 			}
@@ -1116,11 +1112,10 @@ func remapLogicalBitHook(h *components.Hook, ctx *loadCtx) {
 	}
 	h.TargetID = 0
 	if t, ok := newObj.(*components.LogicalBit); ok {
-		t.HookID = 0
 		t.Center = h.Center
 		h.IsHooked = true
 		h.TargetID = t.ID
-		t.HookID = h.ID
+		t.AddHook(h.ID)
 		t.SetWeight(0)
 	}
 }

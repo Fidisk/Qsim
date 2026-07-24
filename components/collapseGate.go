@@ -55,10 +55,8 @@ func NewCollapseGate(x, y, radius float32, color rl.Color, label string) *Collap
 	newHook.Tooltip = "Measure input: plug a qubit determinator"
 	tmp.HookList = append(tmp.HookList, newHook)
 
-	outCollapsed := NewOutputHook(x+snappedDist, y-glob.HookRadius, glob.OutputHookRadius, config.OutputHookColor)
+	outCollapsed := NewLogicalOutputHook(x+snappedDist, y-glob.HookRadius)
 	outCollapsed.Label = "C"
-	outCollapsed.AllowQubitSystem = false
-	outCollapsed.AllowLogicalBit = true
 	outCollapsed.Tooltip = "Measured logical bit (|0> or |1>)"
 	tmp.HookList = append(tmp.HookList, outCollapsed)
 	tmp.OutPutHook = append(tmp.OutPutHook, outCollapsed)
@@ -303,7 +301,7 @@ func (c *CollapseGate) spawnOrUpdateLogicalBit(hookIdx int, value int) {
 			return
 		}
 	}
-	tmp := NewLogicalBit(c.Center.X, c.Center.Y, glob.QubitSystemRadius, int32(value))
+	tmp := NewLogicalBit(c.Center.X, c.Center.Y, glob.QubitSystemRadius/2, int32(value))
 	parent := c.GetParent()
 	if parent != nil {
 		tmp.SetParent(parent)
@@ -384,19 +382,8 @@ func (c *CollapseGate) Draw() {
 				continue
 			}
 
-			r := utils.Dist(start, d.Center) - t.GetCircle().Radius
-			if r < 0 {
-				r = 0
-			}
-			end := rl.Vector2Add(start, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),
-				r,
-			))
-			if _, isLogicalBit := tmp.(*LogicalBit); isLogicalBit {
-				DrawLogicalBitWire(start, end, 4, c.Color)
-			} else {
-				DrawWire(start, end, 4, c.Color)
-			}
+			start = utils.RectEdgePoint(c.Center, t.GetCircle().Center, c.Radius, c.Radius)
+			DrawHookLink(start, t, 4, c.Color)
 		} else {
 			DrawWire(start, d.Center, 4, c.Color)
 		}

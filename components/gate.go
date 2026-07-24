@@ -412,20 +412,13 @@ func (c *Gate) Draw() {
 				continue
 			}
 			t, ok := tmp.(Component)
-		if !ok {
-			d.Disconnect()
-			continue
-		}
-
-			r := utils.Dist(start, d.Center) - t.GetCircle().Radius
-			if r < 0 {
-				r = 0
+			if !ok {
+				d.Disconnect()
+				continue
 			}
-			end := rl.Vector2Add(start, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(d.Center, start)),
-				r,
-			))
-			DrawWire(start, end, 4, c.Color)
+
+			start = utils.RectEdgePoint(c.Center, t.GetCircle().Center, c.Radius, c.Radius)
+			DrawHookLink(start, t, 4, c.Color)
 		} else {
 			DrawWire(start, d.Center, 4, c.Color)
 		}

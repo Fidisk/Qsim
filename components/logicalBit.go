@@ -14,9 +14,12 @@ import (
 // for 1.
 type LogicalBit struct {
 	Circle
-	ID     int32
-	Value  int32 // 0 or 1
-	HookID int32
+	ID    int32
+	Value int32 // 0 or 1
+	// HookID is the primary hook link; LinkedHookIDs holds the additional
+	// fan-out links (see logicalHook.go).
+	HookID        int32
+	LinkedHookIDs []int32
 }
 
 func NewLogicalBit(x, y, radius float32, value int32) *LogicalBit {
@@ -54,12 +57,7 @@ func (lb *LogicalBit) SetValue(v int32) {
 func (lb *LogicalBit) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	switch {
 	case utils.IsMouseState(glob.MouseStateDetach):
-		if lb.HookID != 0 {
-			tmp := utils.GetObjectFromID(lb.HookID)
-			if h, ok := tmp.(*Hook); ok {
-				h.Disconnect()
-			}
-		}
+		lb.disconnectAllHooks()
 	case utils.IsMouseState(glob.MouseStateErase):
 		lb.Kill()
 	default:
@@ -100,21 +98,20 @@ func (lb *LogicalBit) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 		}, 0.25)
 		lb.Center = lb.VirtualCenter
 		lb.ClearForce()
-		// Keep the hook exactly at the bit so the wire stays connected even when
-		// dragging fast (the hook update runs before the bit update in the gate).
-		if lb.HookID != 0 {
-			tmp := utils.GetObjectFromID(lb.HookID)
-			if h, ok := tmp.(*Hook); ok {
-				h.Center = lb.Center
-				h.VirtualCenter = lb.Center
-			}
+		// Keep every linked hook exactly at the bit so the wires stay connected
+		// even when dragging fast (the hook update runs before the bit update
+		// in the gate).
+		for _, h := range lb.LinkedHooks() {
+			h.Center = lb.Center
+			h.VirtualCenter = lb.Center
 		}
 	} else {
 		lb.DecayForce()
 		lb.ApplyForce()
-		// When hooked, the logical bit is anchored to its hook so it moves with
-		// the gate or other owner.
-		if lb.HookID != 0 {
+		// With a single link the bit is anchored to its hook so it moves with
+		// the gate. With several links it floats freely: each gate's hook pull
+		// positions it between its drivers and consumers.
+		if lb.HookID != 0 && len(lb.LinkedHookIDs) == 0 {
 			tmp := utils.GetObjectFromID(lb.HookID)
 			if h, ok := tmp.(*Hook); ok {
 				lb.Center = h.Center
@@ -134,13 +131,16 @@ func (lb *LogicalBit) zipToHook() {
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
-			// Skip the hook the bit is currently attached to: it follows the
-			// bit while dragging, so it would always win the distance check
-			// and the bit could never move to a different hook.
-			if v.ID == lb.HookID {
+			// Skip hooks the bit is already linked to: they follow the bit
+			// while dragging and would always win the distance check.
+			if lb.HasHook(v.ID) {
 				continue
 			}
-			if !v.AllowLogicalBit || v.Hidden || (v.IsHooked && v.TargetID != lb.ID) {
+			if !v.AllowLogicalBit || v.Hidden || v.IsHooked {
+				continue
+			}
+			// A bit is driven by at most one gate output.
+			if v.IsOutput && lb.HasOutputLink() {
 				continue
 			}
 			if utils.Dist(v.Center, lb.Center) <= glob.HookDist {
@@ -149,10 +149,13 @@ func (lb *LogicalBit) zipToHook() {
 			}
 		case hookOwner:
 			for _, d2 := range v.GetHooks() {
-				if d2.ID == lb.HookID {
+				if lb.HasHook(d2.ID) {
 					continue
 				}
-				if !d2.AllowLogicalBit || d2.Hidden || (d2.IsHooked && d2.TargetID != lb.ID) {
+				if !d2.AllowLogicalBit || d2.Hidden || d2.IsHooked {
+					continue
+				}
+				if d2.IsOutput && lb.HasOutputLink() {
 					continue
 				}
 				if utils.Dist(d2.Center, lb.Center) <= glob.HookDist {
@@ -166,22 +169,64 @@ func (lb *LogicalBit) zipToHook() {
 			break
 		}
 	}
-	if !gotHooked && lb.HookID != 0 {
-		lb.removeFromHook()
+	// Releasing the bit anywhere but on a different hook keeps its current
+	// connection: while not dragging, the bit is anchored to its hook and
+	// simply snaps back. Detaching is done explicitly via the detach mouse
+	// mode, not by dragging.
+	if !gotHooked {
+		lb.zipToBit()
 	}
 }
 
-func (lb *LogicalBit) removeFromHook() {
-	if lb.HookID == 0 {
-		return
+// isOutputBit reports whether the bit is actively driven by a gate, i.e. any
+// of its linked hooks is a gate output.
+func (lb *LogicalBit) isOutputBit() bool {
+	return lb.HasOutputLink()
+}
+
+// zipToBit merges the bit into a nearby logical bit: bits accept other bits
+// the way hooks do. The output bit (if any) survives with its value and takes
+// over the loser's hooks; two output bits refuse to merge.
+func (lb *LogicalBit) zipToBit() bool {
+	qp := lb.GetParent()
+	if qp == nil {
+		return false
 	}
-	tmp := utils.GetObjectFromID(lb.HookID)
-	lb.HookID = 0
-	lb.SetWeight(glob.QubitDeterminatorWeight)
-	if h, ok := tmp.(*Hook); ok {
-		h.IsHooked = false
-		h.TargetID = 0
+	for _, d := range qp.GetElement() {
+		other, ok := d.(*LogicalBit)
+		if !ok || other == nil || other.ID == lb.ID {
+			continue
+		}
+		if utils.Dist(other.Center, lb.Center) <= glob.HookDist {
+			return lb.mergeInto(other)
+		}
 	}
+	return false
+}
+
+// mergeInto merges the dragged bit with other. The output bit wins and keeps
+// its value; the loser is removed and the winner inherits all of its hooks.
+// When neither bit is an output, the target (other) wins. Two output bits
+// cannot merge.
+func (lb *LogicalBit) mergeInto(other *LogicalBit) bool {
+	if lb.isOutputBit() && other.isOutputBit() {
+		return false
+	}
+	winner, loser := other, lb
+	if lb.isOutputBit() {
+		winner, loser = lb, other
+	}
+
+	// Remember the loser's hooks before killing it: the winner inherits them.
+	loserHooks := loser.LinkedHooks()
+	loserCenter := loser.Center
+	loser.Kill()
+	for _, h := range loserHooks {
+		h.Connect(winner)
+	}
+	winner.Center = loserCenter
+	winner.VirtualCenter = loserCenter
+	return true
 }
 
 func (lb *LogicalBit) Draw() {
@@ -203,9 +248,7 @@ func (lb *LogicalBit) GetChildCircles() []*Circle { return nil }
 func (lb *LogicalBit) PostUpdate() {}
 
 func (lb *LogicalBit) Kill() {
-	if h, ok := utils.GetObjectFromID(lb.HookID).(*Hook); ok {
-		h.Disconnect()
-	}
+	lb.disconnectAllHooks()
 	parent := lb.GetParent()
 	if parent != nil {
 		parent.DeleteChildWithID(lb.ID)

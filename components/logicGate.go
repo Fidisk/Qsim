@@ -49,9 +49,8 @@ func NewLogicButton(x, y float32, color rl.Color) *LogicButton {
 	lb.SetWeight(glob.GateWeight)
 
 	off := utils.SnapToGrid(glob.QubitSystemCellWidth/2, config.SnapToGridInterval)
-	lb.OutHook = NewOutputHook(x+w/2+off, y, glob.OutputHookRadius, config.OutputHookColor)
+	lb.OutHook = NewLogicalOutputHook(x+w/2+off, y)
 	lb.OutHook.Label = "O"
-	lb.OutHook.AllowLogicalBit = true
 	lb.OutHook.Tooltip = "Button output: logical bit (click the button to toggle)"
 	return lb
 }
@@ -159,13 +158,17 @@ func (lb *LogicButton) updateOutput() {
 			return
 		}
 	}
-	if !lb.OutHook.IsHooked {
-		// The tracked bit was dragged onto another hook: forget it so a fresh
-		// bit spawns on the output.
+	// The tracked bit may have been dragged onto another hook: keep driving
+	// it so the button still controls it, and only respawn once it is gone.
+	if lb.OutputID != 0 {
+		if bit, ok := utils.GetObjectFromID(lb.OutputID).(*LogicalBit); ok {
+			bit.SetValue(lb.Value)
+			return
+		}
 		lb.OutputID = 0
 	}
 	if lb.OutputID == 0 || utils.GetObjectFromID(lb.OutputID) == nil {
-		bit := NewLogicalBit(lb.OutHook.Center.X, lb.OutHook.Center.Y, glob.QubitSystemRadius, lb.Value)
+		bit := NewLogicalBit(lb.OutHook.Center.X, lb.OutHook.Center.Y, glob.QubitSystemRadius/2, lb.Value)
 		parent := lb.GetParent()
 		if parent != nil {
 			bit.SetParent(parent)
@@ -189,7 +192,7 @@ func (lb *LogicButton) Destroy() {
 }
 
 func (lb *LogicButton) Draw() {
-	drawHookWire(lb.Center, lb.OutHook, lb.Width/2, lb.Height/2, lb.Color, true)
+	drawHookWire(lb.Center, lb.OutHook, lb.Width/2, lb.Height/2, lb.Color)
 	lb.OutHook.Draw()
 
 	rect := rl.Rectangle{
@@ -302,21 +305,18 @@ func NewLogicGate(x, y float32, color rl.Color, kind int32) *LogicGate {
 		inAY = y - h/4
 		inB = true
 	}
-	lg.InA = NewHook(x-w/2-off, inAY, glob.HookRadius, config.HookColor)
+	lg.InA = NewLogicalHook(x-w/2-off, inAY)
 	lg.InA.Label = "A"
-	lg.InA.AllowLogicalBit = true
 	lg.InA.Tooltip = "Logic input A: connect a logical bit"
 
 	if inB {
-		lg.InB = NewHook(x-w/2-off, y+h/4, glob.HookRadius, config.HookColor)
+		lg.InB = NewLogicalHook(x-w/2-off, y+h/4)
 		lg.InB.Label = "B"
-		lg.InB.AllowLogicalBit = true
 		lg.InB.Tooltip = "Logic input B: connect a logical bit"
 	}
 
-	lg.OutHook = NewOutputHook(x+w/2+off, y, glob.OutputHookRadius, config.OutputHookColor)
+	lg.OutHook = NewLogicalOutputHook(x+w/2+off, y)
 	lg.OutHook.Label = "O"
-	lg.OutHook.AllowLogicalBit = true
 	lg.OutHook.Tooltip = "Logic output: logical bit"
 	return lg
 }
@@ -481,13 +481,17 @@ func (lg *LogicGate) updateOutput() {
 			return
 		}
 	}
-	if !lg.OutHook.IsHooked {
-		// The tracked bit was dragged onto another hook: forget it so a fresh
-		// bit spawns on the output.
+	// The tracked bit may have been dragged onto another hook: keep driving
+	// it so the gate still controls it, and only respawn once it is gone.
+	if lg.OutputID != 0 {
+		if bit, ok := utils.GetObjectFromID(lg.OutputID).(*LogicalBit); ok {
+			bit.SetValue(value)
+			return
+		}
 		lg.OutputID = 0
 	}
 	if lg.OutputID == 0 || utils.GetObjectFromID(lg.OutputID) == nil {
-		bit := NewLogicalBit(lg.OutHook.Center.X, lg.OutHook.Center.Y, glob.QubitSystemRadius, value)
+		bit := NewLogicalBit(lg.OutHook.Center.X, lg.OutHook.Center.Y, glob.QubitSystemRadius/2, value)
 		parent := lg.GetParent()
 		if parent != nil {
 			bit.SetParent(parent)
@@ -514,11 +518,11 @@ func (lg *LogicGate) Destroy() {
 }
 
 func (lg *LogicGate) Draw() {
-	drawHookWire(lg.Center, lg.InA, lg.Width/2, lg.Height/2, lg.Color, true)
+	drawHookWire(lg.Center, lg.InA, lg.Width/2, lg.Height/2, lg.Color)
 	if lg.InB != nil {
-		drawHookWire(lg.Center, lg.InB, lg.Width/2, lg.Height/2, lg.Color, true)
+		drawHookWire(lg.Center, lg.InB, lg.Width/2, lg.Height/2, lg.Color)
 	}
-	drawHookWire(lg.Center, lg.OutHook, lg.Width/2, lg.Height/2, lg.Color, true)
+	drawHookWire(lg.Center, lg.OutHook, lg.Width/2, lg.Height/2, lg.Color)
 	for _, h := range lg.GetHooks() {
 		h.Draw()
 	}
@@ -598,9 +602,8 @@ func NewLight(x, y float32, color rl.Color) *Light {
 	l.SetWeight(glob.GateWeight)
 
 	off := utils.SnapToGrid(glob.QubitSystemCellWidth/2, config.SnapToGridInterval)
-	l.InHook = NewHook(x-lightBodyRadius-off, y, glob.HookRadius, config.HookColor)
+	l.InHook = NewLogicalHook(x-lightBodyRadius-off, y)
 	l.InHook.Label = "I"
-	l.InHook.AllowLogicalBit = true
 	l.InHook.Tooltip = "Light input: connect a logical bit"
 	return l
 }
@@ -685,22 +688,24 @@ func (l *Light) Destroy() {
 }
 
 func (l *Light) Draw() {
-	edge := rl.Vector2Add(l.Center, rl.Vector2Scale(
-		rl.Vector2Normalize(rl.Vector2Subtract(l.InHook.Center, l.Center)),
-		l.Radius,
-	))
 	if l.InHook.IsHooked {
 		target := utils.GetObjectFromID(l.InHook.TargetID)
 		if target == nil {
 			l.InHook.Disconnect()
 		} else if t, ok := target.(Component); ok {
-			end := rl.Vector2Add(edge, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(l.InHook.Center, edge)),
-				utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
+			// The wire leaves the light on the side facing the bit and points
+			// at its center, no matter where the hook was left.
+			edge := rl.Vector2Add(l.Center, rl.Vector2Scale(
+				rl.Vector2Normalize(rl.Vector2Subtract(t.GetCircle().Center, l.Center)),
+				l.Radius,
 			))
-			DrawLogicalBitWire(edge, end, 4, l.Color)
+			DrawHookLink(edge, t, 4, l.Color)
 		}
 	} else {
+		edge := rl.Vector2Add(l.Center, rl.Vector2Scale(
+			rl.Vector2Normalize(rl.Vector2Subtract(l.InHook.Center, l.Center)),
+			l.Radius,
+		))
 		DrawWire(edge, l.InHook.Center, 4, l.Color)
 	}
 	l.InHook.Draw()
@@ -776,11 +781,11 @@ func pullHookToAnchor(owner *Circle, h *Hook, anchor rl.Vector2) {
 	owner.AddForce(dir.Scale(-1))
 }
 
-// drawHookWire draws the wire between a rectangular body and one of its hooks,
-// stopping at the hooked target's edge. logical selects the double-line
-// logical-bit wire style.
-func drawHookWire(center rl.Vector2, h *Hook, halfW, halfH float32, color rl.Color, logical bool) {
-	edge := utils.RectEdgePoint(center, h.Center, halfW, halfH)
+// drawHookWire draws the wire between a rectangular body and one of its hooks.
+// When hooked, the wire leaves the body on the side facing the target and
+// stops at the target's outline (DrawHookLink); the double-line style is used
+// when the target is a logical carrier.
+func drawHookWire(center rl.Vector2, h *Hook, halfW, halfH float32, color rl.Color) {
 	if h.IsHooked {
 		target := utils.GetObjectFromID(h.TargetID)
 		if target == nil {
@@ -792,16 +797,10 @@ func drawHookWire(center rl.Vector2, h *Hook, halfW, halfH float32, color rl.Col
 			h.Disconnect()
 			return
 		}
-		end := rl.Vector2Add(edge, rl.Vector2Scale(
-			rl.Vector2Normalize(rl.Vector2Subtract(h.Center, edge)),
-			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
-		))
-		if logical {
-			DrawLogicalBitWire(edge, end, 4, color)
-		} else {
-			DrawWire(edge, end, 4, color)
-		}
+		edge := utils.RectEdgePoint(center, t.GetCircle().Center, halfW, halfH)
+		DrawHookLink(edge, t, 4, color)
 		return
 	}
+	edge := utils.RectEdgePoint(center, h.Center, halfW, halfH)
 	DrawWire(edge, h.Center, 4, color)
 }

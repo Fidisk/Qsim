@@ -207,11 +207,8 @@ func (cg *CopyGate) Draw() {
 		if target == nil {
 			cg.InHook.Disconnect()
 		} else if t, ok := target.(Component); ok {
-			end := rl.Vector2Add(inEdge, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(cg.InHook.Center, inEdge)),
-				utils.Dist(inEdge, t.GetCircle().Center)-t.GetCircle().Radius,
-			))
-			DrawWire(inEdge, end, 4, config.HookColor)
+			inEdge := utils.RectEdgePoint(cg.Center, t.GetCircle().Center, cg.Width/2, cg.Height/2)
+			DrawHookLink(inEdge, t, 4, config.HookColor)
 		}
 	} else {
 		DrawWire(inEdge, cg.InHook.Center, 4, config.HookColor)
@@ -225,15 +222,8 @@ func (cg *CopyGate) Draw() {
 		if target == nil {
 			cg.OutHook.Disconnect()
 		} else if t, ok := target.(Component); ok {
-			end := rl.Vector2Add(outEdge, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(cg.OutHook.Center, outEdge)),
-				utils.Dist(outEdge, t.GetCircle().Center)-t.GetCircle().Radius,
-			))
-			if qs, isQubit := target.(*QubitsSystem); isQubit && qs.IsLogical {
-				DrawLogicalBitWire(outEdge, end, 4, cg.Color)
-			} else {
-				DrawWire(outEdge, end, 4, cg.Color)
-			}
+			outEdge := utils.RectEdgePoint(cg.Center, t.GetCircle().Center, cg.Width/2, cg.Height/2)
+			DrawHookLink(outEdge, t, 4, cg.Color)
 		}
 	} else {
 		DrawWire(outEdge, cg.OutHook.Center, 4, cg.Color)

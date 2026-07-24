@@ -54,6 +54,20 @@ func NewOutputHook(x, y, radius float32, color rl.Color) *Hook {
 	return &tmp
 }
 
+// NewLogicalHook creates an input hook that only accepts logical bits.
+func NewLogicalHook(x, y float32) *Hook {
+	h := NewHook(x, y, globals.HookRadius, config.HookColor)
+	h.AllowLogicalBit = true
+	return h
+}
+
+// NewLogicalOutputHook creates an output hook that emits logical bits.
+func NewLogicalOutputHook(x, y float32) *Hook {
+	h := NewOutputHook(x, y, globals.OutputHookRadius, config.OutputHookColor)
+	h.AllowLogicalBit = true
+	return h
+}
+
 func (c *Hook) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	switch {
 	case utils.IsMouseState(glob.MouseStateFix):
@@ -179,8 +193,14 @@ func (c *Hook) Draw() {
 	// Define how bold you want the cross to be (in pixels)
 	thickness := float32(4.0)
 
-	// Port outline, then the "+" cross
-	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, rl.Fade(c.Color, 0.6))
+	// Port outline, then the "+" cross. Logical hooks (logical-bit only) get a
+	// double ring, following the double-line convention for logical carriers.
+	if c.AllowLogicalBit {
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, rl.Fade(c.Color, 0.6))
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius-4, rl.Fade(c.Color, 0.6))
+	} else {
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, rl.Fade(c.Color, 0.6))
+	}
 
 	// Draw the horizontal bar
 	rl.DrawLineEx(left, right, thickness, c.Color)
@@ -210,7 +230,12 @@ func (c *Hook) DrawGhost() {
 	}
 	ghostColor := rl.Fade(c.Color, 0.3)
 
-	rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, ghostColor)
+	if c.AllowLogicalBit {
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, ghostColor)
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius-4, ghostColor)
+	} else {
+		rl.DrawCircleLines(int32(c.Center.X), int32(c.Center.Y), c.Radius, ghostColor)
+	}
 
 	left := rl.Vector2{X: c.Center.X - c.Radius, Y: c.Center.Y}
 	right := rl.Vector2{X: c.Center.X + c.Radius, Y: c.Center.Y}
@@ -301,7 +326,11 @@ func (c *Hook) zipToLogicalBit() {
 		if !ok || lb == nil {
 			continue
 		}
-		if lb.HookID != 0 && lb.HookID != c.ID {
+		if lb.HasHook(c.ID) {
+			continue
+		}
+		// A bit is driven by at most one gate output.
+		if c.IsOutput && lb.HasOutputLink() {
 			continue
 		}
 		if lb.GetParent() == nil {
@@ -343,11 +372,12 @@ func (v *Hook) Connect(val Component) {
 		c.HookID = v.ID
 		c.SetWeight(0)
 	case *LogicalBit:
-		c.removeFromHook()
+		// Logical bits fan out: linking another hook never severs the
+		// bit's existing connections.
+		c.AddHook(v.ID)
 		c.Center = v.Center
 		v.IsHooked = true
 		v.TargetID = c.ID
-		c.HookID = v.ID
 		c.SetWeight(0)
 	}
 }
@@ -384,7 +414,7 @@ func (v *Hook) Disconnect() {
 		c.HookID = 0
 		c.SetWeight(glob.QubitDeterminatorWeight)
 	case *LogicalBit:
-		c.HookID = 0
+		c.RemoveHook(v.ID)
 		c.SetWeight(glob.QubitDeterminatorWeight)
 	default:
 	}
@@ -407,7 +437,6 @@ func (v *Hook) DisconnectAndKill() {
 		c.SetWeight(glob.QubitDeterminatorWeight)
 		c.Kill()
 	case *LogicalBit:
-		c.HookID = 0
 		c.SetWeight(glob.QubitDeterminatorWeight)
 		c.Kill()
 	default:

@@ -62,9 +62,8 @@ func NewCompareGate(x, y, radius float32, color rl.Color, label string) *Compare
 	cg.InB.AllowQubitSystem = true
 	cg.InB.Tooltip = "Compare input B: connect a qubit system"
 
-	cg.OutHook = NewOutputHook(x+halfW+off, y, glob.OutputHookRadius, config.OutputHookColor)
+	cg.OutHook = NewLogicalOutputHook(x+halfW+off, y)
 	cg.OutHook.Label = "O"
-	cg.OutHook.AllowLogicalBit = true
 	cg.OutHook.Tooltip = "Compare output: logical bit (1 = equal, 0 = not equal)"
 
 	return cg
@@ -202,14 +201,8 @@ func (cg *CompareGate) updateOutput() {
 		}
 	}
 
-	if !cg.OutHook.IsHooked {
-		// The tracked bit was dragged onto another hook: forget it so a fresh
-		// bit spawns on the output.
-		cg.OutputID = 0
-	}
-
 	if cg.OutputID == 0 || utils.GetObjectFromID(cg.OutputID) == nil {
-		tmp := NewLogicalBit(cg.OutHook.Center.X, cg.OutHook.Center.Y, glob.QubitSystemRadius, value)
+		tmp := NewLogicalBit(cg.OutHook.Center.X, cg.OutHook.Center.Y, glob.QubitSystemRadius/2, value)
 		parent := cg.GetParent()
 		if parent != nil {
 			tmp.SetParent(parent)
@@ -228,11 +221,8 @@ func (cg *CompareGate) Draw() {
 		if target == nil {
 			cg.InA.Disconnect()
 		} else if t, ok := target.(Component); ok {
-			end := rl.Vector2Add(aEdge, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(cg.InA.Center, aEdge)),
-				utils.Dist(aEdge, t.GetCircle().Center)-t.GetCircle().Radius,
-			))
-			DrawWire(aEdge, end, 4, config.HookColor)
+			aEdge := utils.RectEdgePoint(cg.Center, t.GetCircle().Center, cg.Width/2, cg.Height/2)
+			DrawHookLink(aEdge, t, 4, config.HookColor)
 		}
 	} else {
 		DrawWire(aEdge, cg.InA.Center, 4, config.HookColor)
@@ -246,11 +236,8 @@ func (cg *CompareGate) Draw() {
 		if target == nil {
 			cg.InB.Disconnect()
 		} else if t, ok := target.(Component); ok {
-			end := rl.Vector2Add(bEdge, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(cg.InB.Center, bEdge)),
-				utils.Dist(bEdge, t.GetCircle().Center)-t.GetCircle().Radius,
-			))
-			DrawWire(bEdge, end, 4, config.HookColor)
+			bEdge := utils.RectEdgePoint(cg.Center, t.GetCircle().Center, cg.Width/2, cg.Height/2)
+			DrawHookLink(bEdge, t, 4, config.HookColor)
 		}
 	} else {
 		DrawWire(bEdge, cg.InB.Center, 4, config.HookColor)
@@ -264,11 +251,8 @@ func (cg *CompareGate) Draw() {
 		if target == nil {
 			cg.OutHook.Disconnect()
 		} else if t, ok := target.(Component); ok {
-			end := rl.Vector2Add(outEdge, rl.Vector2Scale(
-				rl.Vector2Normalize(rl.Vector2Subtract(cg.OutHook.Center, outEdge)),
-				utils.Dist(outEdge, t.GetCircle().Center)-t.GetCircle().Radius,
-			))
-			DrawLogicalBitWire(outEdge, end, 4, cg.Color)
+			outEdge := utils.RectEdgePoint(cg.Center, t.GetCircle().Center, cg.Width/2, cg.Height/2)
+			DrawHookLink(outEdge, t, 4, cg.Color)
 		}
 	} else {
 		DrawWire(outEdge, cg.OutHook.Center, 4, cg.Color)

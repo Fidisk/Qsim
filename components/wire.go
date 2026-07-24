@@ -2,6 +2,7 @@ package components
 
 import (
 	"qsim/config"
+	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -12,6 +13,47 @@ import (
 func DrawLogicalBitWire(a, b rl.Vector2, thick float32, col rl.Color) {
 	DrawWire(a, b, thick+3, col)
 	DrawWire(a, b, thick, config.ColorBg)
+}
+
+// IsLogicalTarget reports whether a wire endpoint is a logical carrier: a
+// LogicalBit or a logical QubitSystem (IsLogical set). By convention such
+// connections are drawn with the double-line wire.
+func IsLogicalTarget(target interface{}) bool {
+	switch t := target.(type) {
+	case *LogicalBit:
+		return true
+	case *QubitsSystem:
+		return t.IsLogical
+	}
+	return false
+}
+
+// DrawWireToTarget draws the wire to a hooked target, using the double-line
+// style when the target is a logical carrier (see IsLogicalTarget).
+func DrawWireToTarget(a, b rl.Vector2, thick float32, col rl.Color, target interface{}) {
+	if IsLogicalTarget(target) {
+		DrawLogicalBitWire(a, b, thick, col)
+		return
+	}
+	DrawWire(a, b, thick, col)
+}
+
+// DrawHookLink draws the wire from a body edge to a hooked target. It aims at
+// the target itself rather than at the hook: a target with several links
+// floats between them while the hooks rest at their anchors, so aiming at the
+// hook would leave the wire short of the target. The wire stops at the
+// target's outline and uses the double-line style for logical carriers.
+func DrawHookLink(edge rl.Vector2, t Component, thick float32, col rl.Color) {
+	c := t.GetCircle()
+	r := utils.Dist(edge, c.Center) - c.Radius
+	if r < 0 {
+		r = 0
+	}
+	end := rl.Vector2Add(edge, rl.Vector2Scale(
+		rl.Vector2Normalize(rl.Vector2Subtract(c.Center, edge)),
+		r,
+	))
+	DrawWireToTarget(edge, end, thick, col, t)
 }
 
 // DrawWire draws a connection line as a smooth cubic bezier that leaves its

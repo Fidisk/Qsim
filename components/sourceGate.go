@@ -337,11 +337,8 @@ func (sg *SourceGate) Draw() {
 			sg.OutHook.Disconnect()
 			return
 		}
-		end := rl.Vector2Add(edge, rl.Vector2Scale(
-			rl.Vector2Normalize(rl.Vector2Subtract(sg.OutHook.Center, edge)),
-			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
-		))
-		DrawWire(edge, end, 4, sg.Color)
+		edge = utils.RectEdgePoint(sg.Center, t.GetCircle().Center, tableRect.Width/2, tableRect.Height/2)
+		DrawHookLink(edge, t, 4, sg.Color)
 	} else {
 		DrawWire(edge, sg.OutHook.Center, 4, sg.Color)
 	}

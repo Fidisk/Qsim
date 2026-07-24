@@ -283,11 +283,8 @@ func (it *InfoTable) Draw() {
 			return
 		}
 		t := target.(Component)
-		end := rl.Vector2Add(edge, rl.Vector2Scale(
-			rl.Vector2Normalize(rl.Vector2Subtract(it.Hook.Center, edge)),
-			utils.Dist(edge, t.GetCircle().Center)-t.GetCircle().Radius,
-		))
-		DrawWire(edge, end, 4, config.HookColor)
+		edge = utils.RectEdgePoint(it.Center, t.GetCircle().Center, it.Width/2, it.Height/2)
+		DrawHookLink(edge, t, 4, config.HookColor)
 	} else {
 		DrawWire(edge, it.Hook.Center, 4, config.HookColor)
 	}
