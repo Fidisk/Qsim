@@ -221,65 +221,56 @@ func (c *Gate) MeasureOutput() {
 			continue
 		}
 
-		if prob == 0 {
-			amps := make([]complex64, 1<<QSM.Size)
-			amps[hit<<(n-pos)] = 1
-			result := qubits.NewQubitStateManagerFrom(amps, QSM.ModifierID)
-			hook := c.OutPutHook[hit]
-			if hook.IsHooked {
-				tmp := utils.GetObjectFromID(hook.TargetID)
-				if tmp != nil {
-					if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
-						qs.Origin.CopyFrom(result)
-						continue
-					}
+		// Each branch outputs the state with the collapsed (measured) qubit
+		// removed: the (n-1)-qubit remainder conditioned on the outcome. A
+		// single-qubit input has no remainder, so it outputs the collapsed
+		// qubit itself.
+		var result *qubits.QubitStateManager
+		if QSM.Size == 1 {
+			amps := make([]complex64, 2)
+			amps[hit] = 1
+			result = qubits.NewQubitStateManagerFrom(amps, []int32{QSM.ModifierID[pos]})
+		} else {
+			restMods := make([]int32, 0, QSM.Size-1)
+			for i, d := range QSM.ModifierID {
+				if int32(i) != pos {
+					restMods = append(restMods, d)
 				}
 			}
-			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
-			tmp.Assign(result)
-			parent := c.GetParent()
-			if parent != nil {
-				tmp.SetParent(parent)
-				parent.PushComponent(tmp)
+			shift := QSM.Size - 1 - pos
+			restSize := int32(1) << (QSM.Size - 1)
+			restAmps := make([]complex64, restSize)
+			if prob > 0 {
+				inv := complex64(cmplx.Sqrt(complex128(complex(1/prob, 0))))
+				for j := int32(0); j < restSize; j++ {
+					high := (j >> (shift + 1)) << (shift + 1)
+					low := j & ((1 << shift) - 1)
+					idx := high | (int32(hit) << shift) | low
+					restAmps[j] = QSM.Amptitude[idx] * inv
+				}
 			}
-			hook.Connect(tmp)
-			tmp.ZipDeterminatorsToHooks()
-			continue
-		}
-
-		coeff := complex64(complex(1/prob, 0))
-		coeff = complex64(cmplx.Sqrt(complex128(coeff)))
-
-		result := qubits.NewQubitStateManagerFrom([]complex64{}, QSM.ModifierID)
-
-		for i, d := range QSM.Amptitude {
-			if ((i >> (n - pos)) & 1) == hit {
-				result.Amptitude = append(result.Amptitude, d*coeff)
-			} else {
-				result.Amptitude = append(result.Amptitude, 0)
-			}
+			result = qubits.NewQubitStateManagerFrom(restAmps, restMods)
 		}
 
 		hook := c.OutPutHook[hit]
 		if hook.IsHooked {
 			tmp := utils.GetObjectFromID(hook.TargetID)
-			if tmp == nil {
-				continue
+			if tmp != nil {
+				if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
+					qs.Origin.CopyFrom(result)
+					continue
+				}
 			}
-			if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
-				qs.Origin.CopyFrom(result)
-			}
-		} else {
-			tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
-			tmp.Assign(result)
-			parent := c.GetParent()
-			if parent != nil {
-				tmp.SetParent(parent)
-				parent.PushComponent(tmp)
-			}
-			hook.Connect(tmp)
-			tmp.ZipDeterminatorsToHooks()
 		}
+		tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
+		tmp.Assign(result)
+		parent := c.GetParent()
+		if parent != nil {
+			tmp.SetParent(parent)
+			parent.PushComponent(tmp)
+		}
+		hook.Connect(tmp)
+		tmp.ZipDeterminatorsToHooks()
 	}
 }
 

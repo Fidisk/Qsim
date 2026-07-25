@@ -281,6 +281,14 @@ func (c *Hook) zipToDeterminator() {
 		if qp == nil || qp.GetParent() == nil || !qp.isDeterminatorVisible(d) {
 			continue
 		}
+		// A system's determinators may only feed one gate at a time: if a
+		// sibling is already hooked into another gate, this hook is off-limits.
+		parent := qp.GetParent()
+		if sibling := d.siblingHookOwner(parent); sibling != nil {
+			if owner := findHookOwner(parent, c.ID); owner != sibling {
+				continue
+			}
+		}
 		if utils.Dist(d.Center, c.Center) <= glob.HookDist {
 			c.Connect(d)
 			return

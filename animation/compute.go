@@ -429,8 +429,9 @@ func drawBrackets(d *ComputeDemo, leftX, rightX, top, height float32, mods []int
 		rl.DrawLineEx(rl.NewVector2(leftX, y0), rl.NewVector2(leftX, y1), thick, col)
 		// split at the midpoint so the apex survives even a single segment
 		ym := (y0 + y1) / 2
-		rl.DrawLineEx(rl.NewVector2(xAt(y0), y0), rl.NewVector2(xAt(ym), ym), thick, col)
-		rl.DrawLineEx(rl.NewVector2(xAt(ym), ym), rl.NewVector2(xAt(y1), y1), thick, col)
+		//rl.DrawLineEx(rl.NewVector2(xAt(y0), y0), rl.NewVector2(xAt(ym), ym), thick, col)
+		//rl.DrawLineEx(rl.NewVector2(xAt(ym), ym), rl.NewVector2(xAt(y1), y1), thick, col)
+		_, _ = xAt, ym // keep declared while the right-bracket lines are commented out
 	}
 }
 

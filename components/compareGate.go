@@ -323,17 +323,11 @@ func (cg *CompareGate) GetHooks() []*Hook {
 
 func (cg *CompareGate) PostUpdate() {}
 
+// compareStatesEqual compares two states by amplitude only: systems with
+// different modifier IDs still count as equal when their amplitudes match.
 func compareStatesEqual(a, b *qubits.QubitStateManager) bool {
 	if a.Size != b.Size || len(a.Amptitude) != len(b.Amptitude) {
 		return false
-	}
-	if len(a.ModifierID) != len(b.ModifierID) {
-		return false
-	}
-	for i, id := range a.ModifierID {
-		if id != b.ModifierID[i] {
-			return false
-		}
 	}
 	eps := float64(1e-4)
 	for i, av := range a.Amptitude {

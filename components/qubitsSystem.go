@@ -34,7 +34,8 @@ type QubitsSystem struct {
 	InfoHookID int32
 
 	// IsLogical marks systems that should not expose individual qubit
-	// determinators (e.g. collapsed outputs or copies of a system).
+	// determinators. Kept for save-file compatibility; current producers
+	// (copies, collapse remainders) emit normal systems.
 	IsLogical bool
 }
 
@@ -76,12 +77,69 @@ func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 }
 
 func (c *QubitsSystem) isDeterminatorVisible(d *QubitDeterminator) bool {
+	// Hooked determinators stay visible. Free ones disappear only while the
+	// gate holding a sibling determinator is calculating (all of its inputs
+	// hooked) — until then they stay grabbable so more qubits of the system
+	// can be fed into the same gate.
+	if d.HookID != 0 {
+		return true
+	}
+	parent := c.GetParent()
 	for _, det := range c.QubitDeterminatorList {
-		if det.HookID != 0 {
-			return d.HookID != 0
+		if det.HookID == 0 {
+			continue
+		}
+		if gateCalculating(parent, det.HookID) {
+			return false
 		}
 	}
 	return true
+}
+
+// findHookOwner returns the component whose GetHooks list contains the hook
+// with the given ID (e.g. the gate a determinator is plugged into), or nil
+// for standalone hooks.
+func findHookOwner(parent PlaceholderWindow, hookID int32) Component {
+	h, ok := utils.GetObjectFromID(hookID).(*Hook)
+	if !ok || parent == nil {
+		return nil
+	}
+	for _, comp := range parent.GetElement() {
+		owner, ok := comp.(hookOwner)
+		if !ok {
+			continue
+		}
+		for _, gh := range owner.GetHooks() {
+			if gh == h {
+				return comp
+			}
+		}
+	}
+	return nil
+}
+
+// gateCalculating reports whether the gate owning the given hook is currently
+// calculating, i.e. all of its input hooks are connected.
+func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
+	var hookList []*Hook
+	var inputCount int32
+	switch g := findHookOwner(parent, hookID).(type) {
+	case *Gate:
+		hookList = g.HookList
+		inputCount = g.InputCount
+	case *CollapseGate:
+		hookList = g.HookList
+		inputCount = g.InputCount
+	default:
+		return false
+	}
+	cnt := 0
+	for _, h := range hookList {
+		if h.IsHooked && !h.IsOutput {
+			cnt++
+		}
+	}
+	return cnt == int(inputCount)
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {

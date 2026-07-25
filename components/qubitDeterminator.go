@@ -203,6 +203,24 @@ func (c *QubitDeterminator) GetParent() PlaceholderWindow {
 	return nil
 }
 
+// siblingHookOwner returns the gate that already holds another determinator
+// of the same system, or nil when no sibling is hooked into a gate.
+func (c *QubitDeterminator) siblingHookOwner(parent PlaceholderWindow) Component {
+	qp := c.GetQubitParent()
+	if qp == nil {
+		return nil
+	}
+	for _, det := range qp.QubitDeterminatorList {
+		if det == c || det.HookID == 0 {
+			continue
+		}
+		if owner := findHookOwner(parent, det.HookID); owner != nil {
+			return owner
+		}
+	}
+	return nil
+}
+
 func (c *QubitDeterminator) zipToHook() {
 	qp := c.GetQubitParent()
 	if qp == nil {
@@ -213,15 +231,26 @@ func (c *QubitDeterminator) zipToHook() {
 		return
 	}
 	ele := tmp.GetElement()
+	// A system's determinators may only feed one gate at a time: once a
+	// sibling is hooked into a gate, hooks of other gates are off-limits.
+	sibling := c.siblingHookOwner(tmp)
 	gotHooked := false
 	for _, d := range ele {
 		switch v := d.(type) {
 		case *Hook:
+			if sibling != nil {
+				if owner := findHookOwner(tmp, v.ID); owner != nil && owner != sibling {
+					continue
+				}
+			}
 			if utils.Dist(v.Center, c.Center) <= glob.HookDist && (!v.IsHooked || v.TargetID == c.ID) && !gotHooked && !v.Hidden && !v.AllowLogicalBit {
 				gotHooked = true
 				v.Connect(c)
 			}
 		case hookOwner:
+			if comp, ok := v.(Component); sibling != nil && (!ok || comp != sibling) {
+				continue
+			}
 			for _, d2 := range v.GetHooks() {
 				if d2.Hidden || d2.AllowLogicalBit {
 					continue

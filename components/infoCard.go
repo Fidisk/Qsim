@@ -258,6 +258,8 @@ func (it *InfoTable) RebuildRowsFromStateManager(sm *qub.QubitStateManager) {
 
 		label += "("
 		label += s + ")"
+		//Oi
+		label = s
 
 		rows = append(rows, InfoRow{
 			Label:    label,

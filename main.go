@@ -291,249 +291,69 @@ func main() {
 	})
 	spawnBar.Rename("Object")
 
-	SpawnBut1 := components.NewToggleButton(-25, -362.5, 50, 50, rl.LightGray, "Q",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Qubit) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Qubit)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Qubit)
-		})
+	butByState := map[glob.SpawnType]*components.ToggleButton{}
+	spawnBut := func(label string, fontSize int32, state glob.SpawnType) *components.ToggleButton {
+		b := components.NewToggleButton(0, 0, 50, 50, rl.LightGray, label,
+			func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(state) }, fontSize,
+			func() {
+				utils.SetMouseState(glob.MouseStateSpawn)
+				utils.SetSpawnState(state)
+			},
+			func() {
+				utils.ToggleMouseState(glob.MouseStateSpawn)
+				utils.ToggleSpawnState(state)
+			})
+		butByState[state] = b
+		return b
+	}
 
-	SpawnBut2 := components.NewToggleButton(25, -362.5, 50, 50, rl.LightGray, "H",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Hadamard) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Hadamard)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Hadamard)
-		})
+	// Spawn buttons, laid out in two columns and grouped by kind: quantum
+	// sources, quantum gates, measurement, system tools, classical logic,
+	// then drawing tools. Groups are separated by a small gap.
+	spawnBtns := []components.Component{}
+	row := float32(-362.5)
+	addRow := func(left, right *components.ToggleButton) {
+		left.Center = rl.Vector2{X: -25, Y: row}
+		spawnBtns = append(spawnBtns, left)
+		if right != nil {
+			right.Center = rl.Vector2{X: 25, Y: row}
+			spawnBtns = append(spawnBtns, right)
+		}
+		row += 50
+	}
+	gap := func() { row += 15 }
 
-	SpawnBut3 := components.NewToggleButton(-25, -312.5, 50, 50, rl.LightGray, "X",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.X) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.X)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.X)
-		})
+	// Quantum sources
+	addRow(spawnBut("Q", 40, glob.Qubit), spawnBut("GQ", 30, glob.GQubit))
+	gap()
 
-	SpawnBut4 := components.NewToggleButton(25, -312.5, 50, 50, rl.LightGray, "Y",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Y) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Y)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Y)
-		})
+	// Quantum gates
+	addRow(spawnBut("H", 40, glob.Hadamard), spawnBut("X", 40, glob.X))
+	addRow(spawnBut("Y", 40, glob.Y), spawnBut("Z", 40, glob.Z))
+	addRow(spawnBut("CX", 30, glob.CX), spawnBut("CY", 30, glob.CY))
+	addRow(spawnBut("CZ", 30, glob.CZ), nil)
+	gap()
 
-	SpawnBut5 := components.NewToggleButton(-25, -262.5, 50, 50, rl.LightGray, "Z",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Z) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Z)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Z)
-		})
+	// Measurement
+	addRow(spawnBut("M", 30, glob.Measurement), spawnBut("M2", 30, glob.Measure2))
+	addRow(spawnBut("M3", 20, glob.Measure3), nil)
+	gap()
 
-	SpawnBut6 := components.NewToggleButton(25, -262.5, 50, 50, rl.LightGray, "CX",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.CX) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.CX)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.CX)
-		})
+	// System tools
+	addRow(spawnBut("CP", 30, glob.Copy), spawnBut("==", 20, glob.Compare))
+	addRow(spawnBut("I", 30, glob.Info), nil)
+	gap()
 
-	SpawnBut7 := components.NewToggleButton(-25, -212.5, 50, 50, rl.LightGray, "CY",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.CY) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.CY)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.CY)
-		})
+	// Classical logic
+	addRow(spawnBut("0/1", 20, glob.LogicButton), spawnBut("!", 30, glob.LogicNot))
+	addRow(spawnBut("&", 30, glob.LogicAnd), spawnBut("|", 30, glob.LogicOr))
+	addRow(spawnBut("LT", 20, glob.Light), nil)
+	gap()
 
-	SpawnBut8 := components.NewToggleButton(25, -212.5, 50, 50, rl.LightGray, "CZ",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.CZ) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.CZ)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.CZ)
-		})
+	// Drawing tools
+	addRow(spawnBut("T", 40, glob.TextBox), spawnBut("L", 40, glob.LineDraw))
 
-	SpawnBut9 := components.NewToggleButton(-25, -162.5, 50, 50, rl.LightGray, "M",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Measurement) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Measurement)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Measurement)
-		})
-
-	SpawnBut10 := components.NewToggleButton(25, -162.5, 50, 50, rl.LightGray, "I",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Info) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Info)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Info)
-		})
-
-	SpawnBut11 := components.NewToggleButton(-25, -112.5, 50, 50, rl.LightGray, "GQ",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.GQubit) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.GQubit)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.GQubit)
-		})
-
-	SpawnBut12 := components.NewToggleButton(25, -112.5, 50, 50, rl.LightGray, "T",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.TextBox) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.TextBox)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.TextBox)
-		})
-
-	SpawnBut13 := components.NewToggleButton(-25, -62.5, 50, 50, rl.LightGray, "L",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LineDraw) }, 40,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.LineDraw)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.LineDraw)
-		})
-
-	SpawnBut14 := components.NewToggleButton(25, -62.5, 50, 50, rl.LightGray, "M2",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Measure2) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Measure2)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Measure2)
-		})
-
-	SpawnBut15 := components.NewToggleButton(-25, -12.5, 50, 50, rl.LightGray, "CP",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Copy) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Copy)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Copy)
-		})
-
-	SpawnBut16 := components.NewToggleButton(25, -12.5, 50, 50, rl.LightGray, "==",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Compare) }, 20,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Compare)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Compare)
-		})
-
-	SpawnBut17 := components.NewToggleButton(-25, 37.5, 50, 50, rl.LightGray, "0/1",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicButton) }, 20,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.LogicButton)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.LogicButton)
-		})
-
-	SpawnBut18 := components.NewToggleButton(25, 37.5, 50, 50, rl.LightGray, "!",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicNot) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.LogicNot)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.LogicNot)
-		})
-
-	SpawnBut19 := components.NewToggleButton(-25, 87.5, 50, 50, rl.LightGray, "&",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicAnd) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.LogicAnd)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.LogicAnd)
-		})
-
-	SpawnBut20 := components.NewToggleButton(25, 87.5, 50, 50, rl.LightGray, "|",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.LogicOr) }, 30,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.LogicOr)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.LogicOr)
-		})
-
-	SpawnBut21 := components.NewToggleButton(-25, 137.5, 50, 50, rl.LightGray, "LT",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Light) }, 20,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Light)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Light)
-		})
-
-	SpawnButM3 := components.NewToggleButton(25, 137.5, 50, 50, rl.LightGray, "M3",
-		func() bool { return utils.IsMouseState(glob.MouseStateSpawn) && utils.IsSpawnState(glob.Measure3) }, 20,
-		func() {
-			utils.SetMouseState(glob.MouseStateSpawn)
-			utils.SetSpawnState(glob.Measure3)
-		},
-		func() {
-			utils.ToggleMouseState(glob.MouseStateSpawn)
-			utils.ToggleSpawnState(glob.Measure3)
-		})
-
-	spawnBar.PushComponent(SpawnBut1, SpawnBut2, SpawnBut3, SpawnBut4, SpawnBut5, SpawnBut6, SpawnBut7, SpawnBut8, SpawnBut9, SpawnBut10, SpawnBut11, SpawnBut12, SpawnBut13, SpawnBut14, SpawnBut15, SpawnBut16, SpawnBut17, SpawnBut18, SpawnBut19, SpawnBut20, SpawnBut21, SpawnButM3)
+	spawnBar.PushComponent(spawnBtns...)
 
 	animBar := windows.NewRenderWindow(0, 850, 1600, 50)
 	animBar.IsResizeAllow(false)
@@ -664,22 +484,28 @@ func main() {
 	ToolButLoad.Tooltip = "Load a saved circuit"
 	ToolButSave.Tooltip = "Save the circuit to saves/"
 
-	SpawnBut1.Tooltip = "Qubit system: a |0> qubit with its state grid"
-	SpawnBut2.Tooltip = "Hadamard gate (1 qubit)"
-	SpawnBut3.Tooltip = "Pauli-X / NOT gate (1 qubit)"
-	SpawnBut4.Tooltip = "Pauli-Y gate (1 qubit)"
-	SpawnBut5.Tooltip = "Pauli-Z gate (1 qubit)"
-	SpawnBut6.Tooltip = "Controlled-X / CNOT gate (2 qubits)"
-	SpawnBut7.Tooltip = "Controlled-Y gate (2 qubits)"
-	SpawnBut8.Tooltip = "Controlled-Z gate (2 qubits)"
-	SpawnBut9.Tooltip = "Measurement gate: |0> and |1> outcome branches"
-	SpawnBut10.Tooltip = "Info table: amplitudes of a hooked system"
-	SpawnBut11.Tooltip = "Source gate: continuously emits a custom qubit state"
-	SpawnBut12.Tooltip = "Text box"
-	SpawnBut13.Tooltip = "Line draw"
-	SpawnBut14.Tooltip = "Collapse measurement: outputs the measured qubit and the remaining state; click to force 0/1"
-	SpawnBut15.Tooltip = "Copy gate: create a logical copy of a hooked qubit system"
-	SpawnBut16.Tooltip = "Compare gate: outputs 1 if two qubit systems are equal, 0 otherwise"
+	butByState[glob.Qubit].Tooltip = "Qubit system: a |0> qubit with its state grid"
+	butByState[glob.Hadamard].Tooltip = "Hadamard gate (1 qubit)"
+	butByState[glob.X].Tooltip = "Pauli-X / NOT gate (1 qubit)"
+	butByState[glob.Y].Tooltip = "Pauli-Y gate (1 qubit)"
+	butByState[glob.Z].Tooltip = "Pauli-Z gate (1 qubit)"
+	butByState[glob.CX].Tooltip = "Controlled-X / CNOT gate (2 qubits)"
+	butByState[glob.CY].Tooltip = "Controlled-Y gate (2 qubits)"
+	butByState[glob.CZ].Tooltip = "Controlled-Z gate (2 qubits)"
+	butByState[glob.Measurement].Tooltip = "Measurement gate: |0> and |1> outcome branches"
+	butByState[glob.Measure2].Tooltip = "Collapse measurement: outputs the measured qubit and the remaining state; click to force 0/1"
+	butByState[glob.Measure3].Tooltip = "M3 measurement: like M2, outputs the collapsed qubit and the remaining state"
+	butByState[glob.Info].Tooltip = "Info table: amplitudes of a hooked system"
+	butByState[glob.GQubit].Tooltip = "Source gate: continuously emits a custom qubit state"
+	butByState[glob.Copy].Tooltip = "Copy gate: create a copy of a hooked qubit system"
+	butByState[glob.Compare].Tooltip = "Compare gate: outputs 1 if two qubit systems are equal, 0 otherwise"
+	butByState[glob.LogicButton].Tooltip = "Logic button: click to toggle the output bit 0/1"
+	butByState[glob.LogicNot].Tooltip = "NOT gate: inverts the input bit"
+	butByState[glob.LogicAnd].Tooltip = "AND gate: outputs 1 when both inputs are 1"
+	butByState[glob.LogicOr].Tooltip = "OR gate: outputs 1 when at least one input is 1"
+	butByState[glob.Light].Tooltip = "Light: shines while the connected bit is 1"
+	butByState[glob.TextBox].Tooltip = "Text box"
+	butByState[glob.LineDraw].Tooltip = "Line draw"
 
 	AnimButReset.Tooltip = "Reset animation"
 	AnimButBack.Tooltip = "Previous step"
