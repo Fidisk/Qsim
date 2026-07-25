@@ -222,6 +222,10 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 	sg.pullToHook()
 	sg.OutHook.Update(worldMouse, holdingCursor, isCursorAvailable)
 
+	// Custom amplitudes may not be normalized: force the probabilities to sum
+	// to 1 (see qubits.Normalize).
+	qubits.Normalize(sg.Amplitude)
+
 	if sg.OutHook.IsHooked {
 		targetObj := utils.GetObjectFromID(sg.OutHook.TargetID)
 		if targetObj == nil {
@@ -310,6 +314,7 @@ func (sg *SourceGate) processEditing(isCursorAvailable *bool) {
 		i1, _ := strconv.ParseFloat(sg.imag1Str, 64)
 		sg.Amplitude[0] = complex64(complex(r0, i0))
 		sg.Amplitude[1] = complex64(complex(r1, i1))
+		qubits.Normalize(sg.Amplitude)
 		sg.editing = false
 		sg.holdingCursor = false
 		*isCursorAvailable = true

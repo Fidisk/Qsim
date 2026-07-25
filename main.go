@@ -257,7 +257,19 @@ func main() {
 			winManager = append(winManager, fileWin)
 		})
 
-	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5, ToolButLoad, ToolButSave)
+	ToolButReset := components.NewButton(-50, 0, 100, 25, rl.LightGray, "Reset", 20,
+		func() {
+			// Clear every component from the circuit panel.
+			animation.Reset()
+			elems := panel.GetElement()
+			ids := make([]int32, 0, len(elems))
+			for _, c := range elems {
+				ids = append(ids, c.GetID())
+			}
+			panel.DeleteChildWithID(ids...)
+		})
+
+	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5, ToolButLoad, ToolButSave, ToolButReset)
 
 	spawnBar := windows.NewRenderWindow(1500, 0, 100, 800)
 	spawnBar.IsResizeAllow(false)

@@ -10,7 +10,6 @@ import (
 	qub "qsim/qubits"
 	"qsim/qubits/attributes"
 	"qsim/utils"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -284,25 +283,9 @@ func (c *QubitsSystem) Draw() {
 			}
 			textCol := rl.Fade(c.Color, textA)
 
-			//Lmao why doesnt the AI just make a temp arr lol
-			var mods []int32
-			temp := index
-			for i := 0; temp > 0; i++ {
-				if temp&1 == 1 {
-					mods = append(mods, c.Origin.ModifierID[i])
-				}
-				temp >>= 1
-			}
-
-			// Sort numerically by modifier ID, not by label text
-			sort.Slice(mods, func(a, b int) bool { return mods[a] < mods[b] })
-
-			parts := make([]string, len(mods))
-			for i, id := range mods {
-				parts[i] = modifierLabel(id)
-			}
-
-			nameStr := strings.Join(parts, " + ")
+			// Bit representation of the basis state (e.g. 000, 001, 110),
+			// shown where the modifier names used to be.
+			nameStr := fmt.Sprintf("%0*b", exp, index)
 
 			// Draw number slightly above center (shrink if it would overflow the cell)
 			numFontSize := int32(20)
@@ -328,6 +311,24 @@ func (c *QubitsSystem) Draw() {
 				textCol,
 			)
 		}
+	}
+
+	// Hover: small label above the system naming its qubit determinators
+	// (e.g. "Q0 + Q1 + Q2").
+	if c.hovered {
+		names := make([]string, len(c.Origin.ModifierID))
+		for i, id := range c.Origin.ModifierID {
+			names[i] = modifierLabel(id)
+		}
+		label := strings.Join(names, " + ")
+		fontSize := int32(16)
+		textWidth := rl.MeasureText(label, fontSize)
+		boxW := float32(textWidth) + 12
+		boxH := float32(fontSize) + 8
+		box := rl.NewRectangle(c.Center.X-boxW/2, c.startY-boxH-6, boxW, boxH)
+		rl.DrawRectangleRec(box, config.ColorBg)
+		rl.DrawRectangleLinesEx(box, 2, c.Color)
+		rl.DrawText(label, int32(box.X+6), int32(box.Y+4), fontSize, c.Color)
 	}
 
 	// (Commented‑out old drawing code remains unchanged)

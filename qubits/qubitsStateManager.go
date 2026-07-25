@@ -1,6 +1,8 @@
 package qubits
 
 import (
+	"math"
+
 	"qsim/qubits/attributes"
 	"qsim/utils"
 )
@@ -117,4 +119,23 @@ func (c *QubitStateManager) CopyFrom(other *QubitStateManager) {
 	c.ModifierID = make([]int32, len(other.ModifierID))
 	copy(c.ModifierID, other.ModifierID)
 	c.Size = other.Size
+}
+
+// Normalize rescales amplitudes in place so the probabilities (squares of the
+// magnitudes) sum to 1. This is the rank-1 case of the SVD "force singular
+// values to 1" trick: treated as an n×1 matrix, v = U Σ V† has a single
+// singular value ‖v‖; setting it to 1 yields v/‖v‖. A zero vector is left
+// untouched.
+func Normalize(amplitudes []complex64) {
+	var sumSquares float64
+	for _, a := range amplitudes {
+		sumSquares += float64(real(a)*real(a) + imag(a)*imag(a))
+	}
+	if sumSquares == 0 {
+		return
+	}
+	invNorm := complex64(complex(1/math.Sqrt(sumSquares), 0))
+	for i := range amplitudes {
+		amplitudes[i] *= invNorm
+	}
 }
