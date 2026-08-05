@@ -701,6 +701,55 @@ func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator, i int) {
 	c.AddForce(tmp.Scale(-1))
 }
 
+// CopyFromState replaces this system's quantum state with the supplied one and
+// then invalidates any downstream gates so they recalculate with the new state.
+func (c *QubitsSystem) CopyFromState(state *qub.QubitStateManager) {
+	if c.Origin == nil {
+		c.Origin = qub.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	}
+	c.Origin.CopyFrom(state)
+	c.InvalidateDownstreamGates()
+}
+
+// InvalidateDownstreamGates marks every cached Gate/CollapseGate fed by this
+// system as unmeasured so it recalculates on the next frame, and recursively
+// propagates through the qubit-system outputs of those gates.
+func (c *QubitsSystem) InvalidateDownstreamGates() {
+	parent := c.GetParent()
+	if parent == nil {
+		return
+	}
+	for _, d := range c.QubitDeterminatorList {
+		if d.HookID == 0 {
+			continue
+		}
+		owner := findHookOwner(parent, d.HookID)
+		if owner == nil {
+			continue
+		}
+		var outputs []*Hook
+		switch g := owner.(type) {
+		case *Gate:
+			if g.Measured {
+				g.Measured = false
+				outputs = g.OutPutHook
+			}
+		case *CollapseGate:
+			if g.Measured {
+				g.Measured = false
+				outputs = g.OutPutHook
+			}
+		}
+		for _, oh := range outputs {
+			if oh.IsHooked {
+				if qs, ok := utils.GetObjectFromID(oh.TargetID).(*QubitsSystem); ok {
+					qs.InvalidateDownstreamGates()
+				}
+			}
+		}
+	}
+}
+
 func (c *QubitsSystem) Kill() {
 	for _, d := range c.QubitDeterminatorList {
 		d.Kill()

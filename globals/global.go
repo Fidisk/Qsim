@@ -72,4 +72,5 @@ const (
 	CBitY
 	CBitZ
 	ArbGate
+	Measure4
 )

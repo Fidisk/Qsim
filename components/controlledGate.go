@@ -235,7 +235,7 @@ func (cg *ControlledGate) updateOutput() {
 	if cg.OutHook.IsHooked {
 		tmp := utils.GetObjectFromID(cg.OutHook.TargetID)
 		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
-			qs.Origin.CopyFrom(result)
+			qs.CopyFromState(result)
 			return
 		}
 	}

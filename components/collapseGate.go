@@ -43,6 +43,15 @@ type CollapseGate struct {
 	// collapsed measured qubit as a normal system.
 	NormalSystem bool
 
+	// ConsumeInput is set by M4: after measurement the input qubit determinator
+	// is removed from the parent system so it cannot be reused. Once measured,
+	// losing the input hook does not destroy the produced outputs.
+	ConsumeInput bool
+
+	// SkipRandom forces a deterministic outcome selection. When true, ForceMode
+	// cycles only between 1 (force |0>) and 2 (force |1>) and never samples.
+	SkipRandom bool
+
 	pressPos rl.Vector2 // mouse position at drag start, for click detection
 }
 
@@ -151,7 +160,16 @@ func (c *CollapseGate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 // CycleForce advances the force-measure setting (random -> 0 -> 1) and
 // re-measures if an input is attached.
 func (c *CollapseGate) CycleForce() {
-	c.ForceMode = (c.ForceMode + 1) % 3
+	if c.SkipRandom {
+		// Toggle only between deterministic force |0> (1) and force |1> (2).
+		if c.ForceMode == 1 {
+			c.ForceMode = 2
+		} else {
+			c.ForceMode = 1
+		}
+	} else {
+		c.ForceMode = (c.ForceMode + 1) % 3
+	}
 	// Re-measure without tearing down the outputs: the spawn-or-update
 	// helpers rewrite the hooked logical bit / systems in place, so the
 	// wiring survives a force-mode click. DestroyOutPut would kill them.
@@ -219,13 +237,16 @@ func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		// M3: drop the collapsed system when the input is removed.
 		c.DestroyOutPut()
 	} else if len(c.OutPutHook) > 1 && (c.OutPutHook[0].IsHooked || c.OutPutHook[1].IsHooked) && cnt != int(c.InputCount) {
-		c.DestroyOutPut()
+		if !(c.ConsumeInput && c.Measured) {
+			c.DestroyOutPut()
+		}
 	}
 }
 
-// MeasureOutput realizes a single measurement outcome for the hooked qubit
-// and produces the collapsed qubit and the conditioned remainder state.
-func (c *CollapseGate) MeasureOutput() {
+// getMeasuredInput returns the input hook, the qubit determinator plugged into
+// it, the parent qubit system, and the position of the measured modifier within
+// that system's state. The bool is false when no valid input is connected.
+func (c *CollapseGate) getMeasuredInput() (*Hook, *QubitDeterminator, *QubitsSystem, int32, bool) {
 	var input *Hook
 	for _, h := range c.HookList {
 		if !h.IsOutput {
@@ -234,19 +255,18 @@ func (c *CollapseGate) MeasureOutput() {
 		}
 	}
 	if input == nil || !input.IsHooked {
-		return
+		return nil, nil, nil, 0, false
 	}
 	target := utils.GetObjectFromID(input.TargetID)
 	QD, ok := target.(*QubitDeterminator)
 	if !ok {
-		return
+		return nil, nil, nil, 0, false
 	}
 	qp := QD.GetQubitParent()
 	if qp == nil || qp.Origin == nil {
-		return
+		return nil, nil, nil, 0, false
 	}
 	QSM := qp.Origin
-
 	var pos int32
 	for i, d := range QSM.ModifierID {
 		if QD.ModifierID == d {
@@ -254,33 +274,13 @@ func (c *CollapseGate) MeasureOutput() {
 			break
 		}
 	}
+	return input, QD, qp, pos, true
+}
 
-	// p(measuring 0)
-	var l complex64
-	n := QSM.Size - 1
-	for i, d := range QSM.Amptitude {
-		if ((i >> (n - pos)) & 1) == 0 {
-			l += complex(real(d)*real(d)+imag(d)*imag(d), 0)
-		}
-	}
-	c.OutcomeProbs[0] = cmplx.Abs(complex128(l))
-	c.OutcomeProbs[1] = cmplx.Abs(complex128(complex(1, 0) - l))
-
-	// realize one outcome: sampled, or forced by the click setting
-	var k int32
-	switch c.ForceMode {
-	case 1:
-		k = 0
-	case 2:
-		k = 1
-	default:
-		if rand.Float64() < c.OutcomeProbs[0] {
-			k = 0
-		} else {
-			k = 1
-		}
-	}
-	c.Result = k
+// emitOutcome writes the outputs for the supplied measurement result k, using
+// the original input state QSM and measured-qubit position pos. It is split out
+// so M4 can toggle its output without re-reading the (possibly consumed) input.
+func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32) {
 	p := c.OutcomeProbs[k]
 
 	// The "C" output: M2 emits the realized outcome as a logical bit; M3
@@ -297,9 +297,9 @@ func (c *CollapseGate) MeasureOutput() {
 
 	// --- the remaining (n-1)-qubit state, conditioned on the same outcome ---
 	restMods := make([]int32, 0, QSM.Size-1)
-	for i, d := range QSM.ModifierID {
+	for i := range QSM.ModifierID {
 		if int32(i) != pos {
-			restMods = append(restMods, d)
+			restMods = append(restMods, QSM.ModifierID[i])
 		}
 	}
 	shift := QSM.Size - 1 - pos
@@ -330,6 +330,73 @@ func (c *CollapseGate) MeasureOutput() {
 		c.OutPutHook[1].Hidden = true
 		c.OutPutHook[1].DisconnectAndKill()
 	}
+}
+
+// ConsumeMeasuredInput removes the input qubit determinator from its parent
+// system so it cannot be plugged into another gate. If the parent system is left
+// with no determinators, it is removed as well. This is used by M4.
+func (c *CollapseGate) ConsumeMeasuredInput() {
+	_, QD, qp, _, ok := c.getMeasuredInput()
+	if !ok {
+		return
+	}
+
+	// Remove the determinator from the parent system's list so it is no longer
+	// rendered, updated, or available for hooking.
+	for i, d := range qp.QubitDeterminatorList {
+		if d == QD {
+			qp.QubitDeterminatorList = append(qp.QubitDeterminatorList[:i], qp.QubitDeterminatorList[i+1:]...)
+			break
+		}
+	}
+
+	// Kill the determinator itself. This disconnects it from the input hook,
+	// but CollapseGate.Update will preserve the outputs when ConsumeInput is set.
+	QD.Kill()
+
+	// If the original system has no remaining determinators, remove it too.
+	if len(qp.QubitDeterminatorList) == 0 {
+		qp.Kill()
+	}
+}
+
+// MeasureOutput realizes a single measurement outcome for the hooked qubit
+// and produces the collapsed qubit and the conditioned remainder state.
+func (c *CollapseGate) MeasureOutput() {
+	_, _, qp, pos, ok := c.getMeasuredInput()
+	if !ok {
+		return
+	}
+	QSM := qp.Origin
+
+	// p(measuring 0)
+	var l complex64
+	n := QSM.Size - 1
+	for i, d := range QSM.Amptitude {
+		if ((i >> (n - pos)) & 1) == 0 {
+			l += complex(real(d)*real(d)+imag(d)*imag(d), 0)
+		}
+	}
+	c.OutcomeProbs[0] = cmplx.Abs(complex128(l))
+	c.OutcomeProbs[1] = cmplx.Abs(complex128(complex(1, 0) - l))
+
+	// realize one outcome: sampled, or forced by the click setting
+	var k int32
+	switch c.ForceMode {
+	case 1:
+		k = 0
+	case 2:
+		k = 1
+	default:
+		if rand.Float64() < c.OutcomeProbs[0] {
+			k = 0
+		} else {
+			k = 1
+		}
+	}
+	c.Result = k
+
+	c.emitOutcome(QSM, pos, k)
 	c.Measured = true
 }
 
@@ -340,7 +407,7 @@ func (c *CollapseGate) spawnOrUpdate(hookIdx int, state *qubits.QubitStateManage
 	if hook.IsHooked {
 		tmp := utils.GetObjectFromID(hook.TargetID)
 		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
-			qs.Origin.CopyFrom(state)
+			qs.CopyFromState(state)
 			return
 		}
 	}
@@ -383,7 +450,7 @@ func (c *CollapseGate) spawnOrUpdateNormal(hookIdx int, state *qubits.QubitState
 	if hook.IsHooked {
 		tmp := utils.GetObjectFromID(hook.TargetID)
 		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
-			qs.Origin.CopyFrom(state)
+			qs.CopyFromState(state)
 			return
 		}
 	}

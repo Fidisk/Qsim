@@ -45,6 +45,8 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeGate(v)
 	case *components.CollapseGate:
 		return serializeCollapseGate(v)
+	case *components.M4Gate:
+		return serializeM4Gate(v)
 	case *components.CopyGate:
 		return serializeCopyGate(v)
 	case *components.CompareGate:
@@ -216,6 +218,38 @@ func serializeCollapseGate(g *components.CollapseGate) map[string]interface{} {
 		"normalSystem": g.NormalSystem,
 		"hooks":        hooks,
 	}
+}
+
+func serializeM4Gate(g *components.M4Gate) map[string]interface{} {
+	hooks := make([]map[string]interface{}, len(g.HookList))
+	for i, h := range g.HookList {
+		hooks[i] = serializeHook(h)
+	}
+	m := map[string]interface{}{
+		"type":          "M4Gate",
+		"id":            g.ID,
+		"center":        vec2Map(g.Center),
+		"radius":        g.Radius,
+		"color":         colorMap(g.Color),
+		"isFixed":       g.IsFixed,
+		"weight":        g.GetWeight(),
+		"label":         g.Label,
+		"inputCount":    g.InputCount,
+		"forceMode":     g.ForceMode,
+		"skipRandom":    g.SkipRandom,
+		"frameCount":    g.FrameCount,
+		"swapInterval":  g.SwapInterval,
+		"measured":      g.Measured,
+		"result":        g.Result,
+		"hasRemainder":  g.HasRemainder,
+		"inputConsumed": g.InputConsumed,
+		"storedPos":     g.StoredPos,
+		"hooks":         hooks,
+	}
+	if g.StoredInput != nil {
+		m["storedInput"] = serializeQubitStateManager(g.StoredInput)
+	}
+	return m
 }
 
 func serializeCopyGate(cg *components.CopyGate) map[string]interface{} {

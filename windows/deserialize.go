@@ -250,6 +250,8 @@ func unmarshalComponent(raw map[string]interface{}, ctx *loadCtx) components.Com
 		return unmarshalGate(raw, ctx)
 	case "CollapseGate":
 		return unmarshalCollapseGate(raw, ctx)
+	case "M4Gate":
+		return unmarshalM4Gate(raw, ctx)
 	case "CopyGate":
 		return unmarshalCopyGate(raw, ctx)
 	case "CompareGate":
@@ -459,6 +461,68 @@ func unmarshalCollapseGate(raw map[string]interface{}, ctx *loadCtx) *components
 	}
 	if v, ok := raw["forceMode"]; ok {
 		g.ForceMode = int32(v.(float64))
+	}
+
+	hooksRaw, ok := raw["hooks"].([]interface{})
+	if ok {
+		for i, hRaw := range hooksRaw {
+			if i >= len(g.HookList) {
+				continue
+			}
+			unmarshalHookInto(g.HookList[i], hRaw.(map[string]interface{}), ctx)
+		}
+	}
+
+	return g
+}
+
+func unmarshalM4Gate(raw map[string]interface{}, ctx *loadCtx) *components.M4Gate {
+	center := parseVec2(raw["center"].(map[string]interface{}))
+	radius := float32(raw["radius"].(float64))
+	color := parseColor(raw["color"].(map[string]interface{}))
+
+	g := components.NewM4Gate(center.X, center.Y, radius, color)
+	g.Center = center
+	g.Color = color
+	ctx.oldToNew[int32(raw["id"].(float64))] = g
+
+	if v, ok := raw["isFixed"]; ok {
+		g.IsFixed = v.(bool)
+	}
+	if v, ok := raw["weight"]; ok {
+		g.SetWeight(float32(v.(float64)))
+	}
+	if v, ok := raw["forceMode"]; ok {
+		g.ForceMode = int32(v.(float64))
+	}
+	if v, ok := raw["skipRandom"]; ok {
+		g.SkipRandom = v.(bool)
+	}
+	if v, ok := raw["frameCount"]; ok {
+		g.FrameCount = int(v.(float64))
+	}
+	if v, ok := raw["swapInterval"]; ok {
+		g.SwapInterval = int(v.(float64))
+	}
+	if v, ok := raw["measured"]; ok {
+		g.Measured = v.(bool)
+	}
+	if v, ok := raw["result"]; ok {
+		g.Result = int32(v.(float64))
+	}
+	if v, ok := raw["hasRemainder"]; ok {
+		g.HasRemainder = v.(bool)
+	}
+	if v, ok := raw["inputConsumed"]; ok {
+		g.InputConsumed = v.(bool)
+	}
+	if v, ok := raw["storedPos"]; ok {
+		g.StoredPos = int32(v.(float64))
+	}
+	if v, ok := raw["storedInput"]; ok {
+		if si, ok2 := v.(map[string]interface{}); ok2 {
+			g.StoredInput = unmarshalQubitStateManager(si)
+		}
 	}
 
 	hooksRaw, ok := raw["hooks"].([]interface{})

@@ -337,7 +337,7 @@ func main() {
 
 	// Measurement
 	addRow(spawnBut("M", 30, glob.Measurement), spawnBut("M2", 30, glob.Measure2))
-	addRow(spawnBut("M3", 20, glob.Measure3), nil)
+	addRow(spawnBut("M3", 20, glob.Measure3), spawnBut("M4", 20, glob.Measure4))
 	gap()
 
 	// System tools

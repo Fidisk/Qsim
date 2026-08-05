@@ -176,7 +176,7 @@ func (cg *CopyGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAv
 		if cg.OutHook.IsHooked {
 			outTarget := utils.GetObjectFromID(cg.OutHook.TargetID)
 			if outQS, ok2 := outTarget.(*QubitsSystem); ok2 && outQS.Origin != nil {
-				outQS.Origin.CopyFrom(state)
+				outQS.CopyFromState(state)
 				cg.CopyID = outQS.ID
 			}
 		} else if cg.CopyID == 0 || utils.GetObjectFromID(cg.CopyID) == nil {

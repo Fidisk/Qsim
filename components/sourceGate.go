@@ -237,7 +237,7 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 		}
 		state := qubits.NewQubitStateManagerFrom(sg.Amplitude, []int32{sg.getModifierID()})
 		if target.Origin != nil {
-			target.Origin.CopyFrom(state)
+			target.CopyFromState(state)
 		} else {
 			target.Assign(state)
 		}

@@ -465,6 +465,9 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 	case utils.IsSpawnState(glob.Measure3):
 		m := components.NewCollapseGate3(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "M3")
 		rw.PushComponent(m)
+	case utils.IsSpawnState(glob.Measure4):
+		m := components.NewM4Gate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor)
+		rw.PushComponent(m)
 	case utils.IsSpawnState(glob.Copy):
 		cg := components.NewCopyGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Get")
 		rw.PushComponent(cg)
@@ -544,6 +547,8 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		return components.NewCollapseGate(0, 0, glob.GateRadius, config.GateColor, "M2")
 	case state&glob.Measure3 != 0:
 		return components.NewCollapseGate3(0, 0, glob.GateRadius, config.GateColor, "M3")
+	case state&glob.Measure4 != 0:
+		return components.NewM4Gate(0, 0, glob.GateRadius, config.GateColor)
 	case state&glob.Copy != 0:
 		return components.NewCopyGate(0, 0, glob.GateRadius, config.GateColor, "Copy")
 	case state&glob.Compare != 0:

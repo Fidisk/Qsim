@@ -279,7 +279,7 @@ func (c *Gate) MeasureOutput() {
 			tmp := utils.GetObjectFromID(hook.TargetID)
 			if tmp != nil {
 				if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
-					qs.Origin.CopyFrom(result)
+					qs.CopyFromState(result)
 					continue
 				}
 			}
@@ -348,7 +348,7 @@ func (c *Gate) CalculateOutPut() bool {
 	if len(c.OutPutHook) > 0 && c.OutPutHook[0].IsHooked {
 		tmp := utils.GetObjectFromID(c.OutPutHook[0].TargetID)
 		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
-			qs.Origin.CopyFrom(result)
+			qs.CopyFromState(result)
 			return true
 		}
 	}
