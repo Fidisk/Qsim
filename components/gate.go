@@ -31,6 +31,17 @@ type Gate struct {
 	Measured          bool
 	OutcomeProbs      [2]float64
 	OutcomeLabels     [2]string
+
+	// Editable gates (see NewArbGate) let the user redefine the qubit count
+	// and the operation matrix by right-clicking the gate body.
+	Editable bool
+
+	// inline matrix editing state
+	editing     bool
+	editBuffer  string
+	editErr     string
+	cursorBlink float32
+	cursorShow  bool
 }
 
 func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
@@ -117,10 +128,23 @@ func (c *Gate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 }
 
 func (c *Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.editing {
+		c.processEditing(isCursorAvailable)
+		return
+	}
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if !rl.IsMouseButtonDown(rl.MouseButtonLeft) && c.Tooltip != "" {
 			glob.TooltipText = c.Tooltip
+		}
+		if c.Editable && !c.IsMeasurementGate && rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
+			// right-click: edit the qubit count and the operation matrix inline
+			c.editing = true
+			c.editBuffer = formatMatrixSpec(c.InputCount, c.Operation)
+			c.editErr = ""
+			c.holdingCursor = true
+			*isCursorAvailable = false
+			return
 		}
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
 			c.onClick(worldMouse, isCursorAvailable)
@@ -221,10 +245,6 @@ func (c *Gate) MeasureOutput() {
 			continue
 		}
 
-		// Each branch outputs the state with the collapsed (measured) qubit
-		// removed: the (n-1)-qubit remainder conditioned on the outcome. A
-		// single-qubit input has no remainder, so it outputs the collapsed
-		// qubit itself.
 		var result *qubits.QubitStateManager
 		if QSM.Size == 1 {
 			amps := make([]complex64, 2)
@@ -243,7 +263,9 @@ func (c *Gate) MeasureOutput() {
 			if prob > 0 {
 				inv := complex64(cmplx.Sqrt(complex128(complex(1/prob, 0))))
 				for j := int32(0); j < restSize; j++ {
-					high := (j >> (shift + 1)) << (shift + 1)
+					// Insert the outcome bit at position shift into j: bits of
+					// j at or above shift move up one, the bits below stay.
+					high := (j >> shift) << (shift + 1)
 					low := j & ((1 << shift) - 1)
 					idx := high | (int32(hit) << shift) | low
 					restAmps[j] = QSM.Amptitude[idx] * inv
@@ -308,10 +330,10 @@ func (c *Gate) CalculateOutPut() bool {
 				tmp := *QD.GetQubitParent().Origin
 				QSM = append(QSM, &tmp)
 				Idx = append(Idx, QD.ModifierID)
+			}
 		}
+		c.Measured = true
 	}
-	c.Measured = true
-}
 	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	for i := range QSM {
 		result.Merge(QSM[i])
@@ -457,6 +479,35 @@ func (c *Gate) Draw() {
 
 	if c.MeasureResult != 0 {
 		rl.DrawText("Hit", int32(c.Center.X-30), int32(c.Center.Y-30), 14, c.Color)
+	}
+
+	if c.editing {
+		fontSize := int32(14)
+		hint := "n; row; row; ...  entry: re,im   Enter: apply   Esc: cancel"
+		text := c.editBuffer
+		w := rl.MeasureText(text, fontSize) + 12
+		if hw := rl.MeasureText(hint, 10) + 12; hw > w {
+			w = hw
+		}
+		if w < 200 {
+			w = 200
+		}
+		height := float32(46)
+		if c.editErr != "" {
+			height = 64
+		}
+		box := rl.NewRectangle(c.Center.X-float32(w)/2, c.Center.Y-c.Radius-height-8, float32(w), height)
+		rl.DrawRectangleRounded(box, 0.15, 4, rl.NewColor(30, 30, 30, 255))
+		rl.DrawRectangleRoundedLinesEx(box, 0.15, 4, 1.5, rl.SkyBlue)
+		rl.DrawText(hint, int32(box.X+6), int32(box.Y+4), 10, rl.Gray)
+		rl.DrawText(text, int32(box.X+6), int32(box.Y+18), fontSize, rl.White)
+		if c.cursorShow {
+			tw := rl.MeasureText(text, fontSize)
+			rl.DrawText("|", int32(box.X+6)+tw, int32(box.Y+18), fontSize, rl.SkyBlue)
+		}
+		if c.editErr != "" {
+			rl.DrawText(c.editErr, int32(box.X+6), int32(box.Y+38), 12, rl.Red)
+		}
 	}
 }
 

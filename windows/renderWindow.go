@@ -486,6 +486,18 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 	case utils.IsSpawnState(glob.Light):
 		l := components.NewLight(snapped.X, snapped.Y, config.GateColor)
 		rw.PushComponent(l)
+	case utils.IsSpawnState(glob.CBitX):
+		cg := components.NewControlledGate(snapped.X, snapped.Y, config.GateColor, components.CtrlX)
+		rw.PushComponent(cg)
+	case utils.IsSpawnState(glob.CBitY):
+		cg := components.NewControlledGate(snapped.X, snapped.Y, config.GateColor, components.CtrlY)
+		rw.PushComponent(cg)
+	case utils.IsSpawnState(glob.CBitZ):
+		cg := components.NewControlledGate(snapped.X, snapped.Y, config.GateColor, components.CtrlZ)
+		rw.PushComponent(cg)
+	case utils.IsSpawnState(glob.ArbGate):
+		g := components.NewArbGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor)
+		rw.PushComponent(g)
 	case utils.IsSpawnState(glob.Info):
 		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, config.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
@@ -546,6 +558,14 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		return components.NewLogicGate(0, 0, config.GateColor, components.LogicOr)
 	case state&glob.Light != 0:
 		return components.NewLight(0, 0, config.GateColor)
+	case state&glob.CBitX != 0:
+		return components.NewControlledGate(0, 0, config.GateColor, components.CtrlX)
+	case state&glob.CBitY != 0:
+		return components.NewControlledGate(0, 0, config.GateColor, components.CtrlY)
+	case state&glob.CBitZ != 0:
+		return components.NewControlledGate(0, 0, config.GateColor, components.CtrlZ)
+	case state&glob.ArbGate != 0:
+		return components.NewArbGate(0, 0, glob.GateRadius, config.GateColor)
 	case state&glob.Info != 0:
 		return components.NewInfoTable(0, 0, 260, 40, config.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:

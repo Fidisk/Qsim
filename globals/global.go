@@ -68,4 +68,8 @@ const (
 	LogicAnd
 	LogicOr
 	Light
+	CBitX
+	CBitY
+	CBitZ
+	ArbGate
 )

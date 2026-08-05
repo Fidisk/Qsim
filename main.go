@@ -311,7 +311,7 @@ func main() {
 	// sources, quantum gates, measurement, system tools, classical logic,
 	// then drawing tools. Groups are separated by a small gap.
 	spawnBtns := []components.Component{}
-	row := float32(-362.5)
+	row := float32(-370)
 	addRow := func(left, right *components.ToggleButton) {
 		left.Center = rl.Vector2{X: -25, Y: row}
 		spawnBtns = append(spawnBtns, left)
@@ -321,7 +321,7 @@ func main() {
 		}
 		row += 50
 	}
-	gap := func() { row += 15 }
+	gap := func() { row += 10 }
 
 	// Quantum sources
 	addRow(spawnBut("Q", 40, glob.Qubit), spawnBut("GQ", 30, glob.GQubit))
@@ -331,7 +331,8 @@ func main() {
 	addRow(spawnBut("H", 40, glob.Hadamard), spawnBut("X", 40, glob.X))
 	addRow(spawnBut("Y", 40, glob.Y), spawnBut("Z", 40, glob.Z))
 	addRow(spawnBut("CX", 30, glob.CX), spawnBut("CY", 30, glob.CY))
-	addRow(spawnBut("CZ", 30, glob.CZ), nil)
+	addRow(spawnBut("CZ", 30, glob.CZ), spawnBut("cX", 30, glob.CBitX))
+	addRow(spawnBut("cY", 30, glob.CBitY), spawnBut("cZ", 30, glob.CBitZ))
 	gap()
 
 	// Measurement
@@ -341,7 +342,7 @@ func main() {
 
 	// System tools
 	addRow(spawnBut("CP", 30, glob.Copy), spawnBut("==", 20, glob.Compare))
-	addRow(spawnBut("I", 30, glob.Info), nil)
+	addRow(spawnBut("I", 30, glob.Info), spawnBut("U", 30, glob.ArbGate))
 	gap()
 
 	// Classical logic
@@ -492,8 +493,12 @@ func main() {
 	butByState[glob.CX].Tooltip = "Controlled-X / CNOT gate (2 qubits)"
 	butByState[glob.CY].Tooltip = "Controlled-Y gate (2 qubits)"
 	butByState[glob.CZ].Tooltip = "Controlled-Z gate (2 qubits)"
+	butByState[glob.CBitX].Tooltip = "Bit-controlled X: applies X to the qubit while the control logical bit is 1"
+	butByState[glob.CBitY].Tooltip = "Bit-controlled Y: applies Y to the qubit while the control logical bit is 1"
+	butByState[glob.CBitZ].Tooltip = "Bit-controlled Z: applies Z to the qubit while the control logical bit is 1"
+	butByState[glob.ArbGate].Tooltip = "Arbitrary gate: right-click to set the qubit count and the matrix"
 	butByState[glob.Measurement].Tooltip = "Measurement gate: |0> and |1> outcome branches"
-	butByState[glob.Measure2].Tooltip = "Collapse measurement: outputs the measured qubit and the remaining state; click to force 0/1"
+	butByState[glob.Measure2].Tooltip = "Collapse measurement: outputs the outcome as a logical bit plus the remaining state; click to force 0/1"
 	butByState[glob.Measure3].Tooltip = "M3 measurement: like M2, outputs the collapsed qubit and the remaining state"
 	butByState[glob.Info].Tooltip = "Info table: amplitudes of a hooked system"
 	butByState[glob.GQubit].Tooltip = "Source gate: continuously emits a custom qubit state"

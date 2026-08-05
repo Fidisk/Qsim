@@ -49,6 +49,8 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeCopyGate(v)
 	case *components.CompareGate:
 		return serializeCompareGate(v)
+	case *components.ControlledGate:
+		return serializeControlledGate(v)
 	case *components.LogicButton:
 		return serializeLogicButton(v)
 	case *components.LogicGate:
@@ -189,6 +191,7 @@ func serializeGate(g *components.Gate) map[string]interface{} {
 		"outputCount":       g.OutputCount,
 		"isMeasurementGate": g.IsMeasurementGate,
 		"measureResult":     g.MeasureResult,
+		"editable":          g.Editable,
 		"operation":         op,
 		"hooks":             hooks,
 	}
@@ -249,6 +252,22 @@ func serializeCompareGate(cg *components.CompareGate) map[string]interface{} {
 		"inB":      serializeHook(cg.InB),
 		"outHook":  serializeHook(cg.OutHook),
 		"outputID": cg.OutputID,
+	}
+}
+
+func serializeControlledGate(cg *components.ControlledGate) map[string]interface{} {
+	return map[string]interface{}{
+		"type":      "ControlledGate",
+		"id":        cg.ID,
+		"center":    vec2Map(cg.Center),
+		"radius":    cg.Radius,
+		"color":     colorMap(cg.Color),
+		"isFixed":   cg.IsFixed,
+		"weight":    cg.GetWeight(),
+		"kind":      cg.Kind,
+		"inQubit":   serializeHook(cg.InQubit),
+		"inControl": serializeHook(cg.InControl),
+		"outHook":   serializeHook(cg.OutHook),
 	}
 }
 

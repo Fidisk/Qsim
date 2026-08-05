@@ -254,6 +254,8 @@ func unmarshalComponent(raw map[string]interface{}, ctx *loadCtx) components.Com
 		return unmarshalCopyGate(raw, ctx)
 	case "CompareGate":
 		return unmarshalCompareGate(raw, ctx)
+	case "ControlledGate":
+		return unmarshalControlledGate(raw, ctx)
 	case "LogicButton":
 		return unmarshalLogicButton(raw, ctx)
 	case "LogicGate":
@@ -537,6 +539,39 @@ func unmarshalCompareGate(raw map[string]interface{}, ctx *loadCtx) *components.
 	return cg
 }
 
+func unmarshalControlledGate(raw map[string]interface{}, ctx *loadCtx) *components.ControlledGate {
+	center := parseVec2(raw["center"].(map[string]interface{}))
+	color := parseColor(raw["color"].(map[string]interface{}))
+	kind := int32(0)
+	if v, ok := raw["kind"]; ok {
+		kind = int32(v.(float64))
+	}
+
+	cg := components.NewControlledGate(center.X, center.Y, color, kind)
+	cg.Center = center
+	cg.Color = color
+	ctx.oldToNew[int32(raw["id"].(float64))] = cg
+
+	if v, ok := raw["isFixed"]; ok {
+		cg.IsFixed = v.(bool)
+	}
+	if v, ok := raw["weight"]; ok {
+		cg.SetWeight(float32(v.(float64)))
+	}
+
+	if hookRaw, ok := raw["inQubit"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.InQubit, hookRaw, ctx)
+	}
+	if hookRaw, ok := raw["inControl"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.InControl, hookRaw, ctx)
+	}
+	if hookRaw, ok := raw["outHook"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.OutHook, hookRaw, ctx)
+	}
+
+	return cg
+}
+
 func unmarshalLogicButton(raw map[string]interface{}, ctx *loadCtx) *components.LogicButton {
 	center := parseVec2(raw["center"].(map[string]interface{}))
 	color := parseColor(raw["color"].(map[string]interface{}))
@@ -675,6 +710,9 @@ func unmarshalGate(raw map[string]interface{}, ctx *loadCtx) *components.Gate {
 	}
 	if v, ok := raw["measureResult"]; ok {
 		g.MeasureResult = int32(v.(float64))
+	}
+	if v, ok := raw["editable"]; ok {
+		g.Editable = v.(bool)
 	}
 
 	hooksRaw, ok := raw["hooks"].([]interface{})
@@ -896,6 +934,8 @@ func remapReferences(comps []components.Component, ctx *loadCtx) {
 			remapCopyGateRefs(v, ctx)
 		case *components.CompareGate:
 			remapCompareGateRefs(v, ctx)
+		case *components.ControlledGate:
+			remapControlledGateRefs(v, ctx)
 		case *components.LogicButton:
 			remapLogicButtonRefs(v, ctx)
 		case *components.LogicGate:
@@ -1102,6 +1142,41 @@ func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 			}
 		} else {
 			cg.OutputID = 0
+		}
+	}
+}
+
+func remapControlledGateRefs(cg *components.ControlledGate, ctx *loadCtx) {
+	for _, h := range []*components.Hook{cg.InQubit, cg.InControl, cg.OutHook} {
+		if h.TargetID == 0 {
+			continue
+		}
+		newObj, found := ctx.oldToNew[h.TargetID]
+		if !found {
+			continue
+		}
+		h.TargetID = 0
+		switch t := newObj.(type) {
+		case *components.QubitsSystem:
+			t.HookID = 0
+			t.Center = h.Center
+			h.IsHooked = true
+			h.TargetID = t.ID
+			t.HookID = h.ID
+			t.SetWeight(0)
+		case *components.QubitDeterminator:
+			t.HookID = 0
+			t.Center = h.Center
+			h.IsHooked = true
+			h.TargetID = t.ID
+			t.HookID = h.ID
+			t.SetWeight(0)
+		case *components.LogicalBit:
+			t.Center = h.Center
+			h.IsHooked = true
+			h.TargetID = t.ID
+			t.AddHook(h.ID)
+			t.SetWeight(0)
 		}
 	}
 }
