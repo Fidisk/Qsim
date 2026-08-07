@@ -19,6 +19,9 @@ type pWindow interface {
 
 var winManager []pWindow
 
+// panel is the active circuit window (the loaded/saved circuit).
+var panel *windows.RenderWindow
+
 func shuffleWinManager() {
 	sort.Slice(winManager, func(i, j int) bool {
 		return winManager[i].GetPriority() > winManager[j].GetPriority()

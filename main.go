@@ -17,6 +17,85 @@ import (
 	"qsim/windows"
 )
 
+// buildFileBrowser creates the "File Browser" dialog: one row per .qsim save
+// in saves/ (a load button plus a red "x" delete button), followed by a
+// single Close button that dismisses the dialog. Deleting a save rebuilds the
+// whole dialog from the current directory instead of mutating the component
+// list while it is being updated (which used to crash the update loop when
+// the last row was removed).
+func buildFileBrowser() *windows.RenderWindow {
+	fileWin := windows.NewRenderWindow(200, 100, 400, 500)
+	fileWin.Rename("File Browser")
+	fileWin.SetPriority(200)
+	fileWin.IsSpawnAllow(false)
+	fileWin.ShowGrid = false
+
+	savesDir := "saves"
+	_ = os.MkdirAll(savesDir, 0755)
+	entries, _ := os.ReadDir(savesDir)
+
+	var comps []components.Component
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".qsim" {
+			continue
+		}
+		name := e.Name()
+		btn := components.NewButton(0, 0, 350, 25, rl.LightGray, name, 14,
+			func(f string) func() {
+				return func() {
+					data, err := os.ReadFile(filepath.Join(savesDir, f))
+					if err != nil {
+						return
+					}
+					loaded := windows.LoadState(string(data))
+
+					// Remove existing circuit panels
+					animation.Reset()
+					var keep []pWindow
+					for _, w := range winManager {
+						if rw, ok := w.(*windows.RenderWindow); ok && rw.CanSpawn {
+							utils.DeleteObjectWithID(rw.GetID())
+						} else {
+							keep = append(keep, w)
+						}
+					}
+					winManager = keep
+
+					// Add loaded windows
+					for _, w := range loaded {
+						if rw, ok := w.(*windows.RenderWindow); ok {
+							winManager = append(winManager, rw)
+							panel = rw
+						}
+					}
+					DeleteWindowByID(fileWin.GetID())
+				}
+			}(name))
+		comps = append(comps, btn)
+		xBtn := components.NewButton(0, 0, 25, 25, rl.Red, "x", 14,
+			func(f string, fw *windows.RenderWindow) func() {
+				return func() {
+					os.Remove(filepath.Join("saves", f))
+					DeleteWindowByID(fw.GetID())
+					winManager = append(winManager, buildFileBrowser())
+				}
+			}(name, fileWin))
+		comps = append(comps, xBtn)
+	}
+
+	closeBtn := components.NewButton(0, 0, 350, 25, rl.DarkGray, "Close", 14,
+		func() { DeleteWindowByID(fileWin.GetID()) })
+	comps = append(comps, closeBtn)
+
+	fileWin.IsPanAllow(false)
+	fileWin.IsZoomAllow(false)
+	fileWin.IsVerticalScrollAllow(true)
+	fileWin.PushComponent(comps...)
+	fileWin.AddEffect(func() { effect.ScaleButtonsToWidth(fileWin) })
+	fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: float32(math.Max(0, float64(fileWin.Camera.Target.Y)))} })
+	return fileWin
+}
+
 func main() {
 	InitMainWindow(1600, 900, "Floating Panels")
 
@@ -26,7 +105,7 @@ func main() {
 	// Create one or more draggable inner panels
 
 	//panel := windows.NewWindow(200, 150, 400, 300)
-	panel := windows.NewRenderWindow(0, 0, 1500, 800)
+	panel = windows.NewRenderWindow(0, 0, 1500, 800)
 	panel.Rename("Circuit")
 	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
 	toolBar := windows.NewRenderWindow(0, 800, 1600, 50)
@@ -156,80 +235,7 @@ func main() {
 
 	ToolButLoad := components.NewButton(-250, 0, 100, 25, rl.LightGray, "Load", 20,
 		func() {
-			fileWin := windows.NewRenderWindow(200, 100, 400, 500)
-			fileWin.Rename("File Browser")
-			fileWin.SetPriority(200)
-			fileWin.IsSpawnAllow(false)
-			fileWin.ShowGrid = false
-
-			savesDir := "saves"
-			_ = os.MkdirAll(savesDir, 0755)
-			entries, _ := os.ReadDir(savesDir)
-
-			var comps []components.Component
-			for _, e := range entries {
-				if !e.IsDir() && filepath.Ext(e.Name()) == ".qsim" {
-					name := e.Name()
-					btn := components.NewButton(0, 0, 350, 25, rl.LightGray, name, 14,
-						func(f string) func() {
-							return func() {
-								data, err := os.ReadFile(filepath.Join(savesDir, f))
-								if err != nil {
-									return
-								}
-								loaded := windows.LoadState(string(data))
-
-								// Remove existing circuit panels
-								animation.Reset()
-								var keep []pWindow
-								for _, w := range winManager {
-									if rw, ok := w.(*windows.RenderWindow); ok && rw.CanSpawn {
-										utils.DeleteObjectWithID(rw.GetID())
-									} else {
-										keep = append(keep, w)
-									}
-								}
-								winManager = keep
-
-								// Add loaded windows
-								for _, w := range loaded {
-									if rw, ok := w.(*windows.RenderWindow); ok {
-										winManager = append(winManager, rw)
-										panel = rw
-									}
-								}
-								DeleteWindowByID(fileWin.GetID())
-							}
-						}(name))
-					comps = append(comps, btn)
-					xBtn := components.NewButton(0, 0, 25, 25, rl.Red, "x", 14,
-						func(f string, fw *windows.RenderWindow) func() {
-							return func() {
-								os.Remove(filepath.Join("saves", f))
-								idx := -1
-								for i, c := range fw.GetElement() {
-									if b, ok := c.(*components.Button); ok && b.Label == f {
-										idx = i
-										break
-									}
-								}
-								if idx >= 0 {
-									fw.RemoveComponent(idx + 1)
-									fw.RemoveComponent(idx)
-								}
-							}
-						}(name, fileWin))
-					comps = append(comps, xBtn)
-				}
-			}
-
-			fileWin.IsPanAllow(false)
-			fileWin.IsZoomAllow(false)
-			fileWin.IsVerticalScrollAllow(true)
-			fileWin.PushComponent(comps...)
-			fileWin.AddEffect(func() { effect.ScaleButtonsToWidth(fileWin) })
-			fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: float32(math.Max(0, float64(fileWin.Camera.Target.Y)))} })
-			winManager = append(winManager, fileWin)
+			winManager = append(winManager, buildFileBrowser())
 		})
 
 	ToolButSave := components.NewButton(-150, 0, 100, 25, rl.LightGray, "Save", 20,
@@ -496,7 +502,7 @@ func main() {
 	butByState[glob.CBitX].Tooltip = "Bit-controlled X: applies X to the qubit while the control logical bit is 1"
 	butByState[glob.CBitY].Tooltip = "Bit-controlled Y: applies Y to the qubit while the control logical bit is 1"
 	butByState[glob.CBitZ].Tooltip = "Bit-controlled Z: applies Z to the qubit while the control logical bit is 1"
-	butByState[glob.ArbGate].Tooltip = "Arbitrary gate: right-click to set the qubit count and the matrix"
+	butByState[glob.ArbGate].Tooltip = "Arbitrary gate: right-click to rename, then edit size and the matrix table; non-unitary matrices are auto-fixed on close; hover to preview"
 	butByState[glob.Measurement].Tooltip = "Measurement gate: |0> and |1> outcome branches"
 	butByState[glob.Measure2].Tooltip = "Collapse measurement: outputs the outcome as a logical bit plus the remaining state; click to force 0/1"
 	butByState[glob.Measure3].Tooltip = "M3 measurement: like M2, outputs the collapsed qubit and the remaining state"

@@ -36,6 +36,15 @@ var ScaleButtonsToWidth = func(rw *windows.RenderWindow) {
 		}
 	}
 
+	// A trailing solo button (e.g. the File Browser's Close button) sits on
+	// its own row below the file/delete pairs.
+	if len(elems)%2 == 1 {
+		if btn, ok := elems[len(elems)-1].(*components.Button); ok {
+			btn.Center.X = 0
+			btn.Center.Y = float32(numPairs+1)*btnHeight - float32(rw.Height)/2
+		}
+	}
+
 	if len(elems) > 0 {
 	}
 }

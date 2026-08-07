@@ -220,6 +220,9 @@ func (rw *RenderWindow) Draw() {
 			qs.DrawDeterminators()
 		}
 	}
+	// When a qubit wire exits the visible content area its determinator is
+	// gone, so draw a virtual one at the edge to show which qubit it is.
+	rw.drawEdgeMarkers()
 	if rw.CanSpawn && utils.IsMouseState(glob.MouseStateSpawn) {
 		state := utils.GetSpawnState()
 		if state != glob.None {
@@ -268,6 +271,112 @@ func (rw *RenderWindow) Draw() {
 	rl.DrawRectangleLines(rw.X, rw.Y, rw.Width, rw.Height, rw.ColorBorder)
 }
 
+// liangBarsky clips the segment (a,b) against the axis-aligned box
+// [minX,maxX]x[minY,maxY] and returns the entry/exit parameters of the
+// visible interval. ok is false when the segment misses the box entirely.
+func liangBarsky(a, b rl.Vector2, minX, minY, maxX, maxY float32) (tIn, tOut float32, ok bool) {
+	t0, t1 := float32(0), float32(1)
+	dx, dy := b.X-a.X, b.Y-a.Y
+	p := []float32{-dx, dx, -dy, dy}
+	q := []float32{a.X - minX, maxX - a.X, a.Y - minY, maxY - a.Y}
+	for i := 0; i < 4; i++ {
+		if p[i] == 0 {
+			if q[i] < 0 {
+				return 0, 0, false
+			}
+			continue
+		}
+		r := q[i] / p[i]
+		if p[i] < 0 {
+			if r > t1 {
+				return 0, 0, false
+			}
+			if r > t0 {
+				t0 = r
+			}
+		} else {
+			if r < t0 {
+				return 0, 0, false
+			}
+			if r < t1 {
+				t1 = r
+			}
+		}
+	}
+	return t0, t1, true
+}
+
+// drawEdgeMarkers shows a virtual qubit determinator where a wire exits the
+// visible content area, so a qubit line leaving the window still says which
+// qubit it belongs to. Runs inside the camera transform, in world space.
+func (rw *RenderWindow) drawEdgeMarkers() {
+	capture := rw.GetContentRect()
+	if capture.Width <= 0 || capture.Height <= 0 {
+		return
+	}
+	tl := rl.GetScreenToWorld2D(rl.Vector2{X: capture.X, Y: capture.Y}, rw.Camera)
+	br := rl.GetScreenToWorld2D(rl.Vector2{X: capture.X + capture.Width, Y: capture.Y + capture.Height}, rw.Camera)
+	minX := float32(math.Min(float64(tl.X), float64(br.X)))
+	maxX := float32(math.Max(float64(tl.X), float64(br.X)))
+	minY := float32(math.Min(float64(tl.Y), float64(br.Y)))
+	maxY := float32(math.Max(float64(tl.Y), float64(br.Y)))
+	if maxX <= minX || maxY <= minY {
+		return
+	}
+	box := rl.Rectangle{X: minX, Y: minY, Width: maxX - minX, Height: maxY - minY}
+
+	for _, comp := range rw.WComp {
+		qs, ok := comp.(*components.QubitsSystem)
+		if !ok {
+			continue
+		}
+		for _, d := range qs.QubitDeterminatorList {
+			if !qs.DeterminatorWireVisible(d) {
+				continue
+			}
+			// The real determinator is on screen; no virtual one needed.
+			if rl.CheckCollisionPointRec(d.Center, box) {
+				continue
+			}
+
+			a, b := qs.Center, d.Center
+			_, tOut, ok := liangBarsky(a, b, minX, minY, maxX, maxY)
+			if !ok || tOut >= 1 {
+				continue
+			}
+			// Use the real wire curve at the exit parameter so the marker sits
+			// exactly where the bezier leaves the window edge.
+			exit := components.WirePointAt(a, b, tOut)
+
+			// Nudge the ring just inside the boundary so it stays visible
+			// even though it should sit on the edge.
+			radius := float32(10)
+			if circle := d.GetCircle(); circle != nil && circle.Radius > 0 {
+				radius = circle.Radius
+			}
+			dot := rl.Vector2{
+				X: float32(math.Max(float64(exit.X), float64(minX+radius))),
+				Y: float32(math.Max(float64(exit.Y), float64(minY+radius))),
+			}
+			dot.X = float32(math.Min(float64(dot.X), float64(maxX-radius)))
+			dot.Y = float32(math.Min(float64(dot.Y), float64(maxY-radius)))
+
+			rl.DrawCircleV(dot, radius, config.ColorBg)
+			rl.DrawCircleLinesV(dot, radius, d.Color)
+			label := d.DisplayName()
+			font := int32(14)
+			if int32(radius)*2 < rl.MeasureText(label, font) {
+				font = 10
+			}
+			rl.DrawText(label,
+				int32(dot.X)-rl.MeasureText(label, font)/2,
+				int32(dot.Y)-font/2,
+				font, d.Color)
+		}
+	}
+}
+
+// EnableTitleBar toggles the visible title bar of the window.
 func (rw *RenderWindow) EnableTitleBar(enable bool) {
 	rw.IsTitleBarVisible = enable
 }
@@ -368,11 +477,20 @@ func (rw *RenderWindow) Update() {
 	// draggable even when they end up on top of another component
 	// (e.g. a gate).
 	for i := len(rw.WComp) - 1; i >= 0; i-- {
-		if qs, ok := rw.WComp[i].(*components.QubitsSystem); ok {
-			qs.UpdateDeterminators(worldMouse, rw.holdingCursor, &isCursorAvailable)
+		if i >= len(rw.WComp) {
+			continue
 		}
+		q, ok := rw.WComp[i].(*components.QubitsSystem)
+		if !ok {
+			continue
+		}
+		qs := q
+		qs.UpdateDeterminators(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 	for i := len(rw.WComp) - 1; i >= 0; i-- {
+		if i >= len(rw.WComp) {
+			continue
+		}
 		rw.WComp[i].Update(worldMouse, rw.holdingCursor, &isCursorAvailable)
 	}
 

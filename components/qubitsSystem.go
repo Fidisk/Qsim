@@ -96,6 +96,13 @@ func (c *QubitsSystem) isDeterminatorVisible(d *QubitDeterminator) bool {
 	return true
 }
 
+// DeterminatorWireVisible reports whether the wire to a determinator is
+// currently being drawn. Kept exported so render passes (e.g. edge markers)
+// can agree on which determinators are on screen.
+func (c *QubitsSystem) DeterminatorWireVisible(d *QubitDeterminator) bool {
+	return c.isDeterminatorVisible(d)
+}
+
 // findHookOwner returns the component whose GetHooks list contains the hook
 // with the given ID (e.g. the gate a determinator is plugged into), or nil
 // for standalone hooks.

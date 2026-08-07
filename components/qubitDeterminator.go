@@ -27,6 +27,12 @@ func (c *QubitDeterminator) GetID() int32 {
 	return c.ID
 }
 
+// DisplayName returns the qubit's user-facing name (renamed display name when
+// one is set, otherwise the raw modifier ID). Used by off-screen wire markers.
+func (c *QubitDeterminator) DisplayName() string {
+	return modifierLabel(c.ModifierID)
+}
+
 func NewQubitDeterminator(x, y, radius float32, color rl.Color, qubitID int32) *QubitDeterminator {
 	tmp := QubitDeterminator{
 		Circle:     *NewCircle(x, y, radius, color),

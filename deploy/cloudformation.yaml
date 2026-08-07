@@ -1,0 +1,210 @@
+# Deploy Qsim (web app + share-service) on AWS ECS Fargate behind an ALB.
+#
+# Deploy (from the repo root, requires the AWS CLI + docker login to ECR):
+#   1. Build & push the image:
+#        aws ecr get-login-password --region us-east-1 \
+#          | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.us-east-1.amazonaws.com
+#        docker build -t qsim .
+#        docker tag qsim $ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/qsim:latest
+#        docker push  $ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/qsim:latest
+#   2. Create the stack (VPC/subnets it needs must exist; fill in the two
+#      subnet ids and your ACM cert arn):
+#        aws cloudformation deploy \
+#          --template-file deploy/cloudformation.yaml \
+#          --stack-name qsim \
+#          --capabilities CAPABILITY_IAM \
+#          --parameter-overrides \
+#              SubnetA=subnet-xxxx SubnetB=subnet-yyyy CertArn=arn:aws:acm:... 
+#
+# The service then answers at the ALB DNS name on HTTPS. Point a DNS CNAME at
+# it and you're done. Shares are stored in an S3 bucket (STORAGE=s3), so task
+# restarts lose nothing.
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Qsim quantum circuit app + share-service (Fargate + ALB)
+
+Parameters:
+  SubnetA:
+    Type: String
+    Description: First public subnet id (for the ALB and the task)
+  SubnetB:
+    Type: String
+    Description: Second public subnet id
+  VpcId:
+    Type: String
+    Description: Vpc id the subnets belong to
+  CertArn:
+    Type: String
+    Description: ACM certificate arn for the HTTPS listener
+
+Resources:
+  # ---- S3: durable share storage -------------------------------------------
+  ShareBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+  # ---- Container service ----------------------------------------------------
+  Cluster:
+    Type: AWS::ECS::Cluster
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: qsim
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/qsim:latest"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - { Name: PORT, Value: "8080" }
+            - { Name: STATIC_DIR, Value: /app/static }
+            - { Name: STORAGE, Value: s3 }
+            - { Name: QSIM_SHARES_BUCKET, Value: !Ref ShareBucket }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /ecs/qsim
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: qsim
+
+  # Pull images from ECR.
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # Runtime role: read/write the shares bucket.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: shares-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub "${ShareBucket.Arn}/*"
+
+  # The container only accepts traffic from the ALB.
+  ServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: qsim task security group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !GetAtt AlbSecurityGroup.GroupId
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: qsim load balancer security group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: [!Ref ServiceSecurityGroup]
+          Subnets: [!Ref SubnetA, !Ref SubnetB]
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+
+  # ---- Load balancer ---------------------------------------------------------
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      Subnets: [!Ref SubnetA, !Ref SubnetB]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /healthz
+      HealthCheckIntervalSeconds: 30
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # ---- Logs -------------------------------------------------------------------
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/qsim
+      RetentionInDays: 14
+
+Outputs:
+  LoadBalancerDNS:
+    Value: !GetAtt LoadBalancer.DNSName
+  ShareBucket:
+    Value: !Ref ShareBucket
