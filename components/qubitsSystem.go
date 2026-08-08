@@ -153,7 +153,7 @@ func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
 
 // qubitCycle is the click-cycle of single-qubit states, in order:
 // |0> -> |1> -> |+> -> |-> -> |i> -> |-i>. Freshly spawned qubits start at
-// |i> (see SpawnObject), so the first click goes |i> -> |-i>.
+// |0> (see SpawnObject), so the first click goes |0> -> |1>.
 var qubitCycle = []struct {
 	name string
 	amps []complex64
@@ -204,11 +204,13 @@ func nextQubitState(amps []complex64) []complex64 {
 }
 
 // cycleState advances a standalone single-qubit system to the next state in
-// the cycle. The amplitudes are updated in place so the modifier ID, the
+// the cycle. Fresh qubits stay cyclable even when their determinator is
+// plugged into a gate; systems emitted by a source or a gate (HookID != 0)
+// are not. The amplitudes are updated in place so the modifier ID, the
 // determinators and any hooked wiring survive the change.
 func (c *QubitsSystem) cycleState() {
-	if c.Origin == nil || c.Origin.Size != 1 || c.HookID != 0 || c.InfoHookID != 0 {
-		return // only standalone normal qubits, not source/gate outputs
+	if c.Origin == nil || c.Origin.Size != 1 || c.HookID != 0 {
+		return // only normal qubits, not source/gate outputs
 	}
 	next := nextQubitState(c.Origin.Amptitude)
 	copy(c.Origin.Amptitude, next)
@@ -362,7 +364,8 @@ func trimFloat(f float64) string {
 
 // formatCellAmplitude renders one state-grid amplitude compactly, dropping
 // the part that is zero: 1+0i -> "1", 0+1i -> "i", 0 -> "0",
-// 0.7+0.3i -> "0.7+0.3i", 1-1i -> "1-i".
+// 0.7+0.3i -> "0.7 + 0.3i", 1-i -> "1 - i". The sign is spaced so it reads
+// as a separate element (and gets its own color in drawAmplitude).
 func formatCellAmplitude(v complex64) string {
 	re := trimFloat(float64(real(v)))
 	im := trimFloat(float64(imag(v)))
@@ -386,7 +389,45 @@ func formatCellAmplitude(v complex64) string {
 	if im == "1" {
 		im = ""
 	}
-	return re + sign + im + "i"
+	return re + " " + sign + " " + im + "i"
+}
+
+// drawAmplitude renders an amplitude string left-to-right from (x, y),
+// coloring every '+' sign green and every '-' sign red so the sign of each
+// part reads at a glance (e.g. 0.7 + 0.3i, 1 - i, -0.5i). The base text keeps
+// the given color.
+func drawAmplitude(x, y int32, s string, fontSize int32, base rl.Color) {
+	type seg struct {
+		text string
+		col  rl.Color
+	}
+	var segs []seg
+	var buf strings.Builder
+	flush := func() {
+		if buf.Len() > 0 {
+			segs = append(segs, seg{buf.String(), base})
+			buf.Reset()
+		}
+	}
+	for _, r := range s {
+		switch r {
+		case '+', '-':
+			flush()
+			col := rl.Green
+			if r == '-' {
+				col = rl.Red
+			}
+			segs = append(segs, seg{string(r), col})
+		default:
+			buf.WriteRune(r)
+		}
+	}
+	flush()
+	sx := x
+	for _, g := range segs {
+		rl.DrawText(g.text, sx, y, fontSize, g.col)
+		sx += rl.MeasureText(g.text, fontSize)
+	}
 }
 
 func (c *QubitsSystem) Draw() {
@@ -509,12 +550,9 @@ func (c *QubitsSystem) Draw() {
 				numFontSize--
 				numWidth = rl.MeasureText(numberStr, numFontSize)
 			}
-			rl.DrawText(numberStr,
-				int32(cellCenterX)-numWidth/2,
+			drawAmplitude(int32(cellCenterX)-numWidth/2,
 				int32(cellCenterY)-numFontSize-2, // 2px gap
-				numFontSize,
-				textCol,
-			)
+				numberStr, numFontSize, textCol)
 
 			// Draw name slightly below center
 			nameFontSize := int32(14)
@@ -537,7 +575,7 @@ func (c *QubitsSystem) Draw() {
 			names[i] = modifierLabel(id)
 		}
 		label := strings.Join(names, " + ")
-		if c.Origin.Size == 1 && c.HookID == 0 && c.InfoHookID == 0 {
+		if c.Origin.Size == 1 && c.HookID == 0 {
 			if s := qubitStateName(c.Origin.Amptitude); s != "" {
 				label += "  " + s
 			}

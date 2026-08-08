@@ -26,26 +26,34 @@ import (
 // clicking the gate: ForceMode cycles random -> force 0 -> force 1.
 type CollapseGate struct {
 	Circle
-	ID          int32
-	Label       string
-	Tooltip     string
-	HookList    []*Hook
-	OutPutHook  []*Hook
-	InputCount  int32
+	ID           int32
+	Label        string
+	Tooltip      string
+	HookList     []*Hook
+	OutPutHook   []*Hook
+	InputCount   int32
 	Measured     bool
-	HasRemainder bool // false when the input was a single qubit (no "R" output)
+	HasRemainder bool  // false when the input was a single qubit (no "R" output)
 	Result       int32 // the realized outcome: 0 or 1
-	ForceMode   int32 // 0 = random, 1 = force 0, 2 = force 1
+	ForceMode    int32 // 0 = random, 1 = force 0, 2 = force 1
 	OutcomeProbs [2]float64
+	// measuredHash is retained for measurement reuse bookkeeping and test
+	// compatibility; it is not persisted because the input state is the source
+	// of truth after loading.
+	measuredHash  bool
+	lastInputHash uint64
+	// DisableForceClick lets a specialized measurement gate keep its input
+	// interaction without cycling force mode on a plain click.
+	DisableForceClick bool
 
 	// NormalSystem distinguishes the M3 constructor for save/load. M2
 	// outputs the measured outcome as a logical bit; M3 outputs the
 	// collapsed measured qubit as a normal system.
 	NormalSystem bool
 
-	// ConsumeInput is set by M4: after measurement the input qubit determinator
-	// is removed from the parent system so it cannot be reused. Once measured,
-	// losing the input hook does not destroy the produced outputs.
+	// ConsumeInput preserves produced outputs if a specialized gate loses its
+	// input. M4 keeps its input connected now, but the flag remains part of the
+	// saved behavior contract.
 	ConsumeInput bool
 
 	// SkipRandom forces a deterministic outcome selection. When true, ForceMode
@@ -174,6 +182,23 @@ func (c *CollapseGate) CycleForce() {
 	// helpers rewrite the hooked logical bit / systems in place, so the
 	// wiring survives a force-mode click. DestroyOutPut would kill them.
 	c.Measured = false
+	c.measuredHash = false
+}
+
+func collapseStateHash(qsm *qubits.QubitStateManager) uint64 {
+	h := uint64(14695981039346656037)
+	mix := func(v uint64) {
+		h ^= v
+		h *= 1099511628211
+	}
+	for _, id := range qsm.ModifierID {
+		mix(uint64(uint32(id)))
+	}
+	for _, amp := range qsm.Amptitude {
+		mix(uint64(math.Float32bits(real(amp))))
+		mix(uint64(math.Float32bits(imag(amp))))
+	}
+	return h
 }
 
 func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
@@ -187,7 +212,7 @@ func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
-		if utils.IsMouseState(glob.MouseStateNormal) && utils.Dist(c.pressPos, worldMouse) < 5 {
+		if !c.DisableForceClick && utils.IsMouseState(glob.MouseStateNormal) && utils.Dist(c.pressPos, worldMouse) < 5 {
 			// plain click (no drag): cycle the force-measure setting
 			c.CycleForce()
 		}
@@ -368,6 +393,7 @@ func (c *CollapseGate) MeasureOutput() {
 		return
 	}
 	QSM := qp.Origin
+	inputHash := collapseStateHash(QSM)
 
 	// p(measuring 0)
 	var l complex64
@@ -380,21 +406,28 @@ func (c *CollapseGate) MeasureOutput() {
 	c.OutcomeProbs[0] = cmplx.Abs(complex128(l))
 	c.OutcomeProbs[1] = cmplx.Abs(complex128(complex(1, 0) - l))
 
-	// realize one outcome: sampled, or forced by the click setting
+	// Realize one outcome: reuse an unchanged random result, or sample/force
+	// a new one when the input state, force mode, or explicit reset changes.
 	var k int32
-	switch c.ForceMode {
-	case 1:
-		k = 0
-	case 2:
-		k = 1
-	default:
-		if rand.Float64() < c.OutcomeProbs[0] {
+	if c.ForceMode == 0 && c.measuredHash && inputHash == c.lastInputHash {
+		k = c.Result
+	} else {
+		switch c.ForceMode {
+		case 1:
 			k = 0
-		} else {
+		case 2:
 			k = 1
+		default:
+			if rand.Float64() < c.OutcomeProbs[0] {
+				k = 0
+			} else {
+				k = 1
+			}
 		}
 	}
 	c.Result = k
+	c.lastInputHash = inputHash
+	c.measuredHash = true
 
 	c.emitOutcome(QSM, pos, k)
 	c.Measured = true
@@ -467,6 +500,7 @@ func (c *CollapseGate) spawnOrUpdateNormal(hookIdx int, state *qubits.QubitState
 
 func (c *CollapseGate) DestroyOutPut() {
 	c.Measured = false
+	c.measuredHash = false
 	for _, d := range c.OutPutHook {
 		d.DisconnectAndKill()
 	}

@@ -17,13 +17,15 @@ Guidelines for AI agents (and humans) working in this repository.
   - `gen-qft` (run with `go run ./cmd/examples/gen-qft`): how multi-input
     gates (3-qubit, 8×8 operations) thread a whole system between stages.
   - `gen-adder` (run with `go run ./cmd/examples/gen-adder`): a 4-bit
-    ripple-carry adder (7 + 5 = 12) with per-bit 16×16 permutation gates;
-    shows the leading-modifier hook-ordering constraint (see
+    ripple-carry adder (7 + 5 = 12) with per-bit 16×16 editable universal
+    gates; shows the leading-modifier hook-ordering constraint (see
     `docs/qsim-format.md` §5 Gate), an exhaustive 256-pair check, and M2
     remainder chains that keep running systems small.
-  - `gen-adder2` (run with `go run ./cmd/examples/gen-adder2`): the simple
-    2-bit adder (2 + 1 = 3) — one 6-qubit 64×64 gate for the whole
-    addition plus a 3-gate M2 readout chain, written to `saves/adder2.qsim`.
+    `go run ./cmd/examples/gen-adder -bits 2` writes the 2-bit version
+    (2 + 1 = 3) to `saves/adder2.qsim`.
+  - Shared generator geometry lives in `cmd/examples/layout` (`GridW`,
+    `GridH`, `AfterOutput`): always compute horizontal spacing from it so
+    a qubit system's drawn grid never overlaps the next component.
   Hand-written saves almost always break on the global ID references.
 
 ## Build & test

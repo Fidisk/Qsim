@@ -1,13 +1,13 @@
 // Command gen-superdense is a standalone EXAMPLE that shows how to author a
 // .qsim save programmatically. Instead of hand-writing JSON it builds the
-// circuit out of the engine's own components (sources, gates, systems,
+// circuit out of the engine's own components (normal qubit inputs, gates, systems,
 // collapse measurements, logical bits and lights), wires them with the hook
 // Connect/ConnectInfo APIs, assigns the exact intermediate quantum states
 // with qubits.QubitStateManager, and finally serializes the render window
 // with RenderWindow.SaveState().
 //
 // The generated file (saves/superdense.qsim) implements superdense coding:
-// two sources |0>_A and |0>_B form a Bell pair (H then CX), Alice encodes
+// two normal |0> inputs |0>_A and |0>_B form a Bell pair (H then CX), Alice encodes
 // the message "11" on her qubit (Z gate then X gate, both acting on qubit 0
 // only), Bob applies CX and H, and two M2 collapse gates measure both qubits
 // into logical bits that drive lights.
@@ -28,6 +28,7 @@ import (
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/cmd/examples/layout"
 	"qsim/components"
 	"qsim/config"
 	glob "qsim/globals"
@@ -76,7 +77,10 @@ var (
 // matrix and input count. Hooks are positioned by the constructor at
 // x±GateToHookDist on the snap grid.
 func gate(x, y float32, label string, op [][]complex64, inputCount int32) *components.Gate {
-	return components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
+	g := components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
+	g.Editable = true
+	g.Tooltip = "Universal gate: inspect the operation matrix and the nearby TextBox annotation"
+	return g
 }
 
 // system returns a new QubitsSystem assigned the given state.
@@ -93,6 +97,21 @@ func cloneState(src *qubits.QubitStateManager) *qubits.QubitStateManager {
 		append([]complex64{}, src.Amptitude...),
 		append([]int32{}, src.ModifierID...),
 	)
+}
+
+func textBox(x, y float32, text string, size int32) *components.TextBox {
+	width := float32(len(text))*float32(size)*0.6 + 24
+	tb := components.NewTextBox(x, y, width, float32(size)+16, size)
+	tb.Text = text
+	return tb
+}
+
+func separator(x, y0, y1 float32) *components.LineDraw {
+	ld := components.NewLineDraw(x, y0)
+	ld.End = rl.Vector2{X: x, Y: y1}
+	ld.LineColor = rl.NewColor(90, 90, 90, 255)
+	ld.Placing = false
+	return ld
 }
 
 // oneQubit simulates a 1-qubit gate exactly like the engine: copy, then
@@ -162,70 +181,69 @@ func main() {
 	// --- components -----------------------------------------------------
 	var comps []components.Component
 
-	// Sources.
-	// NewSourceGateWithID pins the emitted qubit's modifier ID; the plain
-	// NewSourceGate only generates one lazily on the first Update, which
-	// would leave the wrong ID in the save.
-	sA := components.NewSourceGateWithID(-1500, -150, 90, config.GateColor, "|0> A", zero, q0)
-	sB := components.NewSourceGateWithID(-1500, 150, 90, config.GateColor, "|0> B", zero, q1)
-	comps = append(comps, sA, sB)
-
-	// Source output systems.
-	qsA := system(sA.OutHook.Center.X, sA.OutHook.Center.Y, stA0)
-	qsB := system(sB.OutHook.Center.X, sB.OutHook.Center.Y, stB0)
-	sA.OutHook.Connect(qsA)
-	sA.OutHook.ConnectInfo(qsA)
-	sB.OutHook.Connect(qsB)
-	sB.OutHook.ConnectInfo(qsB)
+	// Ordinary |0> inputs are standalone systems so the user can cycle their
+	// initial states without a source gate continuously reasserting them.
+	qsA := system(-2250, -100, stA0)
+	qsB := system(-1450, 100, stB0)
 	comps = append(comps, qsA, qsB)
 
+	// Gates are placed with layout.AfterOutput so the grid of each output
+	// system (1 qubit after H, 2 qubits after every 2-input gate) clears
+	// the next component.
+	stageX := float32(-1800)
+
 	// Bell preparation: H on qubit 0, then CX.
-	hA := gate(-1050, -150, "H", hadamard, 1)
+	hA := gate(stageX, -100, "H", hadamard, 1)
 	hA.HookList[0].Connect(qsA.QubitDeterminatorList[0])
 	qsHA := system(hA.OutPutHook[0].Center.X, hA.OutPutHook[0].Center.Y, stHA)
 	hA.OutPutHook[0].Connect(qsHA)
 	comps = append(comps, hA, qsHA)
+	stageX = layout.AfterOutput(stageX, 1, 100)
 
-	cxPrep := gate(-750, 0, "CX", cnot, 2)
+	cxPrep := gate(stageX, 0, "CX", cnot, 2)
 	cxPrep.HookList[0].Connect(qsHA.QubitDeterminatorList[0])
 	cxPrep.HookList[1].Connect(qsB.QubitDeterminatorList[0])
 	qsBell := system(cxPrep.OutPutHook[0].Center.X, cxPrep.OutPutHook[0].Center.Y, stBell)
 	cxPrep.OutPutHook[0].Connect(qsBell)
 	comps = append(comps, cxPrep, qsBell)
+	stageX = layout.AfterOutput(stageX, 2, 100)
 
 	// Alice encodes "11": Z then X, both on qubit 0 only.
-	msgZ := gate(-300, 0, "Z", zOnQ0, 2)
+	msgZ := gate(stageX, 0, "Z", zOnQ0, 2)
 	msgZ.HookList[0].Connect(qsBell.QubitDeterminatorList[0])
 	msgZ.HookList[1].Connect(qsBell.QubitDeterminatorList[1])
 	qsZ := system(msgZ.OutPutHook[0].Center.X, msgZ.OutPutHook[0].Center.Y, stZ)
 	msgZ.OutPutHook[0].Connect(qsZ)
 	comps = append(comps, msgZ, qsZ)
+	stageX = layout.AfterOutput(stageX, 2, 100)
 
-	msgX := gate(150, 0, "X", xOnQ0, 2)
+	msgX := gate(stageX, 0, "X", xOnQ0, 2)
 	msgX.HookList[0].Connect(qsZ.QubitDeterminatorList[0])
 	msgX.HookList[1].Connect(qsZ.QubitDeterminatorList[1])
 	qsX := system(msgX.OutPutHook[0].Center.X, msgX.OutPutHook[0].Center.Y, stX)
 	msgX.OutPutHook[0].Connect(qsX)
 	comps = append(comps, msgX, qsX)
+	stageX = layout.AfterOutput(stageX, 2, 100)
 
 	// Bob decodes: CX then H on qubit 0.
-	cxBob := gate(600, 0, "CX", cnot, 2)
+	cxBob := gate(stageX, 0, "CX", cnot, 2)
 	cxBob.HookList[0].Connect(qsX.QubitDeterminatorList[0])
 	cxBob.HookList[1].Connect(qsX.QubitDeterminatorList[1])
 	qsCXB := system(cxBob.OutPutHook[0].Center.X, cxBob.OutPutHook[0].Center.Y, stCXB)
 	cxBob.OutPutHook[0].Connect(qsCXB)
 	comps = append(comps, cxBob, qsCXB)
+	stageX = layout.AfterOutput(stageX, 2, 100)
 
-	hBob := gate(900, 0, "H", hOnQ0, 2)
+	hBob := gate(stageX, 0, "H", hOnQ0, 2)
 	hBob.HookList[0].Connect(qsCXB.QubitDeterminatorList[0])
 	hBob.HookList[1].Connect(qsCXB.QubitDeterminatorList[1])
 	qsHB := system(hBob.OutPutHook[0].Center.X, hBob.OutPutHook[0].Center.Y, stHB)
 	hBob.OutPutHook[0].Connect(qsHB)
 	comps = append(comps, hBob, qsHB)
 
-	// Measurements: M2 collapse gates, one per qubit. ForceMode 2 forces
-	// the outcome |1>, matching the decoded |11> message so both lights
-	// stay lit.
+	// Measurements: M2 consumes the running system one qubit at a time.
+	// The first M2 emits the q0 bit and an R remainder; the second M2 measures
+	// q1 from that remainder instead of competing for qsHB.
 	measure := func(x, y float32, det *components.QubitDeterminator) (*components.CollapseGate, *components.LogicalBit) {
 		m := components.NewCollapseGate(x, y, glob.GateRadius, config.GateColor, "M2")
 		m.ForceMode = 2
@@ -236,39 +254,48 @@ func main() {
 		return m, bit
 	}
 
-	_, bitA := measure(1200, -150, qsHB.QubitDeterminatorList[0])
-	_, bitB := measure(1200, 150, qsHB.QubitDeterminatorList[1])
+	mX := layout.AfterOutput(stageX, 2, 200) // first M2 after hBob's grid
+	mA, bitA := measure(mX, -50, qsHB.QubitDeterminatorList[0])
+	// The decoded state is -|11>; after measuring q0=1 the conditioned
+	// remainder is -|1> on q1, with its phase retained in the saved state.
+	stR := qubits.NewQubitStateManagerFrom([]complex64{0, -1}, []int32{q1})
+	mA.OutPutHook[1].Hidden = false
+	mA.HasRemainder = true
+	qsR := system(mA.OutPutHook[1].Center.X, mA.OutPutHook[1].Center.Y, stR)
+	mA.OutPutHook[1].Connect(qsR)
+	comps = append(comps, qsR)
+	m2X := layout.AfterOutput(mX, 1, 100)
+	_, bitB := measure(m2X, -20, qsR.QubitDeterminatorList[0])
 
 	// Lights display the measured bits.
-	lightCol := rl.NewColor(241, 121, 0, 255)
-	lightA := components.NewLight(1550, -150, lightCol)
+	lightA := components.NewLight(layout.AfterOutput(mX, 1, 200), -80, config.GateColor)
 	lightA.InHook.Connect(bitA)
-	lightB := components.NewLight(1900, 150, lightCol)
+	lightB := components.NewLight(layout.AfterOutput(m2X, 1, 200), -50, config.GateColor)
 	lightB.InHook.Connect(bitB)
 	comps = append(comps, lightA, lightB)
 
-	// Stage captions.
-	label := func(x, y float32, text string) {
-		comps = append(comps, components.NewLabel(x, y, text, 18, rl.White))
+	// Stage annotations and separators keep the wide state grids readable.
+	text := func(x, y float32, value string, size int32) {
+		comps = append(comps, textBox(x, y, value, size))
 	}
-	label(-1300, -330, "Alice: prepare Bell pair (H, CX)")
-	label(-250, 260, "Alice: encode message 11 (Z, X)")
-	label(650, 260, "Bob: decode (CX, H)")
-	label(1300, -330, "Measure & display (M2 -> bits -> lights)")
+	text(-600, -550, "Superdense coding: send message 11", 24)
+	text(-1600, -450, "Step 1 - Prepare Bell pair", 18)
+	text(-1600, -380, "H then CX creates (|00> + |11>)/sqrt(2).", 14)
+	text(-700, -450, "Step 2 - Alice encodes 11", 18)
+	text(-700, -380, "Z then X act on q0 while q1 stays entangled.", 14)
+	text(250, -450, "Step 3 - Bob decodes", 18)
+	text(250, -380, "CX then H recovers the computational message.", 14)
+	text(1750, -450, "Step 4 - Measure q0, then R -> q1", 18)
+	text(1750, -380, "M2 emits a logical bit; R keeps the unmeasured qubit for the next M2.", 14)
+	for _, x := range []float32{-1550, -1100, -600, -100, 400, 1000} {
+		comps = append(comps, separator(x, -300, 250))
+	}
 
 	rw.PushComponent(comps...)
 
-	// Frame the whole circuit: point the camera at the centroid.
-	var cx, cy float32
-	var n int
-	for _, c := range comps {
-		cx += c.GetCircle().Center.X
-		cy += c.GetCircle().Center.Y
-		n++
-	}
-	if n > 0 {
-		rw.Camera.Target = rl.NewVector2(cx/float32(n), cy/float32(n))
-	}
+	// Frame the full circuit, including the remainder chain and both lights.
+	rw.Camera.Target = rl.NewVector2(300, -150)
+	rw.Camera.Zoom = 0.22
 
 	// --- serialize ------------------------------------------------------
 	data := rw.SaveState()
@@ -314,6 +341,12 @@ func main() {
 					fmt.Fprintf(os.Stderr, "collapse %s hook %s dangling: target %d\n", m.Label, hk.Label, hk.TargetID)
 					os.Exit(1)
 				}
+			}
+		}
+		if l, ok := c.(*components.Light); ok {
+			if l.InHook.IsHooked && utils.GetObjectFromID(l.InHook.TargetID) == nil {
+				fmt.Fprintf(os.Stderr, "light hook dangling: target %d\n", l.InHook.TargetID)
+				os.Exit(1)
 			}
 		}
 	}

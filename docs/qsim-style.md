@@ -30,31 +30,73 @@ recipe for turning a save like that into a self-documenting diagram.
    layout constants and annotation calls, and every hook/ID stays
    consistent automatically.
 
+The TextBox rule applies to authored save annotations. Built-in labels on
+gates/hooks, runtime probability readouts, and the app's own controls are
+engine-rendered exceptions; do not duplicate them with a second raw text
+object.
+
 ---
 
 ## 2. Quantum layout conventions
 
 - **Position**: everything sits on the 100px grid
   (`config.SnapToGridInterval`). Gate bodies are radius 30; input hooks sit
-  at `x−150` (offset `±50` per input), the output hook at `x+150`. A
-  `QubitsSystem` connected to an output hook snaps its center onto the hook.
+  at `x−300` (offset `±50` per input), the output hook at `x+300`, a source
+  table's output hook at `x+400`. A `QubitsSystem` connected to an output
+  hook snaps its center onto the hook.
+- **Respect the state grid**: a qubit system's drawn grid is
+  `2^ceil(n/2) × 2^floor(n/2)` cells of 100px, **centered on the system**
+  (so a 4-qubit system covers 400×400). The hook distances above are sized
+  so a ≤4-qubit grid clears the component that produced it — but the grid
+  also extends right, so place every following component with the shared
+  `cmd/examples/layout` helpers: `GridW(n)`/`GridH(n)` give the footprint
+  and `AfterOutput(gateX, n, margin)` returns the next X that clears it.
+  The adder generator derives its whole column pitch from these helpers
+  (the chain steps shrink as the remainders shrink: 4 → 3 → 2 → 1 qubits).
+  Never let two components sit inside one grid.
 - **Lanes**: pick one Y per qubit wire and never change it mid-circuit.
   Choose a pitch of **200px** (two grid steps) so 2-input gate hooks
   (`±50`) never collide with a neighbor lane. Keep each qubit's X purely
   increasing — gates on a lane form a column list, not a zigzag.
 - **MSB on top**: `origin.modifierIDs[0]` is the most significant bit and
   the top row of every gate matrix (see format doc §6). The topmost lane is
-  therefore `modifierIDs[0]`, the next `modifierIDs[1]`, etc. Label the
-  lanes with their source labels (`|0> A`, `|1> B`, ...) so the bit order
-  is visible on canvas.
-- **Sources left, sinks right**: `SourceGate`s at the left edge of their
-  lane; measurement / classical output at the right edge.
+  therefore `modifierIDs[0]`, the next `modifierIDs[1]`, etc.
+- **Inputs are normal qubits, not sources**: a single-qubit input can be a
+  normal `QubitsSystem` (click to cycle `|0> |1> |+> |-> |i> |-i>`), which
+  stays interactive. Only use a `SourceGate` when fine-grained or
+  entangled initialization is required (Bell pairs, QFT inputs, ...).
+- **Built-in components keep their built-in colors**: never tint a `Light`
+  (or other stock component) with a custom color — the save must look like
+  the app's own palette (`config.GateColor` etc.).
+- **Sources left, sinks right**: inputs at the left edge of their lane;
+  measurement / classical output at the right edge.
 - **Stage columns**: place gates in the same *stage* at the same X across
   lanes, so the circuit reads as a set of vertical slices (see §3).
 - **Camera**: set `cameraTargetX/Y` to the middle of the circuit and a
-  comfortable `cameraZoom` (0.5–0.8 for wide circuits) so the file opens
-  framed — see the `Telepor2.qsim` header, whose target is far outside the
-  circuit.
+  comfortable `cameraZoom` (0.2–0.8 for wide circuits) so the file opens
+  framed.
+
+### Gestalt grouping
+
+When a protocol is not a straight textbook circuit, group it deliberately
+instead of letting every component follow one global line:
+
+- **Proximity**: keep the gate, its short explanation, and its immediate
+  measurement/readout close together; leave a larger gap before the next
+  protocol phase.
+- **Similarity**: use the same TextBox font size and wording pattern for
+  peer steps, the same gate color for a gate family, and the built-in Light
+  color rather than inventing a second palette.
+- **Connectivity**: let actual wires and hook links carry the connection;
+  do not draw decorative lines that look like data paths. If a long wire is
+  unavoidable, add one unobtrusive separator rather than several arrows.
+- **Continuity**: route a continuing qubit or remainder in a consistent
+  direction. A remainder chain should read as `R -> next measurement`, not
+  jump back across an earlier stage.
+
+Use a small number of `LineDraw` separators to define phase boundaries, not
+to outline every component. A line should answer "where does this phase end?"
+without competing with the wires that answer "what is connected?".
 
 ### Example layout (abstract)
 
@@ -63,7 +105,7 @@ recipe for turning a save like that into a self-documenting diagram.
  lane 1 ─ S ──────── G ───────────── M ────────►
  lane 2 ─ S ──────── └──── G ─────── M ────────►
                        └─────────────┘           (2-qubit gate spans lanes)
- classical ──────────── (bits) ─── L ─────────►  (see §5)
+ classical ──────────── (bits) ─── L ─────────►  (see §6)
 ```
 
 ---
@@ -86,7 +128,12 @@ always together:
 
    Number the steps (`Step 1`, `Step 2`, ...) so the save can be read as an
    algorithm. Keep one consistent text color/size for step headers and a
-   smaller one for captions.
+   smaller one for captions. A `TextBox` always auto-fits its text on
+   render; while editing it shows a **+/− pair above the box** to resize the
+   font (which refits the box). A short click steps the size by one; holding
+   the button keeps stepping and the repeat interval shrinks, so holding
+   ramps the scaling up. The sizes in a save are just a starting point the
+   reader can adjust.
 3. **A separator line**: a vertical `LineDraw` between stages, from the top
    lane to the bottom classical lane, thin and dim (so it reads as a grid
    line, not a wire):
@@ -125,15 +172,19 @@ header instead of a one-line box:
 A `U` gate (`editable:true`) is an opaque matrix — its label says `U`, its
 operation says nothing to the reader. Convention:
 
-1. **Rename it** (right-click → rename in the app, or set `"label"` in the
+1. **Every custom operation is an editable universal gate.** A save never
+   uses a plain `Gate` with a custom matrix (e.g. the adder's ADD gates):
+   set `"editable": true` so the gate is a universal gate the user can
+   inspect and edit.
+2. **Rename it** (right-click → rename in the app, or set `"label"` in the
    JSON) to something that names the operation, e.g. `U: Rx(pi/4)`,
-   `U: phase 90°`, `U: random U`.
-2. **Annotate every distinct type at least once** in the save: one caption
+   `U: phase 90°`, `ADD bit 0`.
+3. **Annotate every distinct type at least once** in the save: one caption
    (`TextBox`) per unique operation matrix, placed under the gate, saying
    what the matrix does in circuit terms. When the same U type is reused
    later, no new caption is needed — the earlier one is referenced
    ("same U as step 2").
-3. Keep the caption within the step, e.g.:
+4. Keep the caption within the step, e.g.:
 
 ```json
 {"type": "TextBox", "center": {"x": 1300, "y": -1550}, "width": 460, "height": 34,
@@ -147,7 +198,32 @@ operation says nothing to the reader. Convention:
 
 ---
 
-## 5. Classical visualization: let the result be seen
+## 5. Measurement choice
+
+Choose the measurement component based on what the diagram is trying to
+teach:
+
+- **M1 (`M`)**: show both outcome branches and their probabilities at once.
+  Use it when the protocol's alternatives are the point of the figure.
+- **M2**: realize one outcome and emit a `LogicalBit`. Use it when the next
+  step needs a concrete classical result. Mode `0` (`R`) samples according
+  to probability; modes `0`/`1` in the UI force the corresponding outcome
+  for a deterministic case. Use forced modes for reproducible saves and
+  random mode for distributions.
+- **M3**: realize one outcome but emit the measured qubit as a normal
+  one-qubit system. Use it when the collapsed qubit continues into a
+  quantum gate; its `R` output is the remaining conditioned system.
+- **M4**: alternate the realized M2-style outcome every configured number
+  of frames. Use it as a visual time-series tool when both outcomes are
+  close enough that switching is informative. It normally belongs in the
+  random/`R` presentation context, not as a static forced branch.
+
+For M2/M3/M4, chain the `R` output into the next operation when you need to
+keep a system's drawn grid small or enforce the one-gate-at-a-time rule. A
+filled gate claims its system: unused determinators hide, and determinators
+already connected to another gate are disconnected.
+
+## 6. Classical visualization: let the result be seen
 
 The classical side is the protocol's narration. Telepor2.qsim already uses
 the right vocabulary (copy, compare, lights) but drops the components
@@ -184,7 +260,7 @@ bit.
 
 ---
 
-## 6. Applying the convention: Telepor2.qsim, restyled
+## 7. Applying the convention: Telepor2.qsim, restyled
 
 Telepor2.qsim implements the teleportation protocol with 31 components:
 3 sources (message `|ψ>` and a Bell pair), `H`/`CX`/`M2` on the quantum
@@ -214,19 +290,27 @@ The resulting save reads as:
 
 ---
 
-## 7. Checklist
+## 8. Checklist
 
 Before calling a save "styled":
 
 - [ ] Every qubit has its own horizontal lane; MSB on top; no crossing wires.
 - [ ] Sources at the left, measurement/classical output at the right.
 - [ ] All centers on the 100px grid (gates/hooks/systems).
+- [ ] Every system grid fits its group: calculate the `2^ceil(n/2)` by
+      `2^floor(n/2)` footprint before placing the next component; no gate,
+      TextBox, light, or remainder system sits inside that rectangle.
 - [ ] Stages separated by ≥200px gaps **and** a step `TextBox` header **and**
       a `LineDraw` separator.
 - [ ] Every step has a one-line header; complex steps have a `TextBox`
       explaining the idea.
 - [ ] Every distinct `U`-gate type is renamed and annotated at least once.
+- [ ] Every custom matrix gate has `editable:true` and a nearby TextBox note.
 - [ ] No text is drawn outside a `TextBox` (no bare labels on the canvas).
+- [ ] Use normal qubits for ordinary `0/1/+/-/i/-i` inputs; reserve sources
+      for precise or entangled initialization.
+- [ ] Use M1/M2/M3/M4 according to the measurement purpose in §5; chain `R`
+      when the remainder must continue or a grid must stay small.
 - [ ] Measured bits become `LogicalBit`s shown on `Light`s; protocols that
       need proof use `CopyGate` → `CompareGate` → `Light`.
 - [ ] No dangling classical bits; the last column of the circuit is

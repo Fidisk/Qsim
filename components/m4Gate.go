@@ -46,6 +46,7 @@ func NewM4Gate(x, y, radius float32, color rl.Color) *M4Gate {
 	tmp.SetWeight(glob.GateWeight)
 	tmp.ConsumeInput = true
 	tmp.SkipRandom = true
+	tmp.DisableForceClick = true
 	tmp.ForceMode = 1 // deterministic start at |0>
 	tmp.SwapInterval = defaultM4SwapInterval
 

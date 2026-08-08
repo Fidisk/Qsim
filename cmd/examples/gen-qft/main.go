@@ -30,6 +30,7 @@ import (
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"qsim/cmd/examples/layout"
 	"qsim/components"
 	"qsim/config"
 	glob "qsim/globals"
@@ -87,7 +88,10 @@ func cpDiag(n int, entries map[int]complex64) [][]complex64 {
 // matrix and input count. Hooks are positioned by the constructor at
 // x±GateToHookDist on the snap grid.
 func gate(x, y float32, label string, op [][]complex64, inputCount int32) *components.Gate {
-	return components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
+	g := components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
+	g.Editable = true
+	g.Tooltip = "Universal gate: inspect the operation matrix and the nearby TextBox annotation"
+	return g
 }
 
 // system returns a new QubitsSystem assigned the given state.
@@ -104,6 +108,20 @@ func cloneState(src *qubits.QubitStateManager) *qubits.QubitStateManager {
 		append([]complex64{}, src.Amptitude...),
 		append([]int32{}, src.ModifierID...),
 	)
+}
+
+func textBox(x, y float32, text string, size int32) *components.TextBox {
+	tb := components.NewTextBox(x, y, float32(rl.MeasureText(text, size))+24, float32(size)+16, size)
+	tb.Text = text
+	return tb
+}
+
+func separator(x, y0, y1 float32) *components.LineDraw {
+	ld := components.NewLineDraw(x, y0)
+	ld.End = rl.Vector2{X: x, Y: y1}
+	ld.LineColor = rl.NewColor(90, 90, 90, 255)
+	ld.Placing = false
+	return ld
 }
 
 func main() {
@@ -183,32 +201,33 @@ func main() {
 	// --- components -----------------------------------------------------
 	var comps []components.Component
 
-	// Sources.
-	sA := components.NewSourceGateWithID(-1500, -150, 90, config.GateColor, "|0> A", zero, q0)
-	sB := components.NewSourceGateWithID(-1500, 0, 90, config.GateColor, "|0> B", zero, q1)
-	sC := components.NewSourceGateWithID(-1500, 150, 90, config.GateColor, "|0> C", zero, q2)
-	comps = append(comps, sA, sB, sC)
-
-	qsA := system(sA.OutHook.Center.X, sA.OutHook.Center.Y, stQ0)
-	qsB := system(sB.OutHook.Center.X, sB.OutHook.Center.Y, stQ1)
-	qsC := system(sC.OutHook.Center.X, sC.OutHook.Center.Y, stQ2)
-	sA.OutHook.Connect(qsA)
-	sA.OutHook.ConnectInfo(qsA)
-	sB.OutHook.Connect(qsB)
-	sB.OutHook.ConnectInfo(qsB)
-	sC.OutHook.Connect(qsC)
-	sC.OutHook.ConnectInfo(qsC)
+	// Normal |0> inputs remain interactive and do not need a source gate.
+	// The 200px lane pitch keeps the three input grids separate, and each
+	// input grid clears the gate that reads it.
+	qsA := system(-2250, -200, stQ0)
+	qsB := system(-1500, 0, stQ1)
+	qsC := system(-650, 200, stQ2)
 	comps = append(comps, qsA, qsB, qsC)
 
+	// Stage gates. Each gate is placed with layout.AfterOutput so the grid
+	// of its output system (1, 2, then 3 qubits) clears the next gate; the
+	// pitch therefore grows as the running system grows.
+	stageX := float32(-1800)
+	stage := func(n int, label string, op [][]complex64, k int32, y float32) *components.Gate {
+		g := gate(stageX, y, label, op, k)
+		stageX = layout.AfterOutput(stageX, n, 100)
+		return g
+	}
+
 	// Stage 1: H on q0 only.
-	hA := gate(-1050, -150, "H", hadamard, 1)
+	hA := stage(1, "H", hadamard, 1, -200)
 	hA.HookList[0].Connect(qsA.QubitDeterminatorList[0])
 	qsH := system(hA.OutPutHook[0].Center.X, hA.OutPutHook[0].Center.Y, stH)
 	hA.OutPutHook[0].Connect(qsH)
 	comps = append(comps, hA, qsH)
 
 	// Stage 2: CR(π/2) on (q0,q1), 2 inputs.
-	cr2g := gate(-800, -75, "R(π/2)", cr2, 2)
+	cr2g := stage(2, "R(π/2)", cr2, 2, 0)
 	cr2g.HookList[0].Connect(qsH.QubitDeterminatorList[0]) // q0
 	cr2g.HookList[1].Connect(qsB.QubitDeterminatorList[0]) // q1
 	qsCR2 := system(cr2g.OutPutHook[0].Center.X, cr2g.OutPutHook[0].Center.Y, stCR2)
@@ -217,7 +236,7 @@ func main() {
 
 	// Stage 3: CR(π/4) control q0 target q2 — the first 3-qubit gate. All
 	// three wires of the running system become inputs.
-	cr4g := gate(-500, 0, "R(π/4)", crQ0Q2, 3)
+	cr4g := stage(3, "R(π/4)", crQ0Q2, 3, 0)
 	cr4g.HookList[0].Connect(qsCR2.QubitDeterminatorList[0]) // q0
 	cr4g.HookList[1].Connect(qsCR2.QubitDeterminatorList[1]) // q1
 	cr4g.HookList[2].Connect(qsC.QubitDeterminatorList[0])   // q2
@@ -226,7 +245,7 @@ func main() {
 	comps = append(comps, cr4g, qsCR4)
 
 	// Stage 4: H on q1 over the 3-qubit system.
-	hq1 := gate(-200, 0, "H", kron(3, 1, hadamard), 3)
+	hq1 := stage(3, "H", kron(3, 1, hadamard), 3, 0)
 	hq1.HookList[0].Connect(qsCR4.QubitDeterminatorList[0])
 	hq1.HookList[1].Connect(qsCR4.QubitDeterminatorList[1])
 	hq1.HookList[2].Connect(qsCR4.QubitDeterminatorList[2])
@@ -235,7 +254,7 @@ func main() {
 	comps = append(comps, hq1, qsHQ1)
 
 	// Stage 5: CR(π/2) control q1 target q2.
-	cr2bg := gate(100, 0, "R(π/2)", crQ1Q2, 3)
+	cr2bg := stage(3, "R(π/2)", crQ1Q2, 3, 0)
 	cr2bg.HookList[0].Connect(qsHQ1.QubitDeterminatorList[0])
 	cr2bg.HookList[1].Connect(qsHQ1.QubitDeterminatorList[1])
 	cr2bg.HookList[2].Connect(qsHQ1.QubitDeterminatorList[2])
@@ -244,7 +263,7 @@ func main() {
 	comps = append(comps, cr2bg, qsCR2b)
 
 	// Stage 6: H on q2.
-	hq2 := gate(400, 0, "H", kron(3, 0, hadamard), 3)
+	hq2 := stage(3, "H", kron(3, 0, hadamard), 3, 0)
 	hq2.HookList[0].Connect(qsCR2b.QubitDeterminatorList[0])
 	hq2.HookList[1].Connect(qsCR2b.QubitDeterminatorList[1])
 	hq2.HookList[2].Connect(qsCR2b.QubitDeterminatorList[2])
@@ -252,26 +271,29 @@ func main() {
 	hq2.OutPutHook[0].Connect(qsHQ2)
 	comps = append(comps, hq2, qsHQ2)
 
-	// Stage captions.
-	label := func(x, y float32, text string) {
-		comps = append(comps, components.NewLabel(x, y, text, 18, rl.White))
+	// Stage annotations and separators. The stageX cursor now points just
+	// past the last gate's output grid.
+	text := func(x, y float32, value string, size int32) {
+		comps = append(comps, textBox(x, y, value, size))
 	}
-	label(-1450, 260, "3-qubit QFT, input |000>: H, CR(π/2), CR(π/4), H, CR(π/2), H")
-	label(-1450, 300, "controlled rotations never fire on |0> → uniform superposition (bit-reversed output, no trailing SWAP)")
+	text(200, -550, "3-qubit QFT on |000>", 24)
+	text(-1800, -400, "Step 1 - H on q0", 18)
+	text(-1300, -400, "Step 2 - phase q0/q1", 18)
+	text(-800, -400, "Step 3 - phase q0/q2", 18)
+	text(-200, -400, "Step 4 - H on q1", 18)
+	text(400, -400, "Step 5 - phase q1/q2", 18)
+	text(1000, -400, "Step 6 - H on q2", 18)
+	text(-650, 350, "Inputs are normal |0> qubits; click a standalone input to cycle its state.", 16)
+	text(1400, 350, "Controlled phases are inactive on |0> controls: the result is uniform, bit-reversed, with no trailing SWAP.", 16)
+	for _, x := range []float32{-1500, -1050, -500, 100, 700} {
+		comps = append(comps, separator(x, -300, 300))
+	}
 
 	rw.PushComponent(comps...)
 
-	// Frame the whole circuit: point the camera at the centroid.
-	var cx, cy float32
-	var n int
-	for _, c := range comps {
-		cx += c.GetCircle().Center.X
-		cy += c.GetCircle().Center.Y
-		n++
-	}
-	if n > 0 {
-		rw.Camera.Target = rl.NewVector2(cx/float32(n), cy/float32(n))
-	}
+	// Frame the full circuit, including the input and final 3-qubit grids.
+	rw.Camera.Target = rl.NewVector2(200, -75)
+	rw.Camera.Zoom = 0.28
 
 	// --- serialize ------------------------------------------------------
 	data := rw.SaveState()

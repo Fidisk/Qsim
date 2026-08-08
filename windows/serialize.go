@@ -31,6 +31,7 @@ func (rw *RenderWindow) SaveState() string {
 		"isVerticalScrolling":   rw.IsVerticalScrolling,
 		"isTitleBarVisible":     rw.IsTitleBarVisible,
 		"isTitleEditable":       rw.IsTitleEditable,
+		"showGrid":              rw.ShowGrid,
 		"components":            compList,
 	}
 	b, _ := json.Marshal(data)
@@ -216,6 +217,7 @@ func serializeCollapseGate(g *components.CollapseGate) map[string]interface{} {
 		"inputCount":   g.InputCount,
 		"forceMode":    g.ForceMode,
 		"normalSystem": g.NormalSystem,
+		"outcomeProbs": []float64{g.OutcomeProbs[0], g.OutcomeProbs[1]},
 		"hooks":        hooks,
 	}
 }
@@ -242,6 +244,7 @@ func serializeM4Gate(g *components.M4Gate) map[string]interface{} {
 		"measured":      g.Measured,
 		"result":        g.Result,
 		"hasRemainder":  g.HasRemainder,
+		"outcomeProbs":  []float64{g.OutcomeProbs[0], g.OutcomeProbs[1]},
 		"inputConsumed": g.InputConsumed,
 		"storedPos":     g.StoredPos,
 		"storedSysID":   g.StoredSysID,
@@ -366,6 +369,7 @@ func serializeHook(h *components.Hook) map[string]interface{} {
 		"isHooked":         h.IsHooked,
 		"targetID":         h.TargetID,
 		"isOutput":         h.IsOutput,
+		"hidden":           h.Hidden,
 		"label":            h.Label,
 		"allowQubitSystem": h.AllowQubitSystem,
 		"allowLogicalBit":  h.AllowLogicalBit,

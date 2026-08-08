@@ -13,12 +13,11 @@ JSON:
   QFT showing how multi-input gates (3-qubit, 8×8 operations) thread a whole
   entangled system between stages.
 - `cmd/examples/gen-adder/main.go` (`go run ./cmd/examples/gen-adder`): a
-  4-bit ripple-carry adder (7 + 5 = 12) with one 16×16 permutation gate per
-  bit, verified against all 256 input pairs, and M2 remainder chains that
-  keep every running system small.
-- `cmd/examples/gen-adder2/main.go` (`go run ./cmd/examples/gen-adder2`):
-  the simple 2-bit adder (2 + 1 = 3): a single 6-qubit 64×64 gate for the
-  whole addition plus a 3-gate M2 readout chain.
+  4-bit ripple-carry adder (7 + 5 = 12) with one 16×16 editable universal
+  gate per bit, verified against all 256 input pairs, and M2 remainder
+  chains that keep every running system small. Add `-bits 2` to generate
+  the 2-bit version (2 + 1 = 3) as `saves/adder2.qsim`. Inputs are normal
+  qubits (click to cycle states), not source gates.
 
 ## 1. File structure
 
@@ -43,6 +42,7 @@ Each line must have a `"type"` key: `"Window"`, `"RenderWindow"` or
   "canPan": true, "canSpawn": true,
   "isHorizontalScrolling": false, "isVerticalScrolling": false,
   "isTitleBarVisible": true, "isTitleEditable": false,
+  "showGrid": true,
   "components": [ ...component objects... ]
 }
 ```
@@ -53,23 +53,39 @@ Base window fields: `name`, `id`, `x`, `y`, `width`, `height`,
 `{"r":0,"g":0,"b":0,"a":255}`), `canResize`, `canDrag`, `canZoom`, `priority`.
 
 The camera target is the world point the view is centered on — set it near
-the middle of your circuit so the file opens framed.
+the middle of your circuit so the file opens framed. `showGrid` controls the
+canvas grid lines and defaults to `true` for older saves; serialize it so
+the grid survives a save/load round trip.
 
 ## 3. Common conventions
 
 - **Colors** are `{"r","g","b","a"}` with `uint8` values 0–255.
 - **Vectors** are `{"x":0.0,"y":0.0}`.
 - **Complex numbers** are `{"real":0.70710677,"imag":0}`.
-- **IDs**: every component has an integer `"id"`. IDs must be unique and
-  stable within the file; they are the references used by hooks
+- **IDs**: every referenceable component has an integer `"id"`; annotation
+  components such as `TextBox`/`LineDraw` may omit one. Reference IDs must be
+  unique and stable within the file; they are the references used by hooks
   (`targetID`), systems (`hookID`, `infoHookID`) and determinators
   (`hookID`, `qubitSystemID`). On load the engine remaps old→new IDs, so a
   saved reference must match some object's `"id"` in the file.
 - **World layout**: positions snap to a 100px grid
   (`config.SnapToGridInterval`). Gate bodies are radius 30; input hooks sit
-  `x-150` from the gate center (at `y-50` and `y+50` for 2-input gates);
-  the output hook sits `x+150` (a `QubitsSystem` connected to an output hook
-  moves its center onto the hook). Two hooks connect when within 80px.
+  `x-300` from the gate center (at `y-50` and `y+50` for 2-input gates);
+  the output hook sits `x+300` (a `QubitsSystem` connected to an output hook
+  moves its center onto the hook). A source table's output hook sits at
+  `x+400`. These distances are sized so the drawn state grid of a ≤4-qubit
+  system (2^ceil(n/2)×2^floor(n/2) cells of 100px, centered on the hook)
+  clears the producing component. Two hooks connect when within 80px.
+- **Authored text**: explanatory text belongs in a `TextBox` component, not
+  a bare `Label`. `TextBox` is backgrounded, auto-fits its text when idle,
+  and exposes a font-size +/- control while editing. `Label` remains valid
+  for engine/runtime labels, but is not the style-guide choice for authored
+  protocol notes.
+- **Normal input qubits**: prefer a standalone `QubitsSystem` for a single
+  qubit whose state is one of `|0>`, `|1>`, `|+>`, `|->`, `|i>`, or `|-i>`.
+  The user can click it to cycle those states without changing its modifier
+  ID or wiring. Use `SourceGate` when the source must continuously reassert
+  a precise amplitude or when preparing a fine-grained/entangled input.
 
 ## 4. Hook objects (the wiring mechanism)
 
@@ -92,6 +108,9 @@ Every connection in the engine is a `Hook` pointing at a target:
   `targetID` pointing at the target component's `id`.
 - `isOutput:true` marks hooks that emit a new system/bit (gate `O`, source
   `O`, collapse `C`/`R`); `isOutput:false` hooks consume.
+- `hidden:true` marks hooks that are not drawn (e.g. the collapse `R` hook
+  before a multi-qubit input is measured); the flag is serialized so it
+  survives a save/load round trip.
 - `allowQubitSystem` hooks accept a `QubitsSystem` (or a determinator of
   one); `allowLogicalBit` hooks accept a `LogicalBit` (double-ring look).
 - Labels are purely cosmetic: gate inputs are `I0`, `I1`, …; gate output
@@ -191,8 +210,12 @@ system every frame.
   so that the hook order makes the merged modifier list start with the
   inputs in order — e.g. by feeding fresh single-qubit systems first and
   ordering hooks `(fresh..., existing...)` so the merged list grows as
-  `[I0, I1, ..., In-1, rest...]`. This is why the adder generator uses one
-  4-input gate per bit with hooks `(c_{i+1}, a_i, b_i, c_i)`.
+   `[I0, I1, ..., In-1, rest...]`. This is why the adder generator uses one
+   4-input gate per bit with hooks `(c_{i+1}, a_i, b_i, c_i)`.
+- **Custom operation rule**: a non-standard matrix must be serialized as an
+  editable universal gate (`"editable": true`) and have a nearby authored
+  `TextBox` explaining its basis order and action. Do not introduce a plain
+  non-editable `Gate` with an unexplained custom matrix.
 - Reference matrices: H `[[1,1],[1,-1]]/√2`, X `[[0,1],[1,0]]`, Z
   `[[1,0],[0,-1]]`, CNOT (control qubit 0 → target qubit 1)
   `[[1,0,0,0],[0,1,0,0],[0,0,0,1],[0,0,1,0]]`, CZ
@@ -205,7 +228,19 @@ system every frame.
   list) and has **two** output hooks (|0> and |1> branches). Its input hook
   is `I`.
 
-### CollapseGate — the M2/M3 measurement
+### Measurement gates — M/M1, M2, M3 and M4
+
+The app button is labelled `M`; this document calls that branch-producing
+gate **M1** so it is not confused with M2.
+
+#### M1 (`Gate` with `isMeasurementGate:true`)
+
+M1 keeps both outcomes alive simultaneously. It emits a `|0>` branch and a
+`|1>` branch, each with its probability. Use it when a protocol diagram must
+show all possibilities at once. M1 has two output hooks and does not use
+`forceMode`.
+
+#### M2 (`CollapseGate`, `normalSystem:false`)
 
 ```json
 {
@@ -223,12 +258,38 @@ system every frame.
 - `normalSystem:false` = **M2**: the `C` output is a `LogicalBit` (classical
   0/1) and `C` has `allowLogicalBit:true`, `isOutput:true`. The bit drives
   lights/logic gates.
-- `normalSystem:true` = **M3**: the `C` output is a collapsed normal
-  single-qubit `QubitsSystem` (`allowQubitSystem:true`).
-- `R` ("remainder") is the conditioned state of the other qubits; only
-  exists for multi-qubit inputs (hidden otherwise, `isHooked:false`).
-- `forceMode`: 0 = random outcome, 1 = force |0>, 2 = force |1>. Using
-  force modes makes a save's measured bits deterministic.
+- `R` ("remainder") is the normalized conditioned state of every other
+  qubit, with the measured modifier removed while preserving the remaining
+  modifier order. The hook is always present in the serialized hook list,
+  but is hidden/disconnected for a one-qubit input and becomes visible for a
+  multi-qubit input.
+- `forceMode`: `0` = random (`R` in the UI), `1` = force `|0>`, `2` = force
+  `|1>`. Use `1`/`2` when a reproducible save is required. A forced
+  zero-probability outcome creates a zero-norm remainder and should be
+  avoided. Mode `0` may produce a different result after reload or upstream
+  invalidation.
+- `outcomeProbs`: the `[p0, p1]` probabilities of the last realization,
+  persisted so a saved, already-measured gate (e.g. M4) can keep toggling
+  its remainder correctly after load.
+
+#### M3 (`CollapseGate`, `normalSystem:true`)
+
+M3 uses the same random/forced selection and remainder behavior as M2, but
+its `C` output is the collapsed measured qubit as a normal one-qubit
+`QubitsSystem`, not a `LogicalBit`. Use it when the measured qubit must feed
+another quantum gate. Its `R` output is the conditioned remainder.
+
+#### M4 (`M4Gate`)
+
+M4 starts from an M2-style measurement, retains the input determinator (it
+does not eat the qubit feeding it), stores the measured input, then flips
+the realized result every `swapInterval` frames. Its `C` output is a
+logical bit and its `R` output is the conditioned remainder. It is useful
+for visualizing changing outcomes when the two outcomes are close in
+amplitude. The current engine starts M4 deterministically and alternates the
+two forced outcomes; use the `R`/random presentation style for ordinary M2
+measurements when a distribution, rather than a deterministic alternation,
+is what the protocol needs.
 
 ### LogicalBit — a classical 0/1 value
 
@@ -275,25 +336,39 @@ top row of the gate's grid is the MSB.
 
 ## 7. Building a new circuit — recommended workflow
 
-1. **Prefer programmatic generation.** Write a small Go program like
-   `cmd/examples/gen-superdense/main.go`:
-   - create a `windows.NewRenderWindow`, `rw.PushComponent(...)` every
-     component,
-   - construct sources/gates/systems with the `components.New*`
-     constructors (they lay out hooks and register IDs),
-   - wire with `hook.Connect(det)`, `hook.ConnectInfo(qs)`, output
-     `hook.Connect(qs)`,
-   - assign exact states with `qubits.QubitStateManager`
-     (`NewQubitStateManagerFrom`, `Merge`, `Multiply`, `SwapColumn`) so the
-     serialized `origin` amplitudes are correct,
-   - write `rw.SaveState()` to a file under `saves/`.
-   This guarantees every ID reference is consistent, which is the most
-   error-prone part of hand-editing.
+ 1. **Prefer programmatic generation.** Write a small Go program like
+    `cmd/examples/gen-superdense/main.go`:
+    - create a `windows.NewRenderWindow`, `rw.PushComponent(...)` every
+      component,
+    - construct sources/gates/systems with the `components.New*`
+      constructors (they lay out hooks and register IDs),
+    - wire with `hook.Connect(det)`, `hook.ConnectInfo(qs)`, output
+      `hook.Connect(qs)`,
+    - assign exact states with `qubits.QubitStateManager`
+      (`NewQubitStateManagerFrom`, `Merge`, `Multiply`, `SwapColumn`) so the
+      serialized `origin` amplitudes are correct,
+    - compute every horizontal position with the shared
+      `qsim/cmd/examples/layout` helpers (`GridW`, `GridH`, `AfterOutput`)
+      so each produced system's grid clears the next component,
+    - write `rw.SaveState()` to a file under `saves/`.
+    This guarantees every ID reference is consistent, which is the most
+    error-prone part of hand-editing.
 2. **When hand-editing JSON**, copy a working save (e.g. `saves/Test.qsim`
    or the generated `saves/superdense.qsim`) and modify, keeping: unique
    ids; `hookID`/`targetID`/`infoHookID` pairs consistent; `modifierIDs`
    consistent between `origin`, determinators, and sources; `size` and
    amplitude counts exact powers of two.
-3. **Validate**: load the file through `windows.LoadState` (see the
-   round-trip check at the end of the example generator) and confirm every
-   `isHooked` hook resolves to a live object.
+ 3. **Validate**: load the file through `windows.LoadState` (see the
+    round-trip check at the end of the example generator) and confirm every
+    `isHooked` hook resolves to a live object.
+ 4. **Validate geometry and presentation**: check duplicate modifier IDs in
+    the initial input systems, calculate every system grid rectangle from its
+    `origin.size`, and confirm no gate, measurement, TextBox, light, or
+    remainder system lies inside another system grid. Confirm authored text
+    is TextBox-backed, custom matrices have `editable:true` and a note, and
+    built-in components retain their built-in colors.
+ 5. **Validate measurements**: choose M1/M2/M3/M4 for the intended teaching
+    goal, chain M2/M3 `R` outputs when a remainder continues, and use forced
+    modes only when the save must be reproducible. Run the generator's
+    exhaustive truth-table check where the protocol has finite classical
+    inputs.

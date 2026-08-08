@@ -216,6 +216,14 @@ func unmarshalRenderWindow(raw map[string]interface{}) *RenderWindow {
 	if v, ok := raw["isTitleEditable"]; ok {
 		rw.IsTitleEditable = v.(bool)
 	}
+	// The grid must survive a save/load round trip: NewRenderWindow defaults
+	// it on, but the deserializer builds the window directly, so default it
+	// on here too when the save predates showGrid.
+	if v, ok := raw["showGrid"]; ok {
+		rw.ShowGrid = v.(bool)
+	} else {
+		rw.ShowGrid = true
+	}
 
 	compList, ok := raw["components"].([]interface{})
 	if !ok {
@@ -462,6 +470,12 @@ func unmarshalCollapseGate(raw map[string]interface{}, ctx *loadCtx) *components
 	if v, ok := raw["forceMode"]; ok {
 		g.ForceMode = int32(v.(float64))
 	}
+	if v, ok := raw["outcomeProbs"]; ok {
+		if arr, ok2 := v.([]interface{}); ok2 && len(arr) == 2 {
+			g.OutcomeProbs[0] = arr[0].(float64)
+			g.OutcomeProbs[1] = arr[1].(float64)
+		}
+	}
 
 	hooksRaw, ok := raw["hooks"].([]interface{})
 	if ok {
@@ -512,6 +526,12 @@ func unmarshalM4Gate(raw map[string]interface{}, ctx *loadCtx) *components.M4Gat
 	}
 	if v, ok := raw["hasRemainder"]; ok {
 		g.HasRemainder = v.(bool)
+	}
+	if v, ok := raw["outcomeProbs"]; ok {
+		if arr, ok2 := v.([]interface{}); ok2 && len(arr) == 2 {
+			g.OutcomeProbs[0] = arr[0].(float64)
+			g.OutcomeProbs[1] = arr[1].(float64)
+		}
 	}
 	if v, ok := raw["inputConsumed"]; ok {
 		g.InputConsumed = v.(bool)
@@ -833,6 +853,9 @@ func unmarshalHookInto(h *components.Hook, raw map[string]interface{}, ctx *load
 	if v, ok := raw["isOutput"]; ok {
 		h.IsOutput = v.(bool)
 	}
+	if v, ok := raw["hidden"]; ok {
+		h.Hidden = v.(bool)
+	}
 	if v, ok := raw["label"]; ok {
 		h.Label = v.(string)
 	}
@@ -991,6 +1014,8 @@ func remapReferences(comps []components.Component, ctx *loadCtx) {
 			remapQubitsSystemRefs(v, ctx)
 		case *components.Gate:
 			remapGateRefs(v, ctx)
+		case *components.M4Gate:
+			remapM4GateRefs(v, ctx)
 		case *components.CollapseGate:
 			remapCollapseGateRefs(v, ctx)
 		case *components.InfoTable:
@@ -1111,6 +1136,17 @@ func remapCollapseGateRefs(g *components.CollapseGate, ctx *loadCtx) {
 					t.AddHook(h.ID)
 					t.SetWeight(0)
 				}
+			}
+		}
+	}
+}
+
+func remapM4GateRefs(g *components.M4Gate, ctx *loadCtx) {
+	remapCollapseGateRefs(&g.CollapseGate, ctx)
+	if g.StoredSysID != 0 {
+		if newObj, found := ctx.oldToNew[g.StoredSysID]; found {
+			if qs, ok := newObj.(*components.QubitsSystem); ok {
+				g.StoredSysID = qs.ID
 			}
 		}
 	}

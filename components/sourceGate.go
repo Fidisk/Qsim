@@ -82,8 +82,9 @@ func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []com
 	}
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
-	// Output hook on the right edge of the table
-	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, config.OutputHookColor)
+	// Output hook on the right edge of the table, far enough that the
+	// hooked system's state grid clears the table (matches pullToHook).
+	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.GateToHookDist, config.SnapToGridInterval), y, glob.OutputHookRadius, config.OutputHookColor)
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
@@ -108,8 +109,9 @@ func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp
 	}
 	sg.ID = utils.GenerateID(sg)
 	sg.SetWeight(glob.GateWeight)
-	// Output hook on the right edge of the table
-	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.OutputHookRadius, config.SnapToGridInterval), y, glob.OutputHookRadius, config.OutputHookColor)
+	// Output hook on the right edge of the table, far enough that the
+	// hooked system's state grid clears the table (matches pullToHook).
+	sg.OutHook = NewOutputHook(utils.SnapToGrid(x+sgTableWidth/2+glob.GateToHookDist, config.SnapToGridInterval), y, glob.OutputHookRadius, config.OutputHookColor)
 	sg.OutHook.Label = "O"
 	sg.OutHook.AllowQubitSystem = true
 	sg.OutHook.IsOutput = true
