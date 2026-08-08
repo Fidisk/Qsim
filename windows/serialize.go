@@ -205,13 +205,13 @@ func serializeCollapseGate(g *components.CollapseGate) map[string]interface{} {
 		hooks[i] = serializeHook(h)
 	}
 	return map[string]interface{}{
-		"type":       "CollapseGate",
-		"id":         g.ID,
-		"center":     vec2Map(g.Center),
-		"radius":     g.Radius,
-		"color":      colorMap(g.Color),
-		"isFixed":    g.IsFixed,
-		"weight":     g.GetWeight(),
+		"type":         "CollapseGate",
+		"id":           g.ID,
+		"center":       vec2Map(g.Center),
+		"radius":       g.Radius,
+		"color":        colorMap(g.Color),
+		"isFixed":      g.IsFixed,
+		"weight":       g.GetWeight(),
 		"label":        g.Label,
 		"inputCount":   g.InputCount,
 		"forceMode":    g.ForceMode,
@@ -244,6 +244,7 @@ func serializeM4Gate(g *components.M4Gate) map[string]interface{} {
 		"hasRemainder":  g.HasRemainder,
 		"inputConsumed": g.InputConsumed,
 		"storedPos":     g.StoredPos,
+		"storedSysID":   g.StoredSysID,
 		"hooks":         hooks,
 	}
 	if g.StoredInput != nil {

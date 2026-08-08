@@ -12,6 +12,13 @@ JSON:
 - `cmd/examples/gen-qft/main.go` (`go run ./cmd/examples/gen-qft`): a 3-qubit
   QFT showing how multi-input gates (3-qubit, 8×8 operations) thread a whole
   entangled system between stages.
+- `cmd/examples/gen-adder/main.go` (`go run ./cmd/examples/gen-adder`): a
+  4-bit ripple-carry adder (7 + 5 = 12) with one 16×16 permutation gate per
+  bit, verified against all 256 input pairs, and M2 remainder chains that
+  keep every running system small.
+- `cmd/examples/gen-adder2/main.go` (`go run ./cmd/examples/gen-adder2`):
+  the simple 2-bit adder (2 + 1 = 3): a single 6-qubit 64×64 gate for the
+  whole addition plus a 3-gate M2 readout chain.
 
 ## 1. File structure
 
@@ -175,6 +182,17 @@ system every frame.
   complex). Input order in the hook list matters: input `I0` becomes the
   first (high) column when a multi-input gate runs, then qubits are
   re-ordered to the matrix's basis order by `SwapColumn`.
+- **Critical wiring constraint**: `Gate.CalculateOutPut` merges the input
+  parent systems in hook order (each system once), then calls
+  `SwapColumn(i, FindID(I_i))` for each input. That swap sequence only
+  leaves the inputs where the matrix expects them when the inputs are
+  already the **leading modifiers** of the merged system (the swap is a
+  no-op for them); inputs that sit mid-system get scrambled. So wire gates
+  so that the hook order makes the merged modifier list start with the
+  inputs in order — e.g. by feeding fresh single-qubit systems first and
+  ordering hooks `(fresh..., existing...)` so the merged list grows as
+  `[I0, I1, ..., In-1, rest...]`. This is why the adder generator uses one
+  4-input gate per bit with hooks `(c_{i+1}, a_i, b_i, c_i)`.
 - Reference matrices: H `[[1,1],[1,-1]]/√2`, X `[[0,1],[1,0]]`, Z
   `[[1,0],[0,-1]]`, CNOT (control qubit 0 → target qubit 1)
   `[[1,0,0,0],[0,1,0,0],[0,0,0,1],[0,0,1,0]]`, CZ

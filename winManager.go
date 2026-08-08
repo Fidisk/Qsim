@@ -23,12 +23,16 @@ var winManager []pWindow
 var panel *windows.RenderWindow
 
 func shuffleWinManager() {
-	sort.Slice(winManager, func(i, j int) bool {
+	// Stable sort keeps same-priority windows in their existing z-order
+	// (unstable sort would reshuffle them every frame).
+	sort.SliceStable(winManager, func(i, j int) bool {
 		return winManager[i].GetPriority() > winManager[j].GetPriority()
 	})
 
+	// The window receiving the click is moved up, but only within its own
+	// priority group: it never jumps above a window with higher priority.
 	for i := max(0, len(winManager)-1); i > 0; i-- {
-		if winManager[i].IsActive() {
+		if winManager[i].IsActive() && winManager[i-1].GetPriority() == winManager[i].GetPriority() {
 			winManager[i-1], winManager[i] = winManager[i], winManager[i-1]
 		}
 		winManager[i].SetActive(false)

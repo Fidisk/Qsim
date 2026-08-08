@@ -11,16 +11,19 @@ import (
 )
 
 // M4Gate is a measurement gate like M2 (CollapseGate) that outputs the measured
-// outcome as a logical bit plus the conditioned remainder state. Once measured,
-// it removes the input qubit determinator so the original qubit cannot be reused,
-// and then toggles its output value every N frames. Right-click the gate body
-// to set the flip interval.
+// outcome as a logical bit plus the conditioned remainder state. Unlike M2 it
+// does not eat the input qubit: the plugged determinator stays hooked and
+// visible, and the system it belongs to is committed to this gate (its other
+// determinators hide / disconnect — a qubit system feeds one gate at a time).
+// The gate then toggles its output value every N frames. Right-click the gate
+// body to set the flip interval.
 type M4Gate struct {
 	CollapseGate
 	FrameCount    int
-	InputConsumed bool
+	InputConsumed bool // input snapshot taken (and current)
 	StoredInput   *qubits.QubitStateManager
 	StoredPos     int32
+	StoredSysID   int32 // parent system the snapshot was taken from
 	SwapInterval  int
 
 	// inline editor state for the flip interval
@@ -38,7 +41,7 @@ func NewM4Gate(x, y, radius float32, color rl.Color) *M4Gate {
 	tmp.Circle = *NewCircle(x, y, radius, color)
 	tmp.Label = "M4"
 	tmp.InputCount = 1
-	tmp.Tooltip = "Oscillating measurement: behaves like M2, consumes the input qubit, then toggles the measured output. Right-click to set the flip interval."
+	tmp.Tooltip = "Oscillating measurement: behaves like M2, locks the input qubit (one gate per qubit system), then toggles the measured output. Right-click to set the flip interval."
 	tmp.ID = utils.GenerateID(tmp)
 	tmp.SetWeight(glob.GateWeight)
 	tmp.ConsumeInput = true
@@ -98,10 +101,15 @@ func (m *M4Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvail
 		return
 	}
 
-	if !m.InputConsumed {
+	// The input qubit is NOT consumed: it stays hooked (and visible). When
+	// the plugged qubit changes (different parent system), re-measure
+	// against the new system instead of toggling a stale snapshot.
+	if !m.InputConsumed || m.inputChanged() {
 		m.storeInput()
-		m.ConsumeMeasuredInput()
 		m.InputConsumed = true
+		m.Measured = false
+		m.FrameCount = 0
+		return
 	}
 
 	m.FrameCount++
@@ -185,16 +193,24 @@ func (m *M4Gate) Draw() {
 }
 
 // storeInput copies the input state and measured-qubit position so the gate can
-// keep toggling its output even after the original input determinator has been
-// consumed.
+// keep toggling its output even while the input stays hooked. The parent system
+// ID is remembered so an input swap can be detected and re-measured.
 func (m *M4Gate) storeInput() {
 	_, _, qp, pos, ok := m.getMeasuredInput()
 	if !ok || qp.Origin == nil {
 		return
 	}
 	m.StoredPos = pos
+	m.StoredSysID = qp.ID
 	m.StoredInput = qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	m.StoredInput.CopyFrom(qp.Origin)
+}
+
+// inputChanged reports whether the determinator currently plugged into the
+// gate belongs to a different parent system than the stored snapshot.
+func (m *M4Gate) inputChanged() bool {
+	_, _, qp, _, ok := m.getMeasuredInput()
+	return !ok || qp == nil || qp.Origin == nil || qp.ID != m.StoredSysID
 }
 
 // swapOutput toggles the realized measurement result and re-emits the outputs

@@ -14,11 +14,23 @@ type ToggleButton struct {
 	OnClick       func()      // called when toggled ON
 	OffClick      func()      // called when toggled OFF
 	toggled       func() bool // current state: true = pressed/down
+	// OnPress is called the moment the press begins, so drag-out buttons can
+	// activate their mode immediately (button stays held down and the spawn
+	// ghost follows the mouse while dragging to the canvas).
+	OnPress func()
+	// OnDragOut is called with the screen position when the button is pressed
+	// and released somewhere else (drag-out). When set, the press is not
+	// cancelled when the mouse leaves the button, so the button can be
+	// dragged out of a toolbar; leave nil to cancel the press on mouse-leave.
+	OnDragOut func(screenPos rl.Vector2)
 	// Tooltip is shown in the floating tooltip window while the button is
 	// hovered. Leave empty for no tooltip.
 	Tooltip string
 	held    bool // mouse is currently pressed inside the button
 	hovered bool
+	// wasToggled records the state at press time, so clicking an already
+	// selected drag-out button unselects it instead of keeping it on.
+	wasToggled bool
 }
 
 func NewToggleButton(x, y, width, height float32, color rl.Color, label string, state func() bool, fontsize int32, onClick, offClick func()) *ToggleButton {
@@ -57,30 +69,48 @@ func (tb *ToggleButton) Update(worldMouse rl.Vector2, holdingCursor bool, isCurs
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (tb.held || *isCursorAvailable) {
 			tb.held = true
 			*isCursorAvailable = false
+			// Capture the state before OnPress flips it, so a click on an
+			// already selected button can unselect it on release.
+			tb.wasToggled = tb.toggled()
+			if tb.OnPress != nil {
+				tb.OnPress()
+			}
 		}
 	}
 
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
 		if tb.held {
-			// Toggle only if released inside the button
+			// Released inside the button: plain toggle buttons flip their
+			// state; drag-out buttons already activated on press, so a simple
+			// click leaves the mode on — unless the button was already
+			// selected, in which case the click unselects it.
 			if over {
-				if !tb.toggled() {
-					if tb.OnClick != nil {
-						tb.OnClick()
+				if tb.OnDragOut == nil {
+					if !tb.toggled() {
+						if tb.OnClick != nil {
+							tb.OnClick()
+						}
+					} else {
+						if tb.OffClick != nil {
+							tb.OffClick()
+						}
 					}
-				} else {
+				} else if tb.wasToggled {
 					if tb.OffClick != nil {
 						tb.OffClick()
 					}
 				}
+			} else if tb.OnDragOut != nil {
+				tb.OnDragOut(rl.GetMousePosition())
 			}
 			tb.held = false
 			*isCursorAvailable = true
 		}
 	}
 
-	// Cancel press if mouse leaves the button while held
-	if tb.held && !over {
+	// Cancel press if mouse leaves the button while held — unless the button
+	// supports drag-out, which keeps the press alive until release.
+	if tb.held && !over && tb.OnDragOut == nil {
 		tb.held = false
 		*isCursorAvailable = true
 	}

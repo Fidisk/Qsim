@@ -61,23 +61,86 @@ func ParseMatrixSpec(spec string) (int32, [][]complex64, error) {
 	return n, op, nil
 }
 
+// parseMatrixEntry parses a single matrix entry in either form:
+//
+//	"re" or "re,im"          (comma form:  0.7  or  0.7,0.3)
+//	"a+bi" / "a-bi" / "i"    (math form:   0.7+0.3i, 1-i, i, -i, 2i)
+//
+// Exponent signs are respected ("1e-3+2i" splits at the plus, not the e-).
 func parseMatrixEntry(s string) (complex64, error) {
-	parts := strings.Split(s, ",")
-	if len(parts) > 2 {
-		return 0, fmt.Errorf("bad entry %q (want re or re,im)", s)
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty entry")
 	}
-	re, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return 0, fmt.Errorf("bad entry %q", s)
-	}
-	im := float64(0)
-	if len(parts) == 2 {
-		im, err = strconv.ParseFloat(parts[1], 64)
+
+	if strings.Contains(s, ",") {
+		parts := strings.Split(s, ",")
+		if len(parts) != 2 {
+			return 0, fmt.Errorf("bad entry %q (want re, re,im or a+bi)", s)
+		}
+		re, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
 		if err != nil {
 			return 0, fmt.Errorf("bad entry %q", s)
 		}
+		im, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err != nil {
+			return 0, fmt.Errorf("bad entry %q", s)
+		}
+		return complex64(complex(re, im)), nil
 	}
-	return complex64(complex(re, im)), nil
+
+	hasImag := strings.HasSuffix(s, "i")
+	body := s
+	if hasImag {
+		body = s[:len(s)-1]
+		switch body {
+		case "":
+			return complex64(1i), nil // "i"
+		case "+":
+			return complex64(1i), nil
+		case "-":
+			return complex64(-1i), nil // "-i"
+		}
+		// Split real/imag at the last sign that is not an exponent sign.
+		split := -1
+		for i := len(body) - 1; i > 0; i-- {
+			c := body[i]
+			if (c == '+' || c == '-') && body[i-1] != 'e' && body[i-1] != 'E' {
+				split = i
+				break
+			}
+		}
+		if split == -1 {
+			im, err := strconv.ParseFloat(body, 64) // pure imaginary: "2i"
+			if err != nil {
+				return 0, fmt.Errorf("bad entry %q", s)
+			}
+			return complex64(complex(0, im)), nil
+		}
+		re, err := strconv.ParseFloat(body[:split], 64)
+		if err != nil {
+			return 0, fmt.Errorf("bad entry %q", s)
+		}
+		if split == len(body)-1 {
+			// Trailing sign means the imaginary coefficient is 1: "1-i".
+			im := float64(1)
+			if body[split] == '-' {
+				im = -1
+			}
+			return complex64(complex(re, im)), nil
+		}
+		im, err := strconv.ParseFloat(body[split:], 64)
+		if err != nil {
+			return 0, fmt.Errorf("bad entry %q", s)
+		}
+		return complex64(complex(re, im)), nil
+	}
+
+	re, err := strconv.ParseFloat(s, 64) // pure real: "1", "-0.5", "1e-3"
+	if err != nil {
+		return 0, fmt.Errorf("bad entry %q (want re, re,im or a+bi)", s)
+	}
+	return complex64(complex(re, 0)), nil
 }
 
 // formatMatrixSpec renders the gate's current matrix in the edit-buffer
@@ -104,8 +167,9 @@ func formatMatrixSpec(n int32, op [][]complex64) string {
 
 // processEditing handles the inline table editor: the same name-and-matrix
 // table shown on hover, now interactive. Click a cell to type its value
-// ("0.7" or "0.7,0.3"), use the +/- buttons to change the qubit count,
-// Escape closes the editor.
+// ("0.7" or "0.7,0.3"), use the +/- buttons to change the qubit count;
+// Enter closes the editor and auto-applies the matrix (raylib's default exit
+// key is Escape, so it must not be the way out of the editor).
 func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	c.cursorBlink += rl.GetFrameTime()
 	if c.cursorBlink > 0.5 {
@@ -116,7 +180,7 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	if c.editingCell {
 		key := rl.GetCharPressed()
 		for key > 0 {
-			if strings.ContainsRune("0123456789.,-+eE ", key) && len(c.cellBuffer) < 32 {
+			if strings.ContainsRune("0123456789.,-+eEi ", key) && len(c.cellBuffer) < 32 {
 				c.cellBuffer += string(key)
 			}
 			key = rl.GetCharPressed()
@@ -128,19 +192,25 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 			v, err := parseMatrixEntry(c.cellBuffer)
 			if err != nil {
 				c.editErr = err.Error()
-			} else {
-				c.Operation[c.cellRow][c.cellCol] = v
-				c.editErr = ""
-				c.notice = ""
+				return
 			}
-			c.editingCell = false
+			c.Operation[c.cellRow][c.cellCol] = v
+			c.editErr = ""
+			c.notice = ""
+			// Enter closes the editor: auto-apply the matrix (projecting to
+			// the nearest unitary when needed) and leave edit mode.
+			c.finalizeEdit()
+			c.editing = false
+			c.holdingCursor = false
+			*isCursorAvailable = true
 			return
 		}
 		if rl.IsKeyPressed(rl.KeyEscape) {
 			c.editingCell = false
+			return
 		}
 		// Clicking a different cell commits the current edit and moves the
-		// editor there; cancelling a pending edit with Enter/Esc still works.
+		// editor there; Escape cancels the pending edit.
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && (c.holdingCursor || *isCursorAvailable) {
 			x, _, _, _, cell, gridY, _ := c.editPanelGeom()
 			size := int32(1) << c.InputCount
@@ -204,16 +274,31 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 			}
 		}
 	}
-	if rl.IsKeyPressed(rl.KeyEscape) {
-		if !unitary.IsUnitary(c.Operation, unitary.Tolerance) {
-			dev := unitary.Error(c.Operation)
-			c.Operation = unitary.NearestUnitary(c.Operation)
-			c.notice = fmt.Sprintf("projected to nearest unitary (dev was %.3g)", dev)
-			c.noticeTimer = 4
-		}
+	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
+		c.finalizeEdit()
 		c.editing = false
 		c.holdingCursor = false
 		*isCursorAvailable = true
+		return
+	}
+	if rl.IsKeyPressed(rl.KeyEscape) {
+		c.finalizeEdit()
+		c.editing = false
+		c.holdingCursor = false
+		*isCursorAvailable = true
+		return
+	}
+}
+
+// finalizeEdit auto-applies the edited matrix on editor close: if it is not
+// unitary within tolerance it is projected to the nearest unitary and a
+// transient notice is queued.
+func (c *Gate) finalizeEdit() {
+	if !unitary.IsUnitary(c.Operation, unitary.Tolerance) {
+		dev := unitary.Error(c.Operation)
+		c.Operation = unitary.NearestUnitary(c.Operation)
+		c.notice = fmt.Sprintf("projected to nearest unitary (dev was %.3g)", dev)
+		c.noticeTimer = 4
 	}
 }
 
@@ -260,7 +345,11 @@ func (c *Gate) DrawEditPanel() {
 	gridX := x + 6
 
 	rl.DrawRectangleRec(rl.Rectangle{X: x, Y: y, Width: w, Height: h}, rl.NewColor(30, 30, 30, 235))
-	rl.DrawRectangleLinesEx(rl.Rectangle{X: x, Y: y, Width: w, Height: h}, 1.5, c.Color)
+	borderColor := c.Color
+	if !unitary.IsUnitary(c.Operation, unitary.Tolerance) {
+		borderColor = rl.Orange
+	}
+	rl.DrawRectangleLinesEx(rl.Rectangle{X: x, Y: y, Width: w, Height: h}, 1.5, borderColor)
 
 	labelW := rl.MeasureText(c.Label, 18)
 	rl.DrawText(c.Label, int32(x+(w-float32(labelW))/2), int32(y+4), 18, c.Color)
@@ -268,15 +357,6 @@ func (c *Gate) DrawEditPanel() {
 	sizeRowY := y + 4 + 18 + 4
 	qtext := "qubits: " + strconv.Itoa(int(c.InputCount))
 	rl.DrawText(qtext, int32(x+8), int32(sizeRowY), 14, rl.White)
-
-	dev := unitary.Error(c.Operation)
-	indicator := "unitary: ok"
-	indCol := rl.Lime
-	if dev > unitary.Tolerance {
-		indicator = fmt.Sprintf("unitary dev: %.3g", dev)
-		indCol = rl.Orange
-	}
-	rl.DrawText(indicator, int32(x+8)+rl.MeasureText(qtext, 14)+14, int32(sizeRowY), 14, indCol)
 
 	minusRect := rl.Rectangle{X: x + w - 54, Y: sizeRowY, Width: 22, Height: 20}
 	plusRect := rl.Rectangle{X: x + w - 28, Y: sizeRowY, Width: 22, Height: 20}

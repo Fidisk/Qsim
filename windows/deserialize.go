@@ -519,6 +519,9 @@ func unmarshalM4Gate(raw map[string]interface{}, ctx *loadCtx) *components.M4Gat
 	if v, ok := raw["storedPos"]; ok {
 		g.StoredPos = int32(v.(float64))
 	}
+	if v, ok := raw["storedSysID"]; ok {
+		g.StoredSysID = int32(v.(float64))
+	}
 	if v, ok := raw["storedInput"]; ok {
 		if si, ok2 := v.(map[string]interface{}); ok2 {
 			g.StoredInput = unmarshalQubitStateManager(si)

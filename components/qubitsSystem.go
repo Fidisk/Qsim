@@ -29,6 +29,7 @@ type QubitsSystem struct {
 	startX                float32
 	startY                float32
 	hovered               bool
+	pressPos              rl.Vector2
 
 	//Spagetti
 	InfoHookID int32
@@ -73,6 +74,7 @@ func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 		c.holdingCursor = true
 		c.offset = rl.Vector2Subtract(c.Center, worldMouse)
 		c.VirtualCenter = c.Center
+		c.pressPos = worldMouse
 	}
 }
 
@@ -149,10 +151,110 @@ func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
 	return cnt == int(inputCount)
 }
 
+// qubitCycle is the click-cycle of single-qubit states, in order:
+// |0> -> |1> -> |+> -> |-> -> |i> -> |-i>. Freshly spawned qubits start at
+// |i> (see SpawnObject), so the first click goes |i> -> |-i>.
+var qubitCycle = []struct {
+	name string
+	amps []complex64
+}{
+	{"|0>", []complex64{1, 0}},
+	{"|1>", []complex64{0, 1}},
+	{"|+>", []complex64{h, h}},
+	{"|->", []complex64{h, -h}},
+	{"|i>", []complex64{h, ih}},
+	{"|-i>", []complex64{h, -ih}},
+}
+
+var h = complex64(complex(float32(1/math.Sqrt(2)), 0))  // 1/√2
+var ih = complex64(complex(0, float32(1/math.Sqrt(2)))) // i/√2
+
+// qubitStateName returns the cycle name of the given single-qubit state, or
+// "" when it is not one of the six cycle states.
+func qubitStateName(amps []complex64) string {
+	for _, s := range qubitCycle {
+		ok := len(amps) == len(s.amps)
+		for i := range s.amps {
+			if ok && complexAbs(amps[i]-s.amps[i]) > 1e-4 {
+				ok = false
+			}
+		}
+		if ok {
+			return s.name
+		}
+	}
+	return ""
+}
+
+// nextQubitState returns the amplitude vector that follows the given one in
+// the cycle. Unknown states cycle from |0>.
+func nextQubitState(amps []complex64) []complex64 {
+	for i, s := range qubitCycle {
+		match := len(amps) == len(s.amps)
+		for j := range s.amps {
+			if match && complexAbs(amps[j]-s.amps[j]) > 1e-4 {
+				match = false
+			}
+		}
+		if match {
+			return qubitCycle[(i+1)%len(qubitCycle)].amps
+		}
+	}
+	return qubitCycle[1].amps // unknown -> |1> (next after |0>)
+}
+
+// cycleState advances a standalone single-qubit system to the next state in
+// the cycle. The amplitudes are updated in place so the modifier ID, the
+// determinators and any hooked wiring survive the change.
+func (c *QubitsSystem) cycleState() {
+	if c.Origin == nil || c.Origin.Size != 1 || c.HookID != 0 || c.InfoHookID != 0 {
+		return // only standalone normal qubits, not source/gate outputs
+	}
+	next := nextQubitState(c.Origin.Amptitude)
+	copy(c.Origin.Amptitude, next)
+}
+
+func complexAbs(z complex64) float64 {
+	return math.Hypot(float64(real(z)), float64(imag(z)))
+}
+
+// enforceSingleGate implements the "one gate at a time" rule: a qubit system
+// feeds exactly one gate. Once any of its determinators sits in a gate that
+// is filled (all inputs hooked), every other determinator is hidden, and any
+// determinator still hooked to a DIFFERENT gate is disconnected so it cannot
+// be used twice. Determinators of the same system plugged into the same gate
+// (multi-input gates) are left alone.
+func (c *QubitsSystem) enforceSingleGate() {
+	parent := c.GetParent()
+	if parent == nil {
+		return
+	}
+	for _, det := range c.QubitDeterminatorList {
+		if det.HookID == 0 || !gateCalculating(parent, det.HookID) {
+			continue
+		}
+		owner := findHookOwner(parent, det.HookID)
+		for _, other := range c.QubitDeterminatorList {
+			if other == det || other.HookID == 0 {
+				continue
+			}
+			if findHookOwner(parent, other.HookID) == owner {
+				continue // same gate: multi-input gate sharing this system
+			}
+			if h, ok := utils.GetObjectFromID(other.HookID).(*Hook); ok {
+				h.Disconnect()
+			}
+		}
+		return
+	}
+}
+
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	for _, d := range c.QubitList {
 		d.Update()
 	}
+
+	c.enforceSingleGate()
 
 	// Hover state drives the ghost highlight in Draw.
 	c.hovered = !c.dragging && c.CheckCollide(worldMouse)
@@ -167,6 +269,12 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 		c.dragging = false
 		c.holdingCursor = false
 		*isCursorAvailable = true
+
+		// A plain click (no drag) in normal mode on a standalone single
+		// qubit cycles its state: |0> -> |1> -> |+> -> |-> -> |i> -> |-i>.
+		if utils.IsMouseState(glob.MouseStateNormal) && utils.Dist(c.pressPos, worldMouse) < 5 {
+			c.cycleState()
+		}
 
 		// Commit the drop position BEFORE zipping: during the drag only
 		// VirtualCenter moved, so zipToHook must look for hooks around the
@@ -238,6 +346,47 @@ func modifierLabel(id int32) string {
 		}
 	}
 	return strconv.Itoa(int(id))
+}
+
+// trimFloat formats f with two decimals and strips trailing zeros:
+// "1.00" -> "1", "0.50" -> "0.5", "0.00" -> "0".
+func trimFloat(f float64) string {
+	s := strconv.FormatFloat(f, 'f', 2, 64)
+	s = strings.TrimRight(s, "0")
+	s = strings.TrimRight(s, ".")
+	if s == "-0" {
+		s = "0"
+	}
+	return s
+}
+
+// formatCellAmplitude renders one state-grid amplitude compactly, dropping
+// the part that is zero: 1+0i -> "1", 0+1i -> "i", 0 -> "0",
+// 0.7+0.3i -> "0.7+0.3i", 1-1i -> "1-i".
+func formatCellAmplitude(v complex64) string {
+	re := trimFloat(float64(real(v)))
+	im := trimFloat(float64(imag(v)))
+	if im == "0" {
+		return re
+	}
+	if re == "0" {
+		switch im {
+		case "1":
+			return "i"
+		case "-1":
+			return "-i"
+		}
+		return im + "i"
+	}
+	sign := "+"
+	if imag(v) < 0 {
+		sign = "-"
+		im = trimFloat(-float64(imag(v)))
+	}
+	if im == "1" {
+		im = ""
+	}
+	return re + sign + im + "i"
 }
 
 func (c *QubitsSystem) Draw() {
@@ -338,7 +487,7 @@ func (c *QubitsSystem) Draw() {
 			index := row*c.cols + col
 			r := real(c.Origin.Amptitude[index])
 			img := imag(c.Origin.Amptitude[index])
-			numberStr := fmt.Sprintf("%.2f%+.2fi", r, img)
+			numberStr := formatCellAmplitude(complex(r, img))
 
 			// Fade out states with negligible probability
 			p := r*r + img*img
@@ -352,11 +501,12 @@ func (c *QubitsSystem) Draw() {
 			// shown where the modifier names used to be.
 			nameStr := fmt.Sprintf("%0*b", exp, index)
 
-			// Draw number slightly above center (shrink if it would overflow the cell)
+			// Draw number slightly above center. Font stays at 20 and only
+			// scales down when the entry is too wide for the cell.
 			numFontSize := int32(20)
 			numWidth := rl.MeasureText(numberStr, numFontSize)
-			if numWidth > int32(n)-10 {
-				numFontSize = 14
+			for numWidth > int32(n)-10 && numFontSize > 8 {
+				numFontSize--
 				numWidth = rl.MeasureText(numberStr, numFontSize)
 			}
 			rl.DrawText(numberStr,
@@ -379,13 +529,19 @@ func (c *QubitsSystem) Draw() {
 	}
 
 	// Hover: small label above the system naming its qubit determinators
-	// (e.g. "Q0 + Q1 + Q2").
-	if c.hovered {
+	// (e.g. "Q0 + Q1 + Q2"); standalone single qubits also show their cycle
+	// state (|0>, |1>, |+>, |->, |i>, |-i>).
+	if c.hovered && c.Origin != nil {
 		names := make([]string, len(c.Origin.ModifierID))
 		for i, id := range c.Origin.ModifierID {
 			names[i] = modifierLabel(id)
 		}
 		label := strings.Join(names, " + ")
+		if c.Origin.Size == 1 && c.HookID == 0 && c.InfoHookID == 0 {
+			if s := qubitStateName(c.Origin.Amptitude); s != "" {
+				label += "  " + s
+			}
+		}
 		fontSize := int32(16)
 		textWidth := rl.MeasureText(label, fontSize)
 		boxW := float32(textWidth) + 12

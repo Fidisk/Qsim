@@ -544,7 +544,10 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 	case utils.IsSpawnState(glob.Qubit):
 		q := components.NewQubitsSystem(snapped.X, snapped.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 
-		qState := qubits.NewQubitStateManager([]complex64{1, 0}, 1)
+		// Fresh qubits start at |i> = (|0> + i|1>)/√2; clicking the system
+		// cycles |i> -> |-i> -> |0> -> |1> -> |+> -> |->.
+		t := float32(1 / math.Sqrt(2))
+		qState := qubits.NewQubitStateManager([]complex64{complex(t, 0), complex(0, t)}, 1)
 
 		q.Assign(qState)
 

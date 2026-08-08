@@ -96,6 +96,27 @@ func buildFileBrowser() *windows.RenderWindow {
 	return fileWin
 }
 
+// spawnObjectAt spawns the given component type at a screen position, as used
+// by drag-out from the object bar: it finds the top-most spawnable window
+// under the drop point and spawns there (reusing the window's click-to-spawn
+// logic, which also turns the spawn mode back off). Nothing happens when the
+// drop point is not over a spawnable window.
+func spawnObjectAt(screenPos rl.Vector2, state glob.SpawnType) {
+	for i := 0; i < len(winManager); i++ {
+		rw, ok := winManager[i].(*windows.RenderWindow)
+		if !ok || !rw.CanSpawn {
+			continue
+		}
+		if rl.CheckCollisionPointRec(screenPos, rw.GetContentRect()) {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(state)
+			world := rl.GetScreenToWorld2D(screenPos, rw.Camera)
+			rw.OnClick(world)
+			return
+		}
+	}
+}
+
 func main() {
 	InitMainWindow(1600, 900, "Floating Panels")
 
@@ -287,14 +308,22 @@ func main() {
 	spawnBar.SetPriority(100)
 	spawnBar.AddEffect(func() {
 		effect.ConstSize(spawnBar, 100, 800)
-		effect.PinToRight(spawnBar)
+		effect.PinToSide(spawnBar)
 	})
 	// Keep the buttons at their designed screen positions when the bar is
 	// clamped below its 800px design height, so the top buttons don't slide
-	// under the title bar and get clipped.
+	// under the title bar and get clipped. Scroll input is preserved like the
+	// file browser: the wheel moves the camera and the pin only clamps it
+	// back to the design position when scrolled past the top.
 	spawnBar.PinCamera(func() rl.Vector2 {
-		return rl.Vector2{X: 0, Y: (float32(spawnBar.Height) - 800) / 2}
+		base := (float32(spawnBar.Height) - 800) / 2
+		y := spawnBar.Camera.Target.Y
+		if y < base {
+			y = base
+		}
+		return rl.Vector2{X: 0, Y: y}
 	})
+	spawnBar.IsVerticalScrollAllow(true)
 	spawnBar.Rename("Object")
 
 	butByState := map[glob.SpawnType]*components.ToggleButton{}
@@ -309,6 +338,18 @@ func main() {
 				utils.ToggleMouseState(glob.MouseStateSpawn)
 				utils.ToggleSpawnState(state)
 			})
+		// Activate the spawn mode at press time: the button stays held down
+		// and the ghost preview follows the mouse while dragging to the
+		// canvas, just like the click-to-select flow.
+		b.OnPress = func() {
+			utils.SetMouseState(glob.MouseStateSpawn)
+			utils.SetSpawnState(state)
+		}
+		// Drag the button out of the bar and release over a circuit panel to
+		// spawn that component at the drop point.
+		b.OnDragOut = func(screenPos rl.Vector2) {
+			spawnObjectAt(screenPos, state)
+		}
 		butByState[state] = b
 		return b
 	}
