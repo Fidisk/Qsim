@@ -10,7 +10,8 @@
 // Everything else is served from STATIC_DIR (default "./static").
 //
 // Storage is selected with STORAGE=disk (default; files under
-// QSIM_SHARES_DIR, default "./data") or STORAGE=s3 (see storage_s3.go).
+// QSIM_SHARES_DIR, default "./data"). (The web-dev branch adds an S3 backend
+// and an AWS ECS deployment for hosted instances.)
 package main
 
 import (

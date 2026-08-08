@@ -28,8 +28,6 @@ func makeStore(backend string) (store, error) {
 			dir = "./data"
 		}
 		return &diskStore{dir: dir}, nil
-	case "s3":
-		return makeS3Store()
 	default:
 		return nil, osMkdirErr(backend)
 	}
@@ -42,7 +40,7 @@ func osMkdirErr(backend string) error {
 type unknownStoreError struct{ backend string }
 
 func (e *unknownStoreError) Error() string {
-	return "unknown STORAGE=" + e.backend + " (available: disk, s3)"
+	return "unknown STORAGE=" + e.backend + " (available: disk)"
 }
 
 // diskStore keeps one file per share id inside a local directory.
