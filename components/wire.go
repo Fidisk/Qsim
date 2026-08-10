@@ -42,18 +42,30 @@ func DrawWireToTarget(a, b rl.Vector2, thick float32, col rl.Color, target inter
 // the target itself rather than at the hook: a target with several links
 // floats between them while the hooks rest at their anchors, so aiming at the
 // hook would leave the wire short of the target. The wire stops at the
-// target's outline and uses the double-line style for logical carriers.
+// target's drawn outline — the state-grid rectangle edge for a qubit system,
+// the component circle otherwise — and uses the double-line style for logical
+// carriers.
 func DrawHookLink(edge rl.Vector2, t Component, thick float32, col rl.Color) {
-	c := t.GetCircle()
-	r := utils.Dist(edge, c.Center) - c.Radius
-	if r < 0 {
-		r = 0
+	DrawWireToTarget(edge, outlinePoint(t, edge), thick, col, t)
+}
+
+// outlinePoint returns the point on the target's drawn outline toward which a
+// wire from `from` should stop: the grid rectangle edge for a qubit system
+// (its grid is the visible body, far larger than its 30px circle), the
+// component circle otherwise.
+func outlinePoint(t Component, from rl.Vector2) rl.Vector2 {
+	if qs, ok := t.(*QubitsSystem); ok {
+		return qs.OutlinePoint(from)
 	}
-	end := rl.Vector2Add(edge, rl.Vector2Scale(
-		rl.Vector2Normalize(rl.Vector2Subtract(c.Center, edge)),
-		r,
+	c := t.GetCircle()
+	d := utils.Dist(from, c.Center) - c.Radius
+	if d < 0 {
+		d = 0
+	}
+	return rl.Vector2Add(from, rl.Vector2Scale(
+		rl.Vector2Normalize(rl.Vector2Subtract(c.Center, from)),
+		d,
 	))
-	DrawWireToTarget(edge, end, thick, col, t)
 }
 
 // WirePointAt returns the point at parameter t (0..1) along the same cubic

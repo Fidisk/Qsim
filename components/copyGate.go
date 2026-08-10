@@ -177,12 +177,14 @@ func (cg *CopyGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAv
 			outTarget := utils.GetObjectFromID(cg.OutHook.TargetID)
 			if outQS, ok2 := outTarget.(*QubitsSystem); ok2 && outQS.Origin != nil {
 				outQS.CopyFromState(state)
+				outQS.Probability = qs.Probability
 				cg.CopyID = outQS.ID
 			}
 		} else if cg.CopyID == 0 || utils.GetObjectFromID(cg.CopyID) == nil {
 			// Spawn a fresh copy when there is no surviving copy.
 			tmp := NewQubitsSystem(cg.OutHook.Center.X, cg.OutHook.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
 			tmp.IsLogical = true
+			tmp.Probability = qs.Probability
 			tmp.Assign(state)
 			parent := cg.GetParent()
 			if parent != nil {

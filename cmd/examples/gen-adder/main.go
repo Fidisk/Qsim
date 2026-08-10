@@ -217,14 +217,14 @@ func main() {
 		addQubit(srcX, laneOf[id], val, id)
 	}
 
-	// Register captions on the left of the inputs.
-	text(-2400, topY-120, fmt.Sprintf("carry chain c0..c%d", *bits), 18)
-	text(-2400, laneOf[aID[*bits-1]]+80, "A register (left), B register -> sum (right)", 18)
-	text(-2400, laneOf[cID[0]]-120, "input qubits: click to cycle |0> |1> |+> |-> |i> |-i>", 18)
+	// Register captions on the left of the inputs (footnote/note role).
+	text(-2400, topY-120, fmt.Sprintf("carry chain c0..c%d", *bits), 14)
+	text(-2400, laneOf[aID[*bits-1]]+80, "A register (left), B register -> sum (right)", 14)
+	text(-2400, laneOf[cID[0]]-120, "input qubits: click to cycle |0> |1> |+> |-> |i> |-i>", 14)
 
-	// Title + protocol explanation.
+	// Title (title role) + protocol explanation (note role).
 	text(-1900, -2800, fmt.Sprintf("%d-bit quantum ripple-carry adder: %d + %d = %d", *bits, A, B, A+B), 28)
-	expl := components.NewTextBox(-1900, -2660, 1300, 60, 16)
+	expl := components.NewTextBox(-1900, -2660, 1300, 60, 14)
 	expl.Text = "One 4-input ADD gate per bit computes the sum bit s_i = a_i XOR b_i XOR c_i into the B register and the carry-out c_{i+1} = majority(a_i,b_i,c_i). M2 measurements after each bit read a_i, b_i and c_i off the chain, keeping every running system at 4 qubits (the drawn grid doubles per qubit)."
 	comps = append(comps, expl)
 
@@ -341,6 +341,12 @@ func main() {
 	mx := float32(-1200) + float32(*bits)*bitGap + m1
 	measure(mx, cID[*bits], (A+B)>>*bits)
 	text(mx, -2800, fmt.Sprintf("Sum (B register, MSB first) and carry-out C%d -> lights", *bits), 20)
+	// Footnote: measurement choice (docs/qsim-style.md §5). The M2 gates use
+	// forced modes so the save is reproducible; switching a gate to R samples
+	// randomly per measurement instead.
+	text(mx, -2720,
+		"Measurement note: every M2 is forced (badge 0/1) so the readout is reproducible; click a gate to cycle R (random), 0 or 1.",
+		12)
 
 	// Universal-gate note: the ADD operation is one distinct 16×16 type, so
 	// it is explained once (see docs/qsim-style.md §4).

@@ -83,10 +83,9 @@ func TestDeleteCollapseGate(t *testing.T) {
 	}
 }
 
-// Re-measuring an unchanged input state must reuse the realized outcome
-// instead of drawing a new random one. That is what made M2/M3 flicker when a
-// source refreshes identical amplitudes every frame.
-func TestCollapseGateReMeasureStable(t *testing.T) {
+// Forced modes latch their realized outcome: re-measuring an unchanged input
+// state keeps the result, so a deterministic save never flickers.
+func TestCollapseGateForcedStable(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		fn   func() *CollapseGate
@@ -94,9 +93,9 @@ func TestCollapseGateReMeasureStable(t *testing.T) {
 		{"M2", func() *CollapseGate { return NewCollapseGate(0, 0, 30, rl.White, "M2") }},
 		{"M3", func() *CollapseGate { return NewCollapseGate3(0, 0, 30, rl.White, "M3") }},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			mods := []int32{attributes.GenerateQubitModifierID()}
-			for i := 0; i < 50; i++ {
+		for _, want := range []int32{0, 1} {
+			t.Run(tc.name+"_force"+string(rune('0'+want)), func(t *testing.T) {
+				mods := []int32{attributes.GenerateQubitModifierID()}
 				win := &stubWindow{}
 				qs := NewQubitsSystem(0, 0, 30, rl.White)
 				qs.Assign(qubits.NewQubitStateManagerFrom(
@@ -105,22 +104,50 @@ func TestCollapseGateReMeasureStable(t *testing.T) {
 				g := tc.fn()
 				win.PushComponent(g)
 				g.HookList[0].Connect(qs.QubitDeterminatorList[0])
+				g.ForceMode = want + 1
 
-				g.MeasureOutput()
-				first := g.Result
-				g.Measured = false
-				g.MeasureOutput() // re-measure, same state
-				if g.Result != first {
-					t.Fatalf("result changed on re-measure of identical state: %d -> %d", first, g.Result)
+				for i := 0; i < 20; i++ {
+					g.Measured = false
+					g.MeasureOutput()
+					if g.Result != want {
+						t.Fatalf("forced %d returned %d", want, g.Result)
+					}
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
-// A force click clears the reuse fingerprint; forcing then overrides the
-// previously realized random outcome.
-func TestCollapseGateForceOverridesReuse(t *testing.T) {
+// Random mode draws a fresh sample on every measurement: over many samples of
+// a 50/50 state both outcomes must occur.
+func TestCollapseGateRandomResamples(t *testing.T) {
+	mods := []int32{attributes.GenerateQubitModifierID()}
+	win := &stubWindow{}
+	qs := NewQubitsSystem(0, 0, 30, rl.White)
+	qs.Assign(qubits.NewQubitStateManagerFrom(
+		[]complex64{0.7, 0.7}, mods))
+	win.PushComponent(qs)
+	g := NewCollapseGate(0, 0, 30, rl.White, "M2")
+	win.PushComponent(g)
+	g.HookList[0].Connect(qs.QubitDeterminatorList[0])
+
+	saw0, saw1 := false, false
+	for i := 0; i < 200; i++ {
+		g.Measured = false
+		g.MeasureOutput()
+		if g.Result == 0 {
+			saw0 = true
+		} else {
+			saw1 = true
+		}
+	}
+	if !saw0 || !saw1 {
+		t.Fatalf("random mode did not resample: saw0=%v saw1=%v", saw0, saw1)
+	}
+}
+
+// Forcing overrides a previously realized random outcome.
+func TestCollapseGateForceOverridesRandom(t *testing.T) {
 	mods := []int32{attributes.GenerateQubitModifierID()}
 	for i := 0; i < 50; i++ {
 		win := &stubWindow{}
@@ -132,10 +159,9 @@ func TestCollapseGateForceOverridesReuse(t *testing.T) {
 		win.PushComponent(g)
 		g.HookList[0].Connect(qs.QubitDeterminatorList[0])
 
-		g.MeasureOutput() // random outcome, fingerprint stored
+		g.MeasureOutput() // random outcome
 		g.ForceMode = 1
 		g.Measured = false
-		g.measuredHash = false // what CycleForce does
 		g.MeasureOutput()
 		if g.Result != 0 {
 			t.Fatalf("force 0 was not honored after a random measure: result = %d", g.Result)

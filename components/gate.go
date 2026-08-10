@@ -49,6 +49,8 @@ type Gate struct {
 	cellRow     int32
 	cellCol     int32
 	cellBuffer  string
+	sizeEditing bool
+	sizeStr     string
 	notice      string
 	noticeTimer float32
 }
@@ -128,6 +130,8 @@ func (c *Gate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	case utils.IsMouseState(glob.MouseStateErase):
 		c.Destroy()
 	default:
+		// The most recently clicked gate is the Duplicate button's source.
+		LastSelectedGate = c
 		c.dragging = true
 		*isCursorAvailable = false
 		c.holdingCursor = true
@@ -268,6 +272,8 @@ func (c *Gate) MeasureOutput() {
 		}
 		c.OutcomeProbs[hit] = prob
 		c.OutcomeLabels[hit] = fmt.Sprintf("|%d>", hit)
+		// Branch probability: input system probability x outcome probability.
+		branchProb := qp.Probability * prob
 
 		if hit >= len(c.OutPutHook) {
 			continue
@@ -308,11 +314,13 @@ func (c *Gate) MeasureOutput() {
 			if tmp != nil {
 				if qs, ok2 := tmp.(*QubitsSystem); ok2 && qs.Origin != nil {
 					qs.CopyFromState(result)
+					qs.Probability = branchProb
 					continue
 				}
 			}
 		}
 		tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
+		tmp.Probability = branchProb
 		tmp.Assign(result)
 		parent := c.GetParent()
 		if parent != nil {
@@ -327,6 +335,10 @@ func (c *Gate) MeasureOutput() {
 func (c *Gate) CalculateOutPut() bool {
 	QSM := []*qubits.QubitStateManager{}
 	Idx := []int32{}
+	// Branch probability: the product of the probabilities of the unique
+	// input systems (a system feeding several inputs of one gate counts
+	// once).
+	prob := 1.0
 
 	defer func() {
 		QSM = nil
@@ -355,6 +367,7 @@ func (c *Gate) CalculateOutPut() bool {
 			if IsIN(qid) {
 				Idx = append(Idx, QD.ModifierID)
 			} else {
+				prob *= qidObject.Probability
 				tmp := *QD.GetQubitParent().Origin
 				QSM = append(QSM, &tmp)
 				Idx = append(Idx, QD.ModifierID)
@@ -377,11 +390,13 @@ func (c *Gate) CalculateOutPut() bool {
 		tmp := utils.GetObjectFromID(c.OutPutHook[0].TargetID)
 		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
 			qs.CopyFromState(result)
+			qs.Probability = prob
 			return true
 		}
 	}
 
 	tmp := NewQubitsSystem(c.Center.X, c.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
+	tmp.Probability = prob
 	tmp.Assign(result)
 	parent := c.GetParent()
 	if parent != nil {

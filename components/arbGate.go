@@ -188,6 +188,31 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 		if rl.IsKeyPressed(rl.KeyBackspace) && len(c.cellBuffer) > 0 {
 			c.cellBuffer = c.cellBuffer[:len(c.cellBuffer)-1]
 		}
+		// Arrow keys commit the current value and move to the neighbour cell.
+		if rl.IsKeyPressed(rl.KeyUp) || rl.IsKeyPressed(rl.KeyDown) ||
+			rl.IsKeyPressed(rl.KeyLeft) || rl.IsKeyPressed(rl.KeyRight) {
+			if v, err := parseMatrixEntry(c.cellBuffer); err != nil {
+				c.editErr = err.Error()
+				return
+			} else {
+				c.Operation[c.cellRow][c.cellCol] = v
+				c.editErr = ""
+				c.notice = ""
+			}
+			size := int32(1) << c.InputCount
+			switch {
+			case rl.IsKeyPressed(rl.KeyUp) && c.cellRow > 0:
+				c.cellRow--
+			case rl.IsKeyPressed(rl.KeyDown) && c.cellRow < size-1:
+				c.cellRow++
+			case rl.IsKeyPressed(rl.KeyLeft) && c.cellCol > 0:
+				c.cellCol--
+			case rl.IsKeyPressed(rl.KeyRight) && c.cellCol < size-1:
+				c.cellCol++
+			}
+			c.cellBuffer = formatCellValue(c.Operation[c.cellRow][c.cellCol])
+			return
+		}
 		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
 			v, err := parseMatrixEntry(c.cellBuffer)
 			if err != nil {
@@ -211,6 +236,44 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 		}
 		// Clicking a different cell commits the current edit and moves the
 		// editor there; Escape cancels the pending edit.
+		// Arrow keys move the cell selection; typing a value character starts
+		// editing the selected cell.
+		size := int32(1) << c.InputCount
+		if c.cellRow >= size {
+			c.cellRow = size - 1
+		}
+		if c.cellCol >= size {
+			c.cellCol = size - 1
+		}
+		selKey := rl.GetCharPressed()
+		for selKey > 0 {
+			if strings.ContainsRune("0123456789.,-+eEi ", selKey) {
+				c.cellBuffer = string(rune(selKey))
+				c.editingCell = true
+			}
+			selKey = rl.GetCharPressed()
+		}
+		if rl.IsKeyPressed(rl.KeyUp) && c.cellRow > 0 {
+			c.cellRow--
+			c.cellBuffer = formatCellValue(c.Operation[c.cellRow][c.cellCol])
+			return
+		}
+		if rl.IsKeyPressed(rl.KeyDown) && c.cellRow < size-1 {
+			c.cellRow++
+			c.cellBuffer = formatCellValue(c.Operation[c.cellRow][c.cellCol])
+			return
+		}
+		if rl.IsKeyPressed(rl.KeyLeft) && c.cellCol > 0 {
+			c.cellCol--
+			c.cellBuffer = formatCellValue(c.Operation[c.cellRow][c.cellCol])
+			return
+		}
+		if rl.IsKeyPressed(rl.KeyRight) && c.cellCol < size-1 {
+			c.cellCol++
+			c.cellBuffer = formatCellValue(c.Operation[c.cellRow][c.cellCol])
+			return
+		}
+
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && (c.holdingCursor || *isCursorAvailable) {
 			x, _, _, _, cell, gridY, _ := c.editPanelGeom()
 			size := int32(1) << c.InputCount
@@ -240,12 +303,41 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 	x, y, w, _, cell, gridY, _ := c.editPanelGeom()
 	size := int32(1) << c.InputCount
 	sizeRowY := y + 4 + 18 + 4
+	sizeField := rl.Rectangle{X: x + 8 + float32(rl.MeasureText("qubits: ", 14)), Y: sizeRowY - 3, Width: 28, Height: 20}
 	minusRect := rl.Rectangle{X: x + w - 54, Y: sizeRowY, Width: 22, Height: 20}
 	plusRect := rl.Rectangle{X: x + w - 28, Y: sizeRowY, Width: 22, Height: 20}
 
+	// The size field is clickable while editing: type 1-4 and press Enter to
+	// change the qubit count directly (Enter also closes the editor).
+	if c.sizeEditing {
+		key := rl.GetCharPressed()
+		for key > 0 {
+			if key >= '0' && key <= '9' && len(c.sizeStr) < 3 {
+				c.sizeStr += string(rune(key))
+			}
+			key = rl.GetCharPressed()
+		}
+		if rl.IsKeyPressed(rl.KeyBackspace) && len(c.sizeStr) > 0 {
+			c.sizeStr = c.sizeStr[:len(c.sizeStr)-1]
+		}
+		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
+			if v, err := strconv.Atoi(c.sizeStr); err == nil && v >= 1 && v <= maxGateQubits {
+				label := c.Label
+				c.Reconfigure(resizeGateOperation(c.Operation, int32(v)), int32(v))
+				c.Label = label
+				c.notice = ""
+			}
+			c.sizeEditing = false
+		}
+		if rl.IsKeyPressed(rl.KeyEscape) {
+			c.sizeEditing = false
+		}
+		return // typing in the size field: ignore mouse until done
+	}
+
 	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && (c.holdingCursor || *isCursorAvailable) {
 		switch {
-		case rl.CheckCollisionPointRec(worldMouse, plusRect) && c.InputCount < 4:
+		case rl.CheckCollisionPointRec(worldMouse, plusRect) && c.InputCount < maxGateQubits:
 			label := c.Label
 			c.Reconfigure(resizeGateOperation(c.Operation, c.InputCount+1), c.InputCount+1)
 			c.Label = label
@@ -260,6 +352,10 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 				c.notice = "shrunk matrix projected to nearest unitary"
 				c.noticeTimer = 4
 			}
+			return
+		case rl.CheckCollisionPointRec(worldMouse, sizeField):
+			c.sizeEditing = true
+			c.sizeStr = strconv.Itoa(int(c.InputCount))
 			return
 		}
 		gridX := x + 6
@@ -302,11 +398,51 @@ func (c *Gate) finalizeEdit() {
 	}
 }
 
-// editPanelGeom returns the geometry shared by processEditing and
-// DrawEditPanel: the panel rect, the cell size, the grid font, the grid
-// top-left Y and the panel height.
-func (c *Gate) editPanelGeom() (x, y, w, h, cell, gridY float32, font int32) {
-	size := int32(1) << c.InputCount
+// maxGateQubits is the largest input count the universal gate editor allows
+// (8 qubits -> a 256x256 matrix; beyond that the serialized file and the
+// nearest-unitary projection become impractical).
+const maxGateQubits = 8
+
+// LastSelectedGate is the gate most recently clicked in normal mode; the
+// Duplicate button clones it (with its matrix, so it never needs retyping).
+var LastSelectedGate Component
+
+// cloneOperation deep-copies a matrix so the clone and the source never
+// share backing arrays.
+func cloneOperation(op [][]complex64) [][]complex64 {
+	out := make([][]complex64, len(op))
+	for i, row := range op {
+		out[i] = append([]complex64{}, row...)
+	}
+	return out
+}
+
+// DuplicateGate returns a deep copy of a universal gate at (x, y): the
+// operation matrix, label, qubit count and editable flag are carried over,
+// and the input/output hooks are rebuilt fresh (wiring is not copied). ok is
+// false for unsupported types.
+func DuplicateGate(g Component, x, y float32) (Component, bool) {
+	switch src := g.(type) {
+	case *Gate:
+		ng := NewGate(x, y, src.Radius, src.Color, src.Label, cloneOperation(src.Operation), src.InputCount)
+		ng.Editable = src.Editable
+		ng.Tooltip = src.Tooltip
+		ng.IsFixed = src.IsFixed
+		return ng, true
+	case *ControlledUGate:
+		ng := NewControlledUGate(x, y, src.Color)
+		ng.Label = src.Label
+		ng.Tooltip = src.Tooltip
+		ng.IsFixed = src.IsFixed
+		ng.reconfigureOperation(cloneOperation(src.Operation), src.InputCount)
+		return ng, true
+	}
+	return nil, false
+}
+
+// gateCellSize picks the table cell size and entry font for a 2^n matrix,
+// shrinking the cells as the matrix grows so the edit panel stays usable.
+func gateCellSize(size int32) (cell float32, font int32) {
 	switch size {
 	case 2:
 		cell, font = 54, 20
@@ -314,9 +450,22 @@ func (c *Gate) editPanelGeom() (x, y, w, h, cell, gridY float32, font int32) {
 		cell, font = 44, 16
 	case 8:
 		cell, font = 30, 12
-	default:
+	case 16:
 		cell, font = 22, 9
+	case 32:
+		cell, font = 14, 7
+	default:
+		cell, font = 10, 6
 	}
+	return
+}
+
+// editPanelGeom returns the geometry shared by processEditing and
+// DrawEditPanel: the panel rect, the cell size, the grid font, the grid
+// top-left Y and the panel height.
+func (c *Gate) editPanelGeom() (x, y, w, h, cell, gridY float32, font int32) {
+	size := int32(1) << c.InputCount
+	cell, font = gateCellSize(size)
 	gridW := float32(size) * cell
 	w = gridW + 12
 	if labelW := float32(rl.MeasureText(c.Label, 18)) + 12; labelW > w {
@@ -355,8 +504,21 @@ func (c *Gate) DrawEditPanel() {
 	rl.DrawText(c.Label, int32(x+(w-float32(labelW))/2), int32(y+4), 18, c.Color)
 
 	sizeRowY := y + 4 + 18 + 4
-	qtext := "qubits: " + strconv.Itoa(int(c.InputCount))
-	rl.DrawText(qtext, int32(x+8), int32(sizeRowY), 14, rl.White)
+	rl.DrawText("qubits: ", int32(x+8), int32(sizeRowY), 14, rl.White)
+
+	// Clickable size field: type 1-4 directly (see processEditing).
+	sizeField := rl.Rectangle{X: x + 8 + float32(rl.MeasureText("qubits: ", 14)), Y: sizeRowY - 3, Width: 28, Height: 20}
+	rl.DrawRectangleRec(sizeField, rl.NewColor(45, 45, 45, 255))
+	rl.DrawRectangleLinesEx(sizeField, 1.5, rl.SkyBlue)
+	snum := strconv.Itoa(int(c.InputCount))
+	if c.sizeEditing {
+		snum = c.sizeStr
+	}
+	sw := rl.MeasureText(snum, 14)
+	rl.DrawText(snum, int32(sizeField.X)+int32(sizeField.Width)/2-sw/2, int32(sizeField.Y)+3, 14, rl.White)
+	if c.sizeEditing && c.cursorShow {
+		rl.DrawText("|", int32(sizeField.X)+int32(sizeField.Width)/2+sw/2+1, int32(sizeField.Y)+3, 14, rl.SkyBlue)
+	}
 
 	minusRect := rl.Rectangle{X: x + w - 54, Y: sizeRowY, Width: 22, Height: 20}
 	plusRect := rl.Rectangle{X: x + w - 28, Y: sizeRowY, Width: 22, Height: 20}
@@ -393,6 +555,14 @@ func (c *Gate) DrawEditPanel() {
 		gy := gridY
 		rl.DrawLineV(rl.Vector2{X: gx, Y: gy}, rl.Vector2{X: gx, Y: gy + float32(size)*cell}, rl.Gray)
 		rl.DrawLineV(rl.Vector2{X: gridX, Y: gy + float32(i)*cell}, rl.Vector2{X: gridX + float32(size)*cell, Y: gy + float32(i)*cell}, rl.Gray)
+	}
+
+	// Selected cell outline (arrow-key navigation target).
+	if !c.editingCell && c.cellRow >= 0 && c.cellRow < size && c.cellCol >= 0 && c.cellCol < size {
+		rl.DrawRectangleLinesEx(rl.Rectangle{
+			X: gridX + float32(c.cellCol)*cell, Y: gridY + float32(c.cellRow)*cell,
+			Width: cell, Height: cell,
+		}, 2, rl.SkyBlue)
 	}
 
 	if c.editErr != "" {
@@ -508,18 +678,7 @@ func (c *Gate) DrawValuePanel() {
 
 	// Choose a cell size that keeps the whole grid readable; bigger matrices
 	// get smaller cells.
-	var cell float32
-	var font int32
-	switch size {
-	case 2:
-		cell, font = 54, 20
-	case 4:
-		cell, font = 44, 16
-	case 8:
-		cell, font = 30, 12
-	default:
-		cell, font = 22, 9
-	}
+	cell, font := gateCellSize(size)
 
 	label := c.Label
 	fontSize := int32(20)

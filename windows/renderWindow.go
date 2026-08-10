@@ -193,7 +193,37 @@ func (rw *RenderWindow) Draw() {
 		}
 	}
 
+	// Qubit system grids form the bottom layer: a grid never hides a gate,
+	// TextBox, light or wire it overlaps (overlaps are avoided by the
+	// generator's dynamic spacing, but user-dragged systems may still cross
+	// other components). Everything else draws above the grids, then
+	// determinators on top so they stay grabbable.
 	for _, c := range rw.WComp {
+		if _, ok := c.(*components.QubitsSystem); ok {
+			circle := c.GetCircle()
+			if circle.IsDragging() {
+				offset := circle.VirtualCenter.Subtract(circle.Center)
+				children := c.GetChildCircles()
+				for _, child := range children {
+					child.Center = child.Center.Subtract(offset)
+				}
+				c.DrawGhost()
+				for _, child := range children {
+					child.Center = child.Center.Add(offset)
+				}
+				saved := circle.Center
+				circle.Center = circle.VirtualCenter
+				c.Draw()
+				circle.Center = saved
+			} else {
+				c.Draw()
+			}
+		}
+	}
+	for _, c := range rw.WComp {
+		if _, ok := c.(*components.QubitsSystem); ok {
+			continue
+		}
 		circle := c.GetCircle()
 		if circle.IsDragging() {
 			offset := circle.VirtualCenter.Subtract(circle.Center)
@@ -621,6 +651,9 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 	case utils.IsSpawnState(glob.ArbGate):
 		g := components.NewArbGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor)
 		rw.PushComponent(g)
+	case utils.IsSpawnState(glob.CtrlU):
+		cg := components.NewControlledUGate(snapped.X, snapped.Y, config.GateColor)
+		rw.PushComponent(cg)
 	case utils.IsSpawnState(glob.Info):
 		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, config.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
@@ -691,6 +724,8 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		return components.NewControlledGate(0, 0, config.GateColor, components.CtrlZ)
 	case state&glob.ArbGate != 0:
 		return components.NewArbGate(0, 0, glob.GateRadius, config.GateColor)
+	case state&glob.CtrlU != 0:
+		return components.NewControlledUGate(0, 0, config.GateColor)
 	case state&glob.Info != 0:
 		return components.NewInfoTable(0, 0, 260, 40, config.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:

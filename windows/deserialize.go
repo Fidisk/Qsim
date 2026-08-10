@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 
 	"qsim/components"
+	"qsim/config"
 	glob "qsim/globals"
+	"qsim/migration"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
 
@@ -33,6 +35,10 @@ func parseComplex(m map[string]interface{}) complex64 {
 }
 
 func LoadState(data string) []interface{} {
+	// Upgrade older or unnumbered saves to the current format version
+	// before parsing (see qsim/migration).
+	data = migration.Migrate(data)
+
 	var lines []string
 	current := ""
 	for _, c := range data {
@@ -266,6 +272,8 @@ func unmarshalComponent(raw map[string]interface{}, ctx *loadCtx) components.Com
 		return unmarshalCompareGate(raw, ctx)
 	case "ControlledGate":
 		return unmarshalControlledGate(raw, ctx)
+	case "ControlledUGate":
+		return unmarshalControlledUGate(raw, ctx)
 	case "LogicButton":
 		return unmarshalLogicButton(raw, ctx)
 	case "LogicGate":
@@ -331,6 +339,11 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 
 	if v, ok := raw["isLogical"]; ok {
 		qs.IsLogical = v.(bool)
+	}
+	// Default to 1 when a save predates the probability field.
+	qs.Probability = 1
+	if v, ok := raw["probability"]; ok {
+		qs.Probability = v.(float64)
 	}
 
 	if v, ok := raw["isFixed"]; ok {
@@ -542,6 +555,9 @@ func unmarshalM4Gate(raw map[string]interface{}, ctx *loadCtx) *components.M4Gat
 	if v, ok := raw["storedSysID"]; ok {
 		g.StoredSysID = int32(v.(float64))
 	}
+	if v, ok := raw["storedProb"]; ok {
+		g.StoredProb = v.(float64)
+	}
 	if v, ok := raw["storedInput"]; ok {
 		if si, ok2 := v.(map[string]interface{}); ok2 {
 			g.StoredInput = unmarshalQubitStateManager(si)
@@ -653,6 +669,67 @@ func unmarshalControlledGate(raw map[string]interface{}, ctx *loadCtx) *componen
 		unmarshalHookInto(cg.InControl, hookRaw, ctx)
 	}
 	if hookRaw, ok := raw["outHook"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.OutHook, hookRaw, ctx)
+	}
+
+	return cg
+}
+
+func unmarshalControlledUGate(raw map[string]interface{}, ctx *loadCtx) *components.ControlledUGate {
+	center := parseVec2(raw["center"].(map[string]interface{}))
+	color := parseColor(raw["color"].(map[string]interface{}))
+
+	cg := components.NewControlledUGate(center.X, center.Y, color)
+	cg.Center = center
+	cg.Color = color
+	ctx.oldToNew[int32(raw["id"].(float64))] = cg
+
+	if v, ok := raw["isFixed"]; ok {
+		cg.IsFixed = v.(bool)
+	}
+	if v, ok := raw["weight"]; ok {
+		cg.SetWeight(float32(v.(float64)))
+	}
+	if v, ok := raw["label"]; ok {
+		cg.Label = v.(string)
+	}
+	if v, ok := raw["inputCount"]; ok {
+		cg.InputCount = int32(v.(float64))
+	}
+	if v, ok := raw["editable"]; ok {
+		cg.Editable = v.(bool)
+	}
+	opRaw, ok := raw["operation"].([]interface{})
+	if ok {
+		op := make([][]complex64, len(opRaw))
+		for i, row := range opRaw {
+			rowVals := row.([]interface{})
+			op[i] = make([]complex64, len(rowVals))
+			for j, val := range rowVals {
+				op[i][j] = parseComplex(val.(map[string]interface{}))
+			}
+		}
+		cg.Operation = op
+	}
+	// The hook list is sized by the constructor; grow it to the saved qubit
+	// count so every saved input hook gets a slot to unmarshal into.
+	for cg.InputCount > int32(len(cg.QubitHooks)) {
+		cg.QubitHooks = append(cg.QubitHooks, components.NewHook(0, 0, glob.HookRadius, config.HookColor))
+	}
+
+	hooksRaw, ok := raw["hooks"].([]interface{})
+	if ok {
+		for i, hRaw := range hooksRaw {
+			if i >= len(cg.QubitHooks) {
+				continue
+			}
+			unmarshalHookInto(cg.QubitHooks[i], hRaw.(map[string]interface{}), ctx)
+		}
+	}
+	if hookRaw, ok := raw["control"].(map[string]interface{}); ok {
+		unmarshalHookInto(cg.InControl, hookRaw, ctx)
+	}
+	if hookRaw, ok := raw["out"].(map[string]interface{}); ok {
 		unmarshalHookInto(cg.OutHook, hookRaw, ctx)
 	}
 
@@ -1028,6 +1105,8 @@ func remapReferences(comps []components.Component, ctx *loadCtx) {
 			remapCompareGateRefs(v, ctx)
 		case *components.ControlledGate:
 			remapControlledGateRefs(v, ctx)
+		case *components.ControlledUGate:
+			remapControlledUGateRefs(v, ctx)
 		case *components.LogicButton:
 			remapLogicButtonRefs(v, ctx)
 		case *components.LogicGate:
@@ -1251,6 +1330,41 @@ func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 
 func remapControlledGateRefs(cg *components.ControlledGate, ctx *loadCtx) {
 	for _, h := range []*components.Hook{cg.InQubit, cg.InControl, cg.OutHook} {
+		if h.TargetID == 0 {
+			continue
+		}
+		newObj, found := ctx.oldToNew[h.TargetID]
+		if !found {
+			continue
+		}
+		h.TargetID = 0
+		switch t := newObj.(type) {
+		case *components.QubitsSystem:
+			t.HookID = 0
+			t.Center = h.Center
+			h.IsHooked = true
+			h.TargetID = t.ID
+			t.HookID = h.ID
+			t.SetWeight(0)
+		case *components.QubitDeterminator:
+			t.HookID = 0
+			t.Center = h.Center
+			h.IsHooked = true
+			h.TargetID = t.ID
+			t.HookID = h.ID
+			t.SetWeight(0)
+		case *components.LogicalBit:
+			t.Center = h.Center
+			h.IsHooked = true
+			h.TargetID = t.ID
+			t.AddHook(h.ID)
+			t.SetWeight(0)
+		}
+	}
+}
+
+func remapControlledUGateRefs(g *components.ControlledUGate, ctx *loadCtx) {
+	for _, h := range g.GetHooks() {
 		if h.TargetID == 0 {
 			continue
 		}

@@ -24,6 +24,7 @@ type M4Gate struct {
 	StoredInput   *qubits.QubitStateManager
 	StoredPos     int32
 	StoredSysID   int32 // parent system the snapshot was taken from
+	StoredProb    float64
 	SwapInterval  int
 
 	// inline editor state for the flip interval
@@ -203,6 +204,7 @@ func (m *M4Gate) storeInput() {
 	}
 	m.StoredPos = pos
 	m.StoredSysID = qp.ID
+	m.StoredProb = qp.Probability
 	m.StoredInput = qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	m.StoredInput.CopyFrom(qp.Origin)
 }
@@ -222,7 +224,7 @@ func (m *M4Gate) swapOutput() {
 		return
 	}
 	m.Result = 1 - m.Result
-	m.emitOutcome(m.StoredInput, m.StoredPos, m.Result)
+	m.emitOutcome(m.StoredInput, m.StoredPos, m.Result, m.StoredProb)
 }
 
 // DrawGhost draws the ghost preview; keep the M4 label but skip the editor.

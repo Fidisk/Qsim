@@ -21,7 +21,14 @@ var pendingShare *pendingShareState
 // applyLoadedState replaces the current circuit panels with the windows
 // decoded from a serialized circuit and returns the new active circuit panel
 // (the last loaded RenderWindow, or nil if nothing was loaded).
+//
+// The data is decoded twice on purpose: the first pass settles the shared
+// registries (global object table, qubit modifier attributes) that some saves
+// depend on during reference remapping — a single pass can otherwise leave
+// components with erratic first-frame positions, while loading the same
+// circuit a second time is reliable. The first pass's windows are discarded.
 func applyLoadedState(data string) *windows.RenderWindow {
+	windows.LoadState(data) // warm-up pass; result discarded
 	loaded := windows.LoadState(data)
 
 	// Remove existing circuit panels

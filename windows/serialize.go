@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"qsim/components"
+	glob "qsim/globals"
 	"qsim/qubits"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -18,6 +19,7 @@ func (rw *RenderWindow) SaveState() string {
 	}
 	data := map[string]interface{}{
 		"type":                  "RenderWindow",
+		"saveVersion":           glob.SaveVersion,
 		"window":                json.RawMessage(rw.Window.SaveState()),
 		"cameraZoom":            rw.Camera.Zoom,
 		"cameraTargetX":         rw.Camera.Target.X,
@@ -54,6 +56,8 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeCompareGate(v)
 	case *components.ControlledGate:
 		return serializeControlledGate(v)
+	case *components.ControlledUGate:
+		return serializeControlledUGate(v)
 	case *components.LogicButton:
 		return serializeLogicButton(v)
 	case *components.LogicGate:
@@ -134,6 +138,7 @@ func serializeQubitsSystem(qs *components.QubitsSystem) map[string]interface{} {
 		"hookID":             qs.HookID,
 		"infoHookID":         qs.InfoHookID,
 		"isLogical":          qs.IsLogical,
+		"probability":        qs.Probability,
 		"origin":             serializeQubitStateManager(qs.Origin),
 		"qubitDeterminators": dets,
 	}
@@ -248,6 +253,7 @@ func serializeM4Gate(g *components.M4Gate) map[string]interface{} {
 		"inputConsumed": g.InputConsumed,
 		"storedPos":     g.StoredPos,
 		"storedSysID":   g.StoredSysID,
+		"storedProb":    g.StoredProb,
 		"hooks":         hooks,
 	}
 	if g.StoredInput != nil {
@@ -306,6 +312,37 @@ func serializeControlledGate(cg *components.ControlledGate) map[string]interface
 		"inQubit":   serializeHook(cg.InQubit),
 		"inControl": serializeHook(cg.InControl),
 		"outHook":   serializeHook(cg.OutHook),
+	}
+}
+
+func serializeControlledUGate(g *components.ControlledUGate) map[string]interface{} {
+	hooks := make([]map[string]interface{}, len(g.QubitHooks))
+	for i, h := range g.QubitHooks {
+		hooks[i] = serializeHook(h)
+	}
+	op := make([][]map[string]float32, len(g.Operation))
+	for i, row := range g.Operation {
+		opRow := make([]map[string]float32, len(row))
+		for j, val := range row {
+			opRow[j] = complexMap(val)
+		}
+		op[i] = opRow
+	}
+	return map[string]interface{}{
+		"type":       "ControlledUGate",
+		"id":         g.ID,
+		"center":     vec2Map(g.Center),
+		"radius":     g.Radius,
+		"color":      colorMap(g.Color),
+		"isFixed":    g.IsFixed,
+		"weight":     g.GetWeight(),
+		"label":      g.Label,
+		"inputCount": g.InputCount,
+		"editable":   g.Editable,
+		"operation":  op,
+		"hooks":      hooks,
+		"control":    serializeHook(g.InControl),
+		"out":        serializeHook(g.OutHook),
 	}
 }
 

@@ -53,7 +53,9 @@ object.
   and `AfterOutput(gateX, n, margin)` returns the next X that clears it.
   The adder generator derives its whole column pitch from these helpers
   (the chain steps shrink as the remainders shrink: 4 → 3 → 2 → 1 qubits).
-  Never let two components sit inside one grid.
+  Never let two components sit inside one grid — the engine draws grids
+  beneath everything else, so an overlap is visible but never hides another
+  component; keep it out of reach anyway.
 - **Lanes**: pick one Y per qubit wire and never change it mid-circuit.
   Choose a pitch of **200px** (two grid steps) so 2-input gate hooks
   (`±50`) never collide with a neighbor lane. Keep each qubit's X purely
@@ -98,6 +100,79 @@ Use a small number of `LineDraw` separators to define phase boundaries, not
 to outline every component. A line should answer "where does this phase end?"
 without competing with the wires that answer "what is connected?".
 
+### Grouped protocol layout recipe
+
+The adder (`cmd/examples/gen-adder`) is the canonical grouped circuit:
+inputs on the left, one block per bit (gate + caption + measurement
+chain), separators between blocks. The recipe:
+
+1. **Place the inputs group.** One normal `QubitsSystem` per qubit at a
+   common leftmost X (the generator's `srcX`), each on its own lane —
+   200px pitch, MSB on top — with register captions as `TextBox`es above
+   and below the group. Nothing else shares this column.
+2. **Per stage, place one group containing the gate, its caption, and
+   its measurement chain.** The stage's gates share one X column; the
+   caption `TextBox` goes directly under the gate; the chain (`M2` →
+   `LogicalBit` → `Light`) follows immediately right, each step spaced
+   with `layout.AfterOutput` so no remainder grid covers the next
+   component. Keep the group tight: no gap inside it may exceed the
+   inter-stage gap.
+3. **Then the readout group.** On a classical lane `+300px` below the
+   lowest quantum lane, read left → right from the `M2` columns:
+   `LogicalBit`s into `LogicGate`/`CopyGate` → `CompareGate` → a `Light`
+   at the right edge. The circuit's last column is always a light;
+   per-bit lights may also sit on their lanes inside the stage group, as
+   the adder does.
+4. **Separate groups with whitespace and one separator line.** Leave
+   ≥200px of empty X between groups and draw one thin dim vertical
+   `LineDraw` (90/90/90) from the top lane to the classical lane at that
+   gap. One line per phase boundary, never around a single component.
+5. **Let the wires cross the gaps.** A remainder `R` chain or bit link
+   may span the whitespace into the next group — the wire is the
+   connection, the gap is only a visual pause.
+
+```
+ inputs group            stage group (one per step)          readout group
+ ──────────────           ──────────────────────────────      ───────────────
+  lane 0 ─ I ─────────►   ── G ── M2 ── bit ─────────────►    ─ Copy ─ Compare ─ L
+  lane 1 ─ I ─────────►   ── G ── M2 ── bit ─────────────►    ────────────────►
+  lane 2 ─ I ─────────►   ── └─ G ── M2 ── bit ──────────►    (classical lane,
+  (register captions      caption (same group, under G)       +300px below)
+   above/below)                       │
+               │            ≥200px gap + separator; the R chain
+          ≥200px gap      and bit links may cross the gap
+          + separator
+```
+
+Spacing, in one place:
+
+- Lane pitch 200px (two grid steps); every center on the 100px snap grid.
+- Stage pitch: `nextX = layout.AfterOutput(prevGateX, n, margin)` =
+  `prevGateX + 300 + GridW(n)/2 + margin`, with `GridW(n) = 2^ceil(n/2) × 100`
+  (see `docs/qsim-format.md` §3). Adder margins: 200px after a 4-qubit
+  output (pitch 700), 100px after 3- and 2-qubit remainders (pitch 600
+  and 500), and 350px before the next gate (pitch 750) so that gate's
+  input hooks, 300px left of it, stay clear.
+- Inter-stage whitespace: ≥200px — the §3 floor; the grid formula often
+  demands more, which is fine.
+- Readout lane: `+300px` below the lowest quantum lane.
+
+The four Gestalt principles, applied concretely to this recipe:
+
+- **Proximity**: the gate, caption and measurement chain sit inside one
+  group with no internal gap exceeding the ≥200px inter-stage gap, so
+  each stage binds into a single unit before the eye reaches the next.
+- **Similarity**: peer stages reuse the same `TextBox` sizes (20pt step
+  header, 14pt caption) and the built-in gate/light colors, so parallel
+  groups read as parallel phases without re-reading labels.
+- **Connectivity**: only real hook links carry the data — the `R` chain
+  and the bit→light links may cross the gaps, while the one dim
+  separator per phase touches no hook, so it reads as a boundary, not a
+  path.
+- **Continuity**: a continuing qubit or remainder always flows
+  left → right (`R` → next measurement or gate) on its lane and never
+  jumps back across an earlier group.
+
 ### Example layout (abstract)
 
 ```
@@ -128,12 +203,16 @@ always together:
 
    Number the steps (`Step 1`, `Step 2`, ...) so the save can be read as an
    algorithm. Keep one consistent text color/size for step headers and a
-   smaller one for captions. A `TextBox` always auto-fits its text on
-   render; while editing it shows a **+/− pair above the box** to resize the
-   font (which refits the box). A short click steps the size by one; holding
-   the button keeps stepping and the repeat interval shrinks, so holding
-   ramps the scaling up. The sizes in a save are just a starting point the
-   reader can adjust.
+   smaller one for captions (see the size table in §3). A `TextBox` always
+   auto-fits its text on render, so the `width`/`height` in a save are only
+   starting points. While editing, a **`[-] [size] [+]` strip** sits above
+   the box: a short click on **+/−** steps the font size by one; holding a
+   button keeps stepping with an accelerating ramp (the repeat interval
+   shrinks and the step size doubles, up to a 64px cap; the size clamps at
+   6 with no upper bound). The middle **size field** shows the live size —
+   click it and type a new number (Enter commits, Esc cancels). Every
+   change refits the box, so any saved size is just a starting point the
+   reader can re-tune.
 3. **A separator line**: a vertical `LineDraw` between stages, from the top
    lane to the bottom classical lane, thin and dim (so it reads as a grid
    line, not a wire):
@@ -143,6 +222,39 @@ always together:
  "start": {"x": 600, "y": -1600}, "end": {"x": 600, "y": -1000},
  "lineColor": {"r": 90, "g": 90, "b": 90, "a": 255}, "placed": true}
 ```
+
+### Separator line discipline
+
+A separator's only job is to answer "where does this phase end?" — so use
+it **at major stage boundaries only**, where the 200px gap plus header
+already say a new phase starts but the eye could still merge two stages.
+Between short adjacent stages, the gap and header alone are enough; a
+separator no one needs is noise.
+
+- **How many**: at most one per stage boundary, and a handful per save
+  (about 4–6). If a protocol would need more, it is over-fragmented:
+  merge minor steps into phases and separate the phases, not the
+  micro-steps. Too many separators is worse than none — the canvas reads
+  as a fence instead of a circuit.
+- **Color**: dim mid-gray, e.g. `{"r": 90, "g": 90, "b": 90, "a": 255}` —
+  darker than the wire palette, lighter than the background grid. Never
+  white (that is the `LineDraw` default and reads as a signal), never a
+  bright or saturated color.
+- **Thickness**: a `LineDraw` has no thickness field — it always renders
+  at 2px — so dimness is conveyed by color alone. If a separator looks
+  as bold as a hook, its color is wrong.
+- **Geometry**: vertical, crossing every lane at the boundary X, from
+  above the top lane to below the bottom classical lane. Place it in the
+  empty gap, clear of gates, hooks and boxes.
+
+**A separator must never be mistaken for a wire.** Wires are the curved,
+hooked, blue/pink lines that carry signals; a separator carries nothing.
+So a separator must not: run horizontally along a lane (horizontal = a
+wire); use the wire palette (hook blue, output-hook pink, or anything
+bright enough to catch the eye as a signal); touch or cross a hook, gate
+or system (crossing a gate's position reads as a data path); or end on a
+component. Bare ends, straight line, vertical, dim gray — if a reader
+could imagine a qubit or bit traveling on it, it is wrong.
 
 ### Step header wording
 
@@ -164,6 +276,34 @@ header instead of a one-line box:
  "text": "CX entangles the message qubit with the Bell pair: the pair's state is now conditioned on Alice's qubit.",
  "fontSize": 14}
 ```
+
+### Text size by role
+
+Pick the font size from the role, not the available space; a reader
+should see the hierarchy at a glance without reading a word:
+
+| Role              | `fontSize` | Where it lives                                            |
+|-------------------|------------|-----------------------------------------------------------|
+| Title             | 24–28      | one per save, above the first lane, centered over the circuit |
+| Step header       | 18–20      | above each stage, centered over its lanes (item 2)        |
+| Caption           | 14–16      | directly under the gate or step it explains, inside its group |
+| Footnote / note   | 12–14      | prose, caveats, cross-references ("same U as step 2")     |
+
+- **Captions stay short and close**: 1–2 lines, placed **inside the
+  group they explain** — under the gate, within the step's X span, never
+  straddling a gap or a separator (proximity beats arrows). A `TextBox`
+  has no word-wrap; a long string just widens the box, so break lines
+  yourself (`\n`). Text that would run 3+ lines is a note, not a caption:
+  shorten it and move the detail to a footnote box.
+- **Hierarchy**: the title is the largest text on the canvas; everything
+  else steps down (headers, then captions, then notes). Resist raising a
+  header to title size or a caption to header size.
+- **Mechanics** (see item 2): `TextBox` always auto-fits its box to its
+  text, so the sizes above are starting points. While editing, the
+  `[-] [size] [+]` strip above the box shows the live size in the middle
+  field (click to type a number, Enter commits) and the **+/−** buttons
+  step the size by one — hold either to ramp, and the box refits on every
+  change.
 
 ---
 
@@ -206,10 +346,11 @@ teach:
 - **M1 (`M`)**: show both outcome branches and their probabilities at once.
   Use it when the protocol's alternatives are the point of the figure.
 - **M2**: realize one outcome and emit a `LogicalBit`. Use it when the next
-  step needs a concrete classical result. Mode `0` (`R`) samples according
-  to probability; modes `0`/`1` in the UI force the corresponding outcome
-  for a deterministic case. Use forced modes for reproducible saves and
-  random mode for distributions.
+  step needs a concrete classical result. The UI badge shows `R`, `0`, or
+  `1` for the force mode: `R` samples according to probability, while the
+  `0`/`1` badges (ForceMode `1`/`2`) force the corresponding outcome for a
+  deterministic case. Use forced modes for reproducible saves and random
+  mode for distributions.
 - **M3**: realize one outcome but emit the measured qubit as a normal
   one-qubit system. Use it when the collapsed qubit continues into a
   quantum gate; its `R` output is the remaining conditioned system.
@@ -222,6 +363,19 @@ For M2/M3/M4, chain the `R` output into the next operation when you need to
 keep a system's drawn grid small or enforce the one-gate-at-a-time rule. A
 filled gate claims its system: unused determinators hide, and determinators
 already connected to another gate are disconnected.
+
+**Which measurement should I use?**
+
+- **M1** — shows both outcome branches at once (all possibilities). Pick it when
+  the alternatives are the point of the figure.
+- **M2** — realizes one result. Force modes (badges `0`/`1`) pin a deterministic
+  `|0>`/`|1>` for reproducible saves; `R` mode samples randomly per measurement
+  for varied distributions.
+- **M3** — the same selection as M2, but the outcome continues as a qubit system
+  (feeds quantum gates).
+- **M4** — flips the M2-style result every `x` ticks. Suited to close-amplitude
+  outcomes where the changing result must be visualized; normally used in the
+  `R`/random presentation form.
 
 ## 6. Classical visualization: let the result be seen
 
@@ -246,6 +400,11 @@ measurements:
   received state produces a `LogicalBit`; a `Light` on it is the circuit
   asserting "teleportation worked". Keep the two compared wires
   horizontal and converging on the gate.
+- **`ControlledUGate` (`cU`)** — the classical-control tool: a universal
+  matrix (edited like the `U` gate) that applies only while a hooked
+  `LogicalBit` is 1. Use it for classically conditioned corrections — "apply
+  this operator only if that measured bit was set" — the quantum-lane mirror
+  of a `LogicGate`.
 
 Telepor2's verification chain restyled: `CopyGate` (pristine copy of the
 message qubit) → `CompareGate` (copy vs. Bob's received qubit) →
@@ -304,6 +463,10 @@ Before calling a save "styled":
       a `LineDraw` separator.
 - [ ] Every step has a one-line header; complex steps have a `TextBox`
       explaining the idea.
+- [ ] At most one dim, vertical `LineDraw` per stage boundary, a handful
+      per save, never colored or shaped like a wire (see §3).
+- [ ] Text sizes follow the §3 role table; captions are 1–2 lines and sit
+      inside the group they explain.
 - [ ] Every distinct `U`-gate type is renamed and annotated at least once.
 - [ ] Every custom matrix gate has `editable:true` and a nearby TextBox note.
 - [ ] No text is drawn outside a `TextBox` (no bare labels on the canvas).

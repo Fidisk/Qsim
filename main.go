@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
@@ -40,33 +41,23 @@ func buildFileBrowser() *windows.RenderWindow {
 			continue
 		}
 		name := e.Name()
-		btn := components.NewButton(0, 0, 350, 25, rl.LightGray, name, 14,
+		// Show the save without the .qsim suffix; the load path still uses
+		// the full file name.
+		displayName := strings.TrimSuffix(name, filepath.Ext(name))
+		btn := components.NewButton(0, 0, 350, 25, rl.LightGray, displayName, 14,
 			func(f string) func() {
 				return func() {
 					data, err := os.ReadFile(filepath.Join(savesDir, f))
 					if err != nil {
 						return
 					}
-					loaded := windows.LoadState(string(data))
-
-					// Remove existing circuit panels
-					animation.Reset()
-					var keep []pWindow
-					for _, w := range winManager {
-						if rw, ok := w.(*windows.RenderWindow); ok && rw.CanSpawn {
-							utils.DeleteObjectWithID(rw.GetID())
-						} else {
-							keep = append(keep, w)
-						}
-					}
-					winManager = keep
-
-					// Add loaded windows
-					for _, w := range loaded {
-						if rw, ok := w.(*windows.RenderWindow); ok {
-							winManager = append(winManager, rw)
-							panel = rw
-						}
+					// applyLoadedState loads the circuit twice internally
+					// (see saveload.go) and swaps it into the window list.
+					// It returns the new circuit panel: keep the package
+					// level panel in sync so Reset/Save act on the loaded
+					// circuit, not the deleted old one.
+					if p := applyLoadedState(string(data)); p != nil {
+						panel = p
 					}
 					DeleteWindowByID(fileWin.GetID())
 				}
@@ -273,12 +264,18 @@ func main() {
 			input := components.NewInput(0, 0, 400, 25, 16, 64, func(text string) {
 				os.MkdirAll("saves", 0755)
 
+				// Auto-append the .qsim suffix so every save shows up in the
+				// file browser (which only lists .qsim files).
+				if !strings.HasSuffix(strings.ToLower(text), ".qsim") {
+					text += ".qsim"
+				}
+
 				res := SaveState()
 
 				os.WriteFile(filepath.Join("saves", text), []byte(res), 0644)
 				DeleteWindowByID(fileWin.GetID())
 			})
-			input.SetText("untitled.qsim")
+			input.SetText("untitled")
 			fileWin.PushComponent(input)
 			fileWin.PinCamera(func() rl.Vector2 { return rl.Vector2{X: 0, Y: 0} })
 			winManager = append(winManager, fileWin)
@@ -296,8 +293,18 @@ func main() {
 			panel.DeleteChildWithID(ids...)
 		})
 
-	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5, ToolButLoad, ToolButSave, ToolButReset)
+	// Duplicate the last clicked universal gate (matrix, label and size are
+	// carried over so a gate never has to be retyped).
+	dupBtn := components.NewButton(50, 0, 100, 25, rl.LightGray, "Dup", 20, func() {
+		if g := components.LastSelectedGate; g != nil {
+			c := g.GetCircle()
+			if ng, ok := components.DuplicateGate(g, c.Center.X+100, c.Center.Y+100); ok {
+				panel.PushComponent(ng)
+			}
+		}
+	})
 
+	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5, ToolButLoad, ToolButSave, ToolButReset, dupBtn)
 	spawnBar := windows.NewRenderWindow(1500, 0, 100, 800)
 	spawnBar.IsResizeAllow(false)
 	spawnBar.IsPanAllow(false)
@@ -380,6 +387,7 @@ func main() {
 	addRow(spawnBut("CX", 30, glob.CX), spawnBut("CY", 30, glob.CY))
 	addRow(spawnBut("CZ", 30, glob.CZ), spawnBut("cX", 30, glob.CBitX))
 	addRow(spawnBut("cY", 30, glob.CBitY), spawnBut("cZ", 30, glob.CBitZ))
+	addRow(spawnBut("U", 30, glob.ArbGate), spawnBut("cU", 30, glob.CtrlU))
 	gap()
 
 	// Measurement
@@ -389,7 +397,7 @@ func main() {
 
 	// System tools
 	addRow(spawnBut("CP", 30, glob.Copy), spawnBut("==", 20, glob.Compare))
-	addRow(spawnBut("I", 30, glob.Info), spawnBut("U", 30, glob.ArbGate))
+	addRow(spawnBut("I", 30, glob.Info), nil)
 	gap()
 
 	// Classical logic
@@ -544,6 +552,7 @@ func main() {
 	butByState[glob.CBitY].Tooltip = "Bit-controlled Y: applies Y to the qubit while the control logical bit is 1"
 	butByState[glob.CBitZ].Tooltip = "Bit-controlled Z: applies Z to the qubit while the control logical bit is 1"
 	butByState[glob.ArbGate].Tooltip = "Arbitrary gate: right-click to rename, then edit size and the matrix table; non-unitary matrices are auto-fixed on close; hover to preview"
+	butByState[glob.CtrlU].Tooltip = "Bit-controlled universal gate: applies the edited matrix only while the control logical bit is 1"
 	butByState[glob.Measurement].Tooltip = "Measurement gate: |0> and |1> outcome branches"
 	butByState[glob.Measure2].Tooltip = "Collapse measurement: outputs the outcome as a logical bit plus the remaining state; click to force 0/1"
 	butByState[glob.Measure3].Tooltip = "M3 measurement: like M2, outputs the collapsed qubit and the remaining state"
@@ -551,6 +560,7 @@ func main() {
 	butByState[glob.GQubit].Tooltip = "Source gate: continuously emits a custom qubit state"
 	butByState[glob.Copy].Tooltip = "Copy gate: create a copy of a hooked qubit system"
 	butByState[glob.Compare].Tooltip = "Compare gate: outputs 1 if two qubit systems are equal, 0 otherwise"
+	dupBtn.Tooltip = "Duplicate the last clicked universal gate (matrix carried over)"
 	butByState[glob.LogicButton].Tooltip = "Logic button: click to toggle the output bit 0/1"
 	butByState[glob.LogicNot].Tooltip = "NOT gate: inverts the input bit"
 	butByState[glob.LogicAnd].Tooltip = "AND gate: outputs 1 when both inputs are 1"

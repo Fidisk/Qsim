@@ -24,12 +24,17 @@ type QubitsSystem struct {
 	ID                    int32
 	HookID                int32
 	QubitDeterminatorList []*QubitDeterminator
-	rows                  int32
-	cols                  int32
-	startX                float32
-	startY                float32
-	hovered               bool
-	pressPos              rl.Vector2
+	// Probability is the branch weight of this system: 1 for fresh inputs,
+	// the product of its inputs' probabilities after a gate, and the input
+	// probability times the outcome probability after a measurement. Shown
+	// on hover.
+	Probability float64
+	rows        int32
+	cols        int32
+	startX      float32
+	startY      float32
+	hovered     bool
+	pressPos    rl.Vector2
 
 	//Spagetti
 	InfoHookID int32
@@ -42,10 +47,11 @@ type QubitsSystem struct {
 
 func NewQubitsSystem(x, y, radius float32, color rl.Color) *QubitsSystem {
 	tmp := QubitsSystem{
-		Circle:    *NewCircle(x, y, radius, color),
-		QubitList: nil,
-		Origin:    nil,
-		HookID:    0,
+		Circle:      *NewCircle(x, y, radius, color),
+		QubitList:   nil,
+		Origin:      nil,
+		HookID:      0,
+		Probability: 1,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.QubitSystemWeight)
@@ -58,6 +64,47 @@ func (c *QubitsSystem) GetID() int32 {
 
 func (c *QubitsSystem) CheckCollide(worldMouse rl.Vector2) bool {
 	return rl.CheckCollisionPointRec(worldMouse, rl.Rectangle{X: c.startX, Y: c.startY, Width: float32(c.cols) * glob.QubitSystemCellWidth, Height: float32(c.rows) * glob.QubitSystemCellHeight})
+}
+
+// OutlinePoint returns the point on the state grid's rectangle edge toward
+// `from`: connection wires stop there instead of running over the drawn grid
+// (the grid is the visible body, far larger than the 30px circle). It finds
+// the first edge the segment from->center crosses.
+func (c *QubitsSystem) OutlinePoint(from rl.Vector2) rl.Vector2 {
+	if c.Origin == nil {
+		return from
+	}
+	exp := c.Origin.Size
+	w := float32(int32(1)<<((exp+1)/2)) * glob.QubitSystemCellWidth
+	h := float32(int32(1)<<(exp/2)) * glob.QubitSystemCellHeight
+	cx, cy := c.Center.X, c.Center.Y
+	halfW, halfH := w/2, h/2
+	dx := cx - from.X
+	dy := cy - from.Y
+	best := float32(1)
+	if dx != 0 {
+		for _, ex := range []float32{cx - halfW, cx + halfW} {
+			t := (ex - from.X) / dx
+			if t >= 0 && t <= 1 {
+				py := from.Y + t*dy
+				if py >= cy-halfH && py <= cy+halfH {
+					best = min(best, t)
+				}
+			}
+		}
+	}
+	if dy != 0 {
+		for _, ey := range []float32{cy - halfH, cy + halfH} {
+			t := (ey - from.Y) / dy
+			if t >= 0 && t <= 1 {
+				px := from.X + t*dx
+				if px >= cx-halfW && px <= cx+halfW {
+					best = min(best, t)
+				}
+			}
+		}
+	}
+	return rl.Vector2{X: from.X + best*dx, Y: from.Y + best*dy}
 }
 
 func (c *QubitsSystem) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
@@ -138,6 +185,16 @@ func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
 		inputCount = g.InputCount
 	case *CollapseGate:
 		hookList = g.HookList
+		inputCount = g.InputCount
+	case *M4Gate:
+		// M4 claims the system it measures like any filled gate: the other
+		// (unconnected) determinators of that system hide.
+		hookList = g.HookList
+		inputCount = g.InputCount
+	case *ControlledUGate:
+		// Only the qubit input hooks count: the control and output hooks are
+		// not inputs (the control is a logical bit, not a qubit).
+		hookList = g.QubitHooks
 		inputCount = g.InputCount
 	default:
 		return false
@@ -393,9 +450,8 @@ func formatCellAmplitude(v complex64) string {
 }
 
 // drawAmplitude renders an amplitude string left-to-right from (x, y),
-// coloring every '+' sign green and every '-' sign red so the sign of each
-// part reads at a glance (e.g. 0.7 + 0.3i, 1 - i, -0.5i). The base text keeps
-// the given color.
+// coloring every '+' sign green (e.g. 0.7 + 0.3i, 1 - i, -0.5i). The rest,
+// including the minus sign, keeps the given base color.
 func drawAmplitude(x, y int32, s string, fontSize int32, base rl.Color) {
 	type seg struct {
 		text string
@@ -411,13 +467,9 @@ func drawAmplitude(x, y int32, s string, fontSize int32, base rl.Color) {
 	}
 	for _, r := range s {
 		switch r {
-		case '+', '-':
+		case '+':
 			flush()
-			col := rl.Green
-			if r == '-' {
-				col = rl.Red
-			}
-			segs = append(segs, seg{string(r), col})
+			segs = append(segs, seg{"+", rl.Green})
 		default:
 			buf.WriteRune(r)
 		}
@@ -568,7 +620,9 @@ func (c *QubitsSystem) Draw() {
 
 	// Hover: small label above the system naming its qubit determinators
 	// (e.g. "Q0 + Q1 + Q2"); standalone single qubits also show their cycle
-	// state (|0>, |1>, |+>, |->, |i>, |-i>).
+	// state (|0>, |1>, |+>, |->, |i>, |-i>) and every system shows its
+	// branch probability (the product of its inputs' probabilities through
+	// gates, times the outcome probability after a measurement).
 	if c.hovered && c.Origin != nil {
 		names := make([]string, len(c.Origin.ModifierID))
 		for i, id := range c.Origin.ModifierID {
@@ -580,6 +634,7 @@ func (c *QubitsSystem) Draw() {
 				label += "  " + s
 			}
 		}
+		label += fmt.Sprintf("  p=%.3f", c.Probability)
 		fontSize := int32(16)
 		textWidth := rl.MeasureText(label, fontSize)
 		boxW := float32(textWidth) + 12

@@ -37,11 +37,6 @@ type CollapseGate struct {
 	Result       int32 // the realized outcome: 0 or 1
 	ForceMode    int32 // 0 = random, 1 = force 0, 2 = force 1
 	OutcomeProbs [2]float64
-	// measuredHash is retained for measurement reuse bookkeeping and test
-	// compatibility; it is not persisted because the input state is the source
-	// of truth after loading.
-	measuredHash  bool
-	lastInputHash uint64
 	// DisableForceClick lets a specialized measurement gate keep its input
 	// interaction without cycling force mode on a plain click.
 	DisableForceClick bool
@@ -182,23 +177,6 @@ func (c *CollapseGate) CycleForce() {
 	// helpers rewrite the hooked logical bit / systems in place, so the
 	// wiring survives a force-mode click. DestroyOutPut would kill them.
 	c.Measured = false
-	c.measuredHash = false
-}
-
-func collapseStateHash(qsm *qubits.QubitStateManager) uint64 {
-	h := uint64(14695981039346656037)
-	mix := func(v uint64) {
-		h ^= v
-		h *= 1099511628211
-	}
-	for _, id := range qsm.ModifierID {
-		mix(uint64(uint32(id)))
-	}
-	for _, amp := range qsm.Amptitude {
-		mix(uint64(math.Float32bits(real(amp))))
-		mix(uint64(math.Float32bits(imag(amp))))
-	}
-	return h
 }
 
 func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
@@ -255,7 +233,9 @@ func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 
 	if cnt == int(c.InputCount) {
-		if !c.Measured {
+		// Random mode (0/R) re-samples on every tick so the realized result
+		// reflects the outcome distribution live; forced modes latch once.
+		if !c.Measured || (c.ForceMode == 0 && !c.SkipRandom) {
 			c.MeasureOutput()
 		}
 	} else if c.NormalSystem && c.Measured {
@@ -303,10 +283,13 @@ func (c *CollapseGate) getMeasuredInput() (*Hook, *QubitDeterminator, *QubitsSys
 }
 
 // emitOutcome writes the outputs for the supplied measurement result k, using
-// the original input state QSM and measured-qubit position pos. It is split out
-// so M4 can toggle its output without re-reading the (possibly consumed) input.
-func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32) {
+// the original input state QSM and measured-qubit position pos. inputProb is
+// the branch probability of the input system; the outputs carry
+// inputProb * p(outcome) so a hover shows the true branch weight. It is split
+// out so M4 can toggle its output without re-reading the input.
+func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32, inputProb float64) {
 	p := c.OutcomeProbs[k]
+	branchProb := inputProb * p
 
 	// The "C" output: M2 emits the realized outcome as a logical bit; M3
 	// emits the collapsed measured qubit as a normal single-qubit system
@@ -316,6 +299,9 @@ func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32) 
 		amps[k] = 1
 		state := qubits.NewQubitStateManagerFrom(amps, []int32{QSM.ModifierID[pos]})
 		c.spawnOrUpdateNormal(0, state)
+		if qs, ok := utils.GetObjectFromID(c.OutPutHook[0].TargetID).(*QubitsSystem); ok {
+			qs.Probability = branchProb
+		}
 	} else {
 		c.spawnOrUpdateLogicalBit(0, int(k))
 	}
@@ -347,6 +333,9 @@ func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32) 
 		c.HasRemainder = true
 		c.OutPutHook[1].Hidden = false
 		c.spawnOrUpdate(1, rest)
+		if qs, ok := utils.GetObjectFromID(c.OutPutHook[1].TargetID).(*QubitsSystem); ok {
+			qs.Probability = branchProb
+		}
 	} else {
 		// Single-qubit input: there is no remaining state, so only the
 		// collapsed qubit shows. Hide the remainder hook and clear any stale
@@ -393,7 +382,6 @@ func (c *CollapseGate) MeasureOutput() {
 		return
 	}
 	QSM := qp.Origin
-	inputHash := collapseStateHash(QSM)
 
 	// p(measuring 0)
 	var l complex64
@@ -406,30 +394,24 @@ func (c *CollapseGate) MeasureOutput() {
 	c.OutcomeProbs[0] = cmplx.Abs(complex128(l))
 	c.OutcomeProbs[1] = cmplx.Abs(complex128(complex(1, 0) - l))
 
-	// Realize one outcome: reuse an unchanged random result, or sample/force
-	// a new one when the input state, force mode, or explicit reset changes.
+	// Realize one outcome: forced by the click setting, or a fresh random
+	// sample each call (random mode re-measures every tick).
 	var k int32
-	if c.ForceMode == 0 && c.measuredHash && inputHash == c.lastInputHash {
-		k = c.Result
-	} else {
-		switch c.ForceMode {
-		case 1:
+	switch c.ForceMode {
+	case 1:
+		k = 0
+	case 2:
+		k = 1
+	default:
+		if rand.Float64() < c.OutcomeProbs[0] {
 			k = 0
-		case 2:
+		} else {
 			k = 1
-		default:
-			if rand.Float64() < c.OutcomeProbs[0] {
-				k = 0
-			} else {
-				k = 1
-			}
 		}
 	}
 	c.Result = k
-	c.lastInputHash = inputHash
-	c.measuredHash = true
 
-	c.emitOutcome(QSM, pos, k)
+	c.emitOutcome(QSM, pos, k, qp.Probability)
 	c.Measured = true
 }
 
@@ -500,7 +482,6 @@ func (c *CollapseGate) spawnOrUpdateNormal(hookIdx int, state *qubits.QubitState
 
 func (c *CollapseGate) DestroyOutPut() {
 	c.Measured = false
-	c.measuredHash = false
 	for _, d := range c.OutPutHook {
 		d.DisconnectAndKill()
 	}

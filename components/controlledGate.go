@@ -213,6 +213,7 @@ func (cg *ControlledGate) updateOutput() {
 		return
 	}
 	src := qp.Origin
+	inProb := qp.Probability
 
 	amps := make([]complex64, len(src.Amptitude))
 	copy(amps, src.Amptitude)
@@ -236,11 +237,13 @@ func (cg *ControlledGate) updateOutput() {
 		tmp := utils.GetObjectFromID(cg.OutHook.TargetID)
 		if qs, ok := tmp.(*QubitsSystem); ok && qs.Origin != nil {
 			qs.CopyFromState(result)
+			qs.Probability = inProb
 			return
 		}
 	}
 
 	tmp := NewQubitsSystem(cg.Center.X, cg.Center.Y, glob.QubitSystemRadius, config.QubitSystemColor)
+	tmp.Probability = inProb
 	tmp.Assign(result)
 	parent := cg.GetParent()
 	if parent != nil {
