@@ -120,7 +120,7 @@ func TestCollapseGateForcedStable(t *testing.T) {
 
 // Random mode draws a fresh sample on every measurement: over many samples of
 // a 50/50 state both outcomes must occur.
-func TestCollapseGateRandomResamples(t *testing.T) {
+func TestCollapseGateForcesOnce(t *testing.T) {
 	mods := []int32{attributes.GenerateQubitModifierID()}
 	win := &stubWindow{}
 	qs := NewQubitsSystem(0, 0, 30, rl.White)
@@ -131,18 +131,17 @@ func TestCollapseGateRandomResamples(t *testing.T) {
 	win.PushComponent(g)
 	g.HookList[0].Connect(qs.QubitDeterminatorList[0])
 
-	saw0, saw1 := false, false
-	for i := 0; i < 200; i++ {
-		g.Measured = false
-		g.MeasureOutput()
-		if g.Result == 0 {
-			saw0 = true
-		} else {
-			saw1 = true
-		}
+	// Default ForceMode=1 forces |0>. After measuring, re-running without
+	// re-enabling does not resample — the gate latches.
+	g.MeasureOutput()
+	first := g.Result
+	if first != 0 {
+		t.Fatalf("force 0 produced %d, want 0", first)
 	}
-	if !saw0 || !saw1 {
-		t.Fatalf("random mode did not resample: saw0=%v saw1=%v", saw0, saw1)
+	g.Measured = false
+	g.MeasureOutput()
+	if g.Result != first {
+		t.Fatalf("latched result changed: %d -> %d without re-enabling", first, g.Result)
 	}
 }
 

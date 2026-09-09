@@ -11,13 +11,13 @@ import (
 
 type Hook struct {
 	Circle
-	IsHooked          bool
-	ID                int32
-	TargetID          int32
-	IsOutput          bool
-	Label             string
-	AllowQubitSystem  bool
-	AllowLogicalBit   bool
+	IsHooked         bool
+	ID               int32
+	TargetID         int32
+	IsOutput         bool
+	Label            string
+	AllowQubitSystem bool
+	AllowLogicalBit  bool
 
 	// Hidden hooks are not drawn and cannot be interacted with (e.g. the
 	// collapse gate's unused remainder output).
@@ -108,8 +108,25 @@ func (c *Hook) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailab
 		}
 	}
 	if c.IsHooked {
-		if utils.GetObjectFromID(c.TargetID) == nil {
+		target := utils.GetObjectFromID(c.TargetID)
+		dead := target == nil
+		if !dead {
+			if det, isDet := target.(*QubitDeterminator); isDet {
+				// A determinator whose parent system is gone (killed or
+				// replaced live) is orphaned: it still holds the hook but
+				// feeds no real state. Release it so the hook re-attaches
+				// to the system actually on screen.
+				dead = det.GetQubitParent() == nil
+			}
+		}
+		if dead {
 			c.Disconnect()
+			// The target was removed (e.g. its determinator was replaced or
+			// a save left a dangling reference): re-attach to whatever
+			// determinator sits under this hook so the connection heals.
+			if !c.dragging {
+				c.zipToDeterminator()
+			}
 			//Should do smth about physics here, but meh
 			return
 		}

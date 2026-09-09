@@ -177,9 +177,47 @@ func findHookOwner(parent PlaceholderWindow, hookID int32) Component {
 // gateCalculating reports whether the gate owning the given hook is currently
 // calculating, i.e. all of its input hooks are connected.
 func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
+	h, ok := utils.GetObjectFromID(hookID).(*Hook)
+	if !ok {
+		return false
+	}
+	var owner hookOwner
+	if parent != nil {
+		for _, comp := range parent.GetElement() {
+			if o, ok2 := comp.(hookOwner); ok2 {
+				for _, gh := range o.GetHooks() {
+					if gh == h {
+						owner = o
+						break
+					}
+				}
+				if owner != nil {
+					break
+				}
+			}
+		}
+	}
+	if owner == nil {
+		for _, obj := range utils.ObjectList {
+			if o, ok2 := obj.(hookOwner); ok2 {
+				for _, gh := range o.GetHooks() {
+					if gh == h {
+						owner = o
+						break
+					}
+				}
+				if owner != nil {
+					break
+				}
+			}
+		}
+	}
+	if owner == nil {
+		return false
+	}
 	var hookList []*Hook
 	var inputCount int32
-	switch g := findHookOwner(parent, hookID).(type) {
+	switch g := owner.(type) {
 	case *Gate:
 		hookList = g.HookList
 		inputCount = g.InputCount
@@ -187,13 +225,9 @@ func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
 		hookList = g.HookList
 		inputCount = g.InputCount
 	case *M4Gate:
-		// M4 claims the system it measures like any filled gate: the other
-		// (unconnected) determinators of that system hide.
 		hookList = g.HookList
 		inputCount = g.InputCount
 	case *ControlledUGate:
-		// Only the qubit input hooks count: the control and output hooks are
-		// not inputs (the control is a logical bit, not a qubit).
 		hookList = g.QubitHooks
 		inputCount = g.InputCount
 	default:

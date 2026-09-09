@@ -115,6 +115,15 @@ func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, is
 		return
 	}
 
+	// Heal a stale hook link: the hook was deleted or re-targeted without
+	// this determinator noticing (e.g. a live delete/replace), which would
+	// keep the determinator "hooked" forever and block sibling hiding.
+	if c.HookID != 0 {
+		if h, ok := utils.GetObjectFromID(c.HookID).(*Hook); !ok || !h.IsHooked || h.TargetID != c.ID {
+			c.removeFromHook()
+		}
+	}
+
 	// collision check using world coordinates
 	if rl.CheckCollisionPointCircle(worldMouse, c.Center, c.Radius) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
@@ -310,4 +319,5 @@ func (c *QubitDeterminator) Kill() {
 			parent.DeleteChildWithID(c.ID)
 		}
 	}
+	utils.DeleteObjectWithID(c.ID)
 }

@@ -34,11 +34,6 @@ type Step struct {
 // target is above the file's current version.
 var steps = []Step{
 	{
-		// 0.8.0: saves became versioned. Older saves also get explicit
-		// defaults for the fields introduced by the branch-probability work
-		// (QubitsSystem.probability) and the M4 stored input probability
-		// (M4Gate.storedProb), plus an explicit showGrid flag, so the
-		// format is unambiguous going forward.
 		To: "0.8.0",
 		Apply: func(w map[string]interface{}) {
 			if w["type"] != "RenderWindow" {
@@ -62,6 +57,32 @@ var steps = []Step{
 					case "M4Gate":
 						if cm["storedProb"] == nil {
 							cm["storedProb"] = float64(1)
+						}
+					}
+				}
+			}
+		},
+	},
+	{
+		To: "0.8.1",
+		Apply: func(w map[string]interface{}) {
+			if w["type"] != "RenderWindow" {
+				return
+			}
+			w["saveVersion"] = "0.8.1"
+			if comps, ok := w["components"].([]interface{}); ok {
+				for _, c := range comps {
+					cm, ok := c.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if cm["type"] != "CollapseGate" && cm["type"] != "M4Gate" {
+						continue
+					}
+					if v, ok := cm["forceMode"]; ok {
+						fm := int32(v.(float64))
+						if fm == 0 {
+							cm["forceMode"] = float64(1)
 						}
 					}
 				}

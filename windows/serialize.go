@@ -2,10 +2,12 @@ package windows
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"qsim/components"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/qubits/attributes"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -17,6 +19,17 @@ func (rw *RenderWindow) SaveState() string {
 			compList = append(compList, m)
 		}
 	}
+
+	// Write custom determinator names so renamed qubits survive save/load.
+	modifierNames := map[string]string{}
+	for i := 0; i < attributes.AttributesManager.Len(); i++ {
+		id := int32(i)
+		def := "Q" + strconv.Itoa(i)
+		if n, ok := attributes.AttributesManager.Get(id).(*attributes.Name); ok && n.Val != def {
+			modifierNames[strconv.Itoa(i)] = n.Val
+		}
+	}
+
 	data := map[string]interface{}{
 		"type":                  "RenderWindow",
 		"saveVersion":           glob.SaveVersion,
@@ -35,6 +48,7 @@ func (rw *RenderWindow) SaveState() string {
 		"isTitleEditable":       rw.IsTitleEditable,
 		"showGrid":              rw.ShowGrid,
 		"components":            compList,
+		"modifierNames":         modifierNames,
 	}
 	b, _ := json.Marshal(data)
 	return string(b)

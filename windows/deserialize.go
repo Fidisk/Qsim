@@ -2,6 +2,7 @@ package windows
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"qsim/components"
 	"qsim/config"
@@ -250,6 +251,22 @@ func unmarshalRenderWindow(raw map[string]interface{}) *RenderWindow {
 
 	for _, comp := range created {
 		rw.PushComponent(comp)
+	}
+
+	if names, ok := raw["modifierNames"].(map[string]interface{}); ok {
+		for idStr, v := range names {
+			s, ok2 := v.(string)
+			if !ok2 {
+				continue
+			}
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				continue
+			}
+			if int32(id) < int32(attributes.AttributesManager.Len()) {
+				attributes.AttributesManager.SetName(int32(id), s)
+			}
+		}
 	}
 
 	return rw
@@ -1128,6 +1145,9 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 				qs.HookID = h.ID
 				qs.SetWeight(0)
 			}
+		} else {
+			qs.HookID = 0
+			qs.SetWeight(glob.QubitSystemWeight)
 		}
 	}
 	if qs.InfoHookID != 0 {
@@ -1138,6 +1158,9 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 				qs.InfoHookID = h.ID
 				qs.SetWeight(0)
 			}
+		} else {
+			qs.InfoHookID = 0
+			qs.SetWeight(glob.QubitSystemWeight)
 		}
 	}
 	for _, d := range qs.QubitDeterminatorList {
@@ -1151,6 +1174,9 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 					d.HookID = h.ID
 					d.SetWeight(0)
 				}
+			} else {
+				d.HookID = 0
+				d.SetWeight(glob.QubitDeterminatorWeight)
 			}
 		}
 	}
@@ -1159,30 +1185,34 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 func remapGateRefs(g *components.Gate, ctx *loadCtx) {
 	for _, h := range g.HookList {
 		if h.TargetID != 0 {
-			if newObj, found := ctx.oldToNew[h.TargetID]; found {
+			newObj, found := ctx.oldToNew[h.TargetID]
+			if !found {
 				h.TargetID = 0
-				switch t := newObj.(type) {
-				case *components.QubitsSystem:
-					t.HookID = 0
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.HookID = h.ID
-					t.SetWeight(0)
-				case *components.QubitDeterminator:
-					t.HookID = 0
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.HookID = h.ID
-					t.SetWeight(0)
-				case *components.LogicalBit:
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.AddHook(h.ID)
-					t.SetWeight(0)
-				}
+				h.IsHooked = false
+				continue
+			}
+			h.TargetID = 0
+			switch t := newObj.(type) {
+			case *components.QubitsSystem:
+				t.HookID = 0
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.HookID = h.ID
+				t.SetWeight(0)
+			case *components.QubitDeterminator:
+				t.HookID = 0
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.HookID = h.ID
+				t.SetWeight(0)
+			case *components.LogicalBit:
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.AddHook(h.ID)
+				t.SetWeight(0)
 			}
 		}
 	}
@@ -1191,30 +1221,34 @@ func remapGateRefs(g *components.Gate, ctx *loadCtx) {
 func remapCollapseGateRefs(g *components.CollapseGate, ctx *loadCtx) {
 	for _, h := range g.HookList {
 		if h.TargetID != 0 {
-			if newObj, found := ctx.oldToNew[h.TargetID]; found {
+			newObj, found := ctx.oldToNew[h.TargetID]
+			if !found {
 				h.TargetID = 0
-				switch t := newObj.(type) {
-				case *components.QubitsSystem:
-					t.HookID = 0
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.HookID = h.ID
-					t.SetWeight(0)
-				case *components.QubitDeterminator:
-					t.HookID = 0
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.HookID = h.ID
-					t.SetWeight(0)
-				case *components.LogicalBit:
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.AddHook(h.ID)
-					t.SetWeight(0)
-				}
+				h.IsHooked = false
+				continue
+			}
+			h.TargetID = 0
+			switch t := newObj.(type) {
+			case *components.QubitsSystem:
+				t.HookID = 0
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.HookID = h.ID
+				t.SetWeight(0)
+			case *components.QubitDeterminator:
+				t.HookID = 0
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.HookID = h.ID
+				t.SetWeight(0)
+			case *components.LogicalBit:
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.AddHook(h.ID)
+				t.SetWeight(0)
 			}
 		}
 	}
@@ -1243,6 +1277,9 @@ func remapInfoTableRefs(it *components.InfoTable, ctx *loadCtx) {
 				qs.InfoHookID = h.ID
 				qs.SetWeight(0)
 			}
+		} else {
+			h.TargetID = 0
+			h.IsHooked = false
 		}
 	}
 }
@@ -1259,6 +1296,9 @@ func remapSourceGateRefs(sg *components.SourceGate, ctx *loadCtx) {
 				qs.InfoHookID = h.ID
 				qs.SetWeight(0)
 			}
+		} else {
+			h.TargetID = 0
+			h.IsHooked = false
 		}
 	}
 }
@@ -1279,41 +1319,45 @@ func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 	for _, h := range []*components.Hook{cg.InA, cg.InB, cg.OutHook} {
 		isInput := h == cg.InA || h == cg.InB
 		if h.TargetID != 0 {
-			if newObj, found := ctx.oldToNew[h.TargetID]; found {
+			newObj, found := ctx.oldToNew[h.TargetID]
+			if !found {
 				h.TargetID = 0
-				switch t := newObj.(type) {
-				case *components.QubitsSystem:
-					// Compare inputs are read-only: they attach through
-					// InfoHookID so the system's source link (HookID) survives.
-					if isInput {
-						t.InfoHookID = 0
-						t.Center = h.Center
-						h.IsHooked = true
-						h.TargetID = t.ID
-						t.InfoHookID = h.ID
-						t.SetWeight(0)
-						break
-					}
-					t.HookID = 0
+				h.IsHooked = false
+				continue
+			}
+			h.TargetID = 0
+			switch t := newObj.(type) {
+			case *components.QubitsSystem:
+				// Compare inputs are read-only: they attach through
+				// InfoHookID so the system's source link (HookID) survives.
+				if isInput {
+					t.InfoHookID = 0
 					t.Center = h.Center
 					h.IsHooked = true
 					h.TargetID = t.ID
-					t.HookID = h.ID
+					t.InfoHookID = h.ID
 					t.SetWeight(0)
-				case *components.QubitDeterminator:
-					t.HookID = 0
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.HookID = h.ID
-					t.SetWeight(0)
-				case *components.LogicalBit:
-					t.Center = h.Center
-					h.IsHooked = true
-					h.TargetID = t.ID
-					t.AddHook(h.ID)
-					t.SetWeight(0)
+					break
 				}
+				t.HookID = 0
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.HookID = h.ID
+				t.SetWeight(0)
+			case *components.QubitDeterminator:
+				t.HookID = 0
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.HookID = h.ID
+				t.SetWeight(0)
+			case *components.LogicalBit:
+				t.Center = h.Center
+				h.IsHooked = true
+				h.TargetID = t.ID
+				t.AddHook(h.ID)
+				t.SetWeight(0)
 			}
 		}
 	}
@@ -1335,6 +1379,8 @@ func remapControlledGateRefs(cg *components.ControlledGate, ctx *loadCtx) {
 		}
 		newObj, found := ctx.oldToNew[h.TargetID]
 		if !found {
+			h.TargetID = 0
+			h.IsHooked = false
 			continue
 		}
 		h.TargetID = 0
@@ -1370,6 +1416,8 @@ func remapControlledUGateRefs(g *components.ControlledUGate, ctx *loadCtx) {
 		}
 		newObj, found := ctx.oldToNew[h.TargetID]
 		if !found {
+			h.TargetID = 0
+			h.IsHooked = false
 			continue
 		}
 		h.TargetID = 0
@@ -1406,6 +1454,8 @@ func remapLogicalBitHook(h *components.Hook, ctx *loadCtx) {
 	}
 	newObj, found := ctx.oldToNew[h.TargetID]
 	if !found {
+		h.TargetID = 0
+		h.IsHooked = false
 		return
 	}
 	h.TargetID = 0

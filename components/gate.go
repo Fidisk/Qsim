@@ -381,7 +381,11 @@ func (c *Gate) CalculateOutPut() bool {
 	}
 
 	for i := range Idx {
-		result.SwapColumn(int32(i), result.FindID(Idx[i]))
+		col := result.FindID(Idx[i])
+		if col < 0 {
+			return false
+		}
+		result.SwapColumn(int32(i), col)
 	}
 
 	result.Multiply(c.Operation, c.InputCount)

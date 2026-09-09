@@ -306,7 +306,7 @@ func main() {
 
 	toolBar.PushComponent(ToolBut1, ToolBut2, ToolBut3, ToolBut4, ToolBut5, ToolButLoad, ToolButSave, ToolButReset, dupBtn)
 	spawnBar := windows.NewRenderWindow(1500, 0, 100, 800)
-	spawnBar.IsResizeAllow(false)
+	spawnBar.IsResizeAllow(true)
 	spawnBar.IsPanAllow(false)
 	spawnBar.IsZoomAllow(false)
 	spawnBar.IsDragAllow(true)
@@ -314,7 +314,6 @@ func main() {
 	spawnBar.ShowGrid = false
 	spawnBar.SetPriority(100)
 	spawnBar.AddEffect(func() {
-		effect.ConstSize(spawnBar, 100, 800)
 		effect.PinToSide(spawnBar)
 	})
 	// Keep the buttons at their designed screen positions when the bar is
@@ -587,6 +586,10 @@ func main() {
 		for _, d := range winManager {
 			d.Update()
 		}
+
+		// Recalculate the animation whenever the circuit changes (matrices,
+		// wiring, qubit states, component set).
+		animation.Sync(panel.WComp)
 
 		animation.Update()
 

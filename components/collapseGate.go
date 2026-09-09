@@ -63,6 +63,7 @@ func NewCollapseGate(x, y, radius float32, color rl.Color, label string) *Collap
 		Circle:     *NewCircle(x, y, radius, color),
 		Label:      label,
 		InputCount: 1,
+		ForceMode:  1,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
@@ -101,6 +102,7 @@ func NewCollapseGate3(x, y, radius float32, color rl.Color, label string) *Colla
 		Label:        label,
 		InputCount:   1,
 		NormalSystem: true,
+		ForceMode:    1,
 	}
 	tmp.ID = utils.GenerateID(&tmp)
 	tmp.SetWeight(glob.GateWeight)
@@ -163,15 +165,10 @@ func (c *CollapseGate) onClick(worldMouse rl.Vector2, isCursorAvailable *bool) {
 // CycleForce advances the force-measure setting (random -> 0 -> 1) and
 // re-measures if an input is attached.
 func (c *CollapseGate) CycleForce() {
-	if c.SkipRandom {
-		// Toggle only between deterministic force |0> (1) and force |1> (2).
-		if c.ForceMode == 1 {
-			c.ForceMode = 2
-		} else {
-			c.ForceMode = 1
-		}
+	if c.ForceMode == 1 {
+		c.ForceMode = 2
 	} else {
-		c.ForceMode = (c.ForceMode + 1) % 3
+		c.ForceMode = 1
 	}
 	// Re-measure without tearing down the outputs: the spawn-or-update
 	// helpers rewrite the hooked logical bit / systems in place, so the
@@ -233,9 +230,7 @@ func (c *CollapseGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	}
 
 	if cnt == int(c.InputCount) {
-		// Random mode (0/R) re-samples on every tick so the realized result
-		// reflects the outcome distribution live; forced modes latch once.
-		if !c.Measured || (c.ForceMode == 0 && !c.SkipRandom) {
+		if !c.Measured {
 			c.MeasureOutput()
 		}
 	} else if c.NormalSystem && c.Measured {

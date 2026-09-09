@@ -323,18 +323,29 @@ func (cg *CompareGate) GetHooks() []*Hook {
 
 func (cg *CompareGate) PostUpdate() {}
 
-// compareStatesEqual compares two states by amplitude only: systems with
-// different modifier IDs still count as equal when their amplitudes match.
+// compareStatesEqual reports whether two states are physically identical,
+// ignoring global phase: |<a|b>|^2 = ||a||^2 * ||b||^2 (fidelity 1). Systems
+// with different modifier IDs still count as equal when their states match.
+// The 1e-8 fidelity slack keeps the same strictness as the old per-amplitude
+// 1e-4 tolerance (an orthogonal amplitude error of norm ~1e-4 drops fidelity
+// by ~1e-8), while a global phase e^{i*theta} cancels in the inner product.
 func compareStatesEqual(a, b *qubits.QubitStateManager) bool {
 	if a.Size != b.Size || len(a.Amptitude) != len(b.Amptitude) {
 		return false
 	}
-	eps := float64(1e-4)
-	for i, av := range a.Amptitude {
-		bv := b.Amptitude[i]
-		if cmplx.Abs(complex128(av-bv)) > eps {
-			return false
-		}
+	eps := float64(1e-8)
+	var normA, normB float64
+	var dot complex128
+	for i := range a.Amptitude {
+		av := complex128(a.Amptitude[i])
+		bv := complex128(b.Amptitude[i])
+		normA += real(av)*real(av) + imag(av)*imag(av)
+		normB += real(bv)*real(bv) + imag(bv)*imag(bv)
+		dot += cmplx.Conj(av) * bv
 	}
-	return true
+	if normA <= eps || normB <= eps {
+		return normA <= eps && normB <= eps
+	}
+	fidelity := cmplx.Abs(dot) * cmplx.Abs(dot) / (normA * normB)
+	return 1-fidelity <= eps
 }
