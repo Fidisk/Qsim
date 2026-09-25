@@ -1,0 +1,71 @@
+{
+  "name": "Bell",
+  "n_qubits": 2,
+  "qasm": "bell.qasm",
+  "qubits": [
+    {
+      "qasm": 0,
+      "modifier": 0,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    },
+    {
+      "qasm": 1,
+      "modifier": 1,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "gate": "h",
+      "qubits": [
+        0
+      ],
+      "label": "H"
+    },
+    {
+      "gate": "cx",
+      "qubits": [
+        0,
+        1
+      ],
+      "label": "CX"
+    }
+  ],
+  "expected": [
+    {
+      "real": 0.7071067690849304,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0.7071067690849304,
+      "imag": 0
+    }
+  ],
+  "notes": []
+}

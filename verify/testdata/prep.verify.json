@@ -1,0 +1,58 @@
+{
+  "name": "Prep",
+  "n_qubits": 1,
+  "qasm": "prep.qasm",
+  "qubits": [
+    {
+      "qasm": 0,
+      "modifier": 4,
+      "init": [
+        {
+          "real": 0.7071067690849304,
+          "imag": 0
+        },
+        {
+          "real": 0.7071067690849304,
+          "imag": 0
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "gate": "prep",
+      "qubits": [
+        0
+      ],
+      "state": [
+        {
+          "real": 0.7071067690849304,
+          "imag": 0
+        },
+        {
+          "real": 0.7071067690849304,
+          "imag": 0
+        }
+      ],
+      "label": "init"
+    },
+    {
+      "gate": "h",
+      "qubits": [
+        0
+      ],
+      "label": "H"
+    }
+  ],
+  "expected": [
+    {
+      "real": 0.9999999403953552,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    }
+  ],
+  "notes": []
+}

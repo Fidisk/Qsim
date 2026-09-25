@@ -1,0 +1,81 @@
+{
+  "name": "TeleportDriven",
+  "n_qubits": 2,
+  "qasm": "teleportdriven.qasm",
+  "qubits": [
+    {
+      "qasm": 0,
+      "modifier": 8,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    },
+    {
+      "qasm": 1,
+      "modifier": 9,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "gate": "h",
+      "qubits": [
+        0
+      ],
+      "label": "H"
+    },
+    {
+      "gate": "cx",
+      "qubits": [
+        0,
+        1
+      ],
+      "label": "CX"
+    },
+    {
+      "gate": "cx",
+      "qubits": [
+        0,
+        1
+      ],
+      "label": "cX"
+    }
+  ],
+  "expected": [
+    {
+      "real": 0.7071067690849304,
+      "imag": 0
+    },
+    {
+      "real": 0.7071067690849304,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    }
+  ],
+  "notes": [
+    "M2: control(s) compiled to quantum control (deferred measurement); outcome statistics not verified"
+  ]
+}

@@ -16,6 +16,18 @@ import (
 
 type loadCtx struct {
 	oldToNew map[int32]interface{}
+	// Link snapshots, keyed by object: remap resolves component by
+	// component while rewriting link fields to new IDs, so a later remap
+	// must never read a live link field as an old ID. Every remap below
+	// resolves through these snapshots (taken before any rewrite), which
+	// makes the result independent of save order. Without this, a hook
+	// whose target was already translated reads back a new ID, misses
+	// oldToNew and drops the link — or, on numeric collision with an old
+	// ID, cross-wires to the wrong object.
+	hookTarget map[*components.Hook]int32
+	sysHook    map[*components.QubitsSystem]int32
+	sysInfo    map[*components.QubitsSystem]int32
+	detHook    map[*components.QubitDeterminator]int32
 }
 
 func parseColor(m map[string]interface{}) rl.Color {
@@ -237,7 +249,13 @@ func unmarshalRenderWindow(raw map[string]interface{}) *RenderWindow {
 		return rw
 	}
 
-	ctx := &loadCtx{oldToNew: make(map[int32]interface{})}
+	ctx := &loadCtx{
+		oldToNew:   make(map[int32]interface{}),
+		hookTarget: make(map[*components.Hook]int32),
+		sysHook:    make(map[*components.QubitsSystem]int32),
+		sysInfo:    make(map[*components.QubitsSystem]int32),
+		detHook:    make(map[*components.QubitDeterminator]int32),
+	}
 
 	var created []components.Component
 	for _, c := range compList {
@@ -1101,7 +1119,75 @@ func unmarshalLineDraw(raw map[string]interface{}) *components.LineDraw {
 	return ld
 }
 
+// snapshotLinks records every parsed (old-ID) link before any remap
+// rewrites a link field. See loadCtx for why this must precede resolution.
+func snapshotLinks(comps []components.Component, ctx *loadCtx) {
+	snapHook := func(h *components.Hook) {
+		if h == nil {
+			return
+		}
+		if _, done := ctx.hookTarget[h]; !done {
+			ctx.hookTarget[h] = h.TargetID
+		}
+	}
+	for _, comp := range comps {
+		if ho, ok := comp.(interface{ GetHooks() []*components.Hook }); ok {
+			for _, h := range ho.GetHooks() {
+				snapHook(h)
+			}
+		}
+		switch v := comp.(type) {
+		case *components.QubitsSystem:
+			ctx.sysHook[v] = v.HookID
+			ctx.sysInfo[v] = v.InfoHookID
+			for _, d := range v.QubitDeterminatorList {
+				ctx.detHook[d] = d.HookID
+			}
+		case *components.SourceGate:
+			snapHook(v.OutHook)
+		case *components.CopyGate:
+			snapHook(v.InHook)
+			snapHook(v.OutHook)
+		case *components.InfoTable:
+			snapHook(v.Hook)
+		}
+	}
+}
+
+// oldTarget returns the parsed (old-ID) link target of a hook.
+func oldTarget(ctx *loadCtx, h *components.Hook) int32 {
+	if v, ok := ctx.hookTarget[h]; ok {
+		return v
+	}
+	return h.TargetID
+}
+
+// oldHookID returns the parsed producer-hook link of a system.
+func oldHookID(ctx *loadCtx, qs *components.QubitsSystem) int32 {
+	if v, ok := ctx.sysHook[qs]; ok {
+		return v
+	}
+	return qs.HookID
+}
+
+// oldInfoHookID returns the parsed info-hook link of a system.
+func oldInfoHookID(ctx *loadCtx, qs *components.QubitsSystem) int32 {
+	if v, ok := ctx.sysInfo[qs]; ok {
+		return v
+	}
+	return qs.InfoHookID
+}
+
+// oldDetHook returns the parsed hook link of a determinator.
+func oldDetHook(ctx *loadCtx, d *components.QubitDeterminator) int32 {
+	if v, ok := ctx.detHook[d]; ok {
+		return v
+	}
+	return d.HookID
+}
+
 func remapReferences(comps []components.Component, ctx *loadCtx) {
+	snapshotLinks(comps, ctx)
 	for _, comp := range comps {
 		switch v := comp.(type) {
 		case *components.QubitsSystem:
@@ -1135,8 +1221,8 @@ func remapReferences(comps []components.Component, ctx *loadCtx) {
 }
 
 func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
-	if qs.HookID != 0 {
-		if newObj, found := ctx.oldToNew[qs.HookID]; found {
+	if hookID := oldHookID(ctx, qs); hookID != 0 {
+		if newObj, found := ctx.oldToNew[hookID]; found {
 			if h, ok := newObj.(*components.Hook); ok {
 				qs.HookID = 0
 				qs.SetWeight(glob.QubitSystemWeight)
@@ -1150,8 +1236,8 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 			qs.SetWeight(glob.QubitSystemWeight)
 		}
 	}
-	if qs.InfoHookID != 0 {
-		if newObj, found := ctx.oldToNew[qs.InfoHookID]; found {
+	if infoID := oldInfoHookID(ctx, qs); infoID != 0 {
+		if newObj, found := ctx.oldToNew[infoID]; found {
 			if h, ok := newObj.(*components.Hook); ok {
 				h.IsHooked = true
 				h.TargetID = qs.ID
@@ -1164,8 +1250,8 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 		}
 	}
 	for _, d := range qs.QubitDeterminatorList {
-		if d.HookID != 0 {
-			if newObj, found := ctx.oldToNew[d.HookID]; found {
+		if detHook := oldDetHook(ctx, d); detHook != 0 {
+			if newObj, found := ctx.oldToNew[detHook]; found {
 				if h, ok := newObj.(*components.Hook); ok {
 					d.HookID = 0
 					d.SetWeight(glob.QubitDeterminatorWeight)
@@ -1184,8 +1270,8 @@ func remapQubitsSystemRefs(qs *components.QubitsSystem, ctx *loadCtx) {
 
 func remapGateRefs(g *components.Gate, ctx *loadCtx) {
 	for _, h := range g.HookList {
-		if h.TargetID != 0 {
-			newObj, found := ctx.oldToNew[h.TargetID]
+		if target := oldTarget(ctx, h); target != 0 {
+			newObj, found := ctx.oldToNew[target]
 			if !found {
 				h.TargetID = 0
 				h.IsHooked = false
@@ -1220,8 +1306,8 @@ func remapGateRefs(g *components.Gate, ctx *loadCtx) {
 
 func remapCollapseGateRefs(g *components.CollapseGate, ctx *loadCtx) {
 	for _, h := range g.HookList {
-		if h.TargetID != 0 {
-			newObj, found := ctx.oldToNew[h.TargetID]
+		if target := oldTarget(ctx, h); target != 0 {
+			newObj, found := ctx.oldToNew[target]
 			if !found {
 				h.TargetID = 0
 				h.IsHooked = false
@@ -1267,8 +1353,11 @@ func remapM4GateRefs(g *components.M4Gate, ctx *loadCtx) {
 
 func remapInfoTableRefs(it *components.InfoTable, ctx *loadCtx) {
 	h := it.Hook
-	if h.TargetID != 0 {
-		if newObj, found := ctx.oldToNew[h.TargetID]; found {
+	if h == nil {
+		return
+	}
+	if target := oldTarget(ctx, h); target != 0 {
+		if newObj, found := ctx.oldToNew[target]; found {
 			if qs, ok := newObj.(*components.QubitsSystem); ok {
 				qs.InfoHookID = 0
 				qs.Center = h.Center
@@ -1286,8 +1375,11 @@ func remapInfoTableRefs(it *components.InfoTable, ctx *loadCtx) {
 
 func remapSourceGateRefs(sg *components.SourceGate, ctx *loadCtx) {
 	h := sg.OutHook
-	if h.TargetID != 0 {
-		if newObj, found := ctx.oldToNew[h.TargetID]; found {
+	if h == nil {
+		return
+	}
+	if target := oldTarget(ctx, h); target != 0 {
+		if newObj, found := ctx.oldToNew[target]; found {
 			if qs, ok := newObj.(*components.QubitsSystem); ok {
 				qs.InfoHookID = 0
 				qs.Center = h.Center
@@ -1313,13 +1405,50 @@ func remapCopyGateRefs(cg *components.CopyGate, ctx *loadCtx) {
 			cg.CopyID = 0
 		}
 	}
+	// The copy input only reads its system: link the hook without touching
+	// the system's own producer link.
+	if cg.InHook != nil {
+		if target := oldTarget(ctx, cg.InHook); target != 0 {
+			if newObj, found := ctx.oldToNew[target]; found {
+				if qs, ok := newObj.(*components.QubitsSystem); ok {
+					cg.InHook.IsHooked = true
+					cg.InHook.TargetID = qs.ID
+				}
+			} else {
+				cg.InHook.TargetID = 0
+				cg.InHook.IsHooked = false
+			}
+		}
+	}
+	// The copy output owns its system like a gate output. These links were
+	// previously never remapped (only proximity zip healed them in the GUI).
+	if cg.OutHook != nil {
+		if target := oldTarget(ctx, cg.OutHook); target != 0 {
+			if newObj, found := ctx.oldToNew[target]; found {
+				if qs, ok := newObj.(*components.QubitsSystem); ok {
+					qs.HookID = 0
+					qs.Center = cg.OutHook.Center
+					cg.OutHook.IsHooked = true
+					cg.OutHook.TargetID = qs.ID
+					qs.HookID = cg.OutHook.ID
+					qs.SetWeight(0)
+				}
+			} else {
+				cg.OutHook.TargetID = 0
+				cg.OutHook.IsHooked = false
+			}
+		}
+	}
 }
 
 func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 	for _, h := range []*components.Hook{cg.InA, cg.InB, cg.OutHook} {
+		if h == nil {
+			continue
+		}
 		isInput := h == cg.InA || h == cg.InB
-		if h.TargetID != 0 {
-			newObj, found := ctx.oldToNew[h.TargetID]
+		if target := oldTarget(ctx, h); target != 0 {
+			newObj, found := ctx.oldToNew[target]
 			if !found {
 				h.TargetID = 0
 				h.IsHooked = false
@@ -1374,10 +1503,14 @@ func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 
 func remapControlledGateRefs(cg *components.ControlledGate, ctx *loadCtx) {
 	for _, h := range []*components.Hook{cg.InQubit, cg.InControl, cg.OutHook} {
-		if h.TargetID == 0 {
+		if h == nil {
 			continue
 		}
-		newObj, found := ctx.oldToNew[h.TargetID]
+		target := oldTarget(ctx, h)
+		if target == 0 {
+			continue
+		}
+		newObj, found := ctx.oldToNew[target]
 		if !found {
 			h.TargetID = 0
 			h.IsHooked = false
@@ -1411,10 +1544,14 @@ func remapControlledGateRefs(cg *components.ControlledGate, ctx *loadCtx) {
 
 func remapControlledUGateRefs(g *components.ControlledUGate, ctx *loadCtx) {
 	for _, h := range g.GetHooks() {
-		if h.TargetID == 0 {
+		if h == nil {
 			continue
 		}
-		newObj, found := ctx.oldToNew[h.TargetID]
+		target := oldTarget(ctx, h)
+		if target == 0 {
+			continue
+		}
+		newObj, found := ctx.oldToNew[target]
 		if !found {
 			h.TargetID = 0
 			h.IsHooked = false
@@ -1449,10 +1586,14 @@ func remapControlledUGateRefs(g *components.ControlledUGate, ctx *loadCtx) {
 // remapLogicalBitHook reconnects a hook whose target is a LogicalBit: the bit
 // anchors to the hook and the hook points at the new bit ID.
 func remapLogicalBitHook(h *components.Hook, ctx *loadCtx) {
-	if h.TargetID == 0 {
+	if h == nil {
 		return
 	}
-	newObj, found := ctx.oldToNew[h.TargetID]
+	target := oldTarget(ctx, h)
+	if target == 0 {
+		return
+	}
+	newObj, found := ctx.oldToNew[target]
 	if !found {
 		h.TargetID = 0
 		h.IsHooked = false

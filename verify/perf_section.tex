@@ -1,0 +1,68 @@
+% Performance-analysis section for the Qsim report.
+% Requires only the article class (no extra packages).
+% Raw data: verify/bench.txt, produced by `go run ./cmd/bench`.
+
+\section{Performance Analysis}
+\label{sec:performance-analysis}
+
+To characterize the performance limits of QSim, the computational cost of
+the simulation engine was measured headless on an 11th Gen Intel Core
+i7-1165G7 processor with 16\,GB of memory; reported values are best-of-$N$
+runs. The benchmark exercises the same primitives the desktop application
+executes on every frame when recomputing gate outputs -- state merging,
+qubit reordering, and unitary application on complex64 state vectors -- so
+the pipeline times below constitute a lower bound on per-frame engine
+cost, excluding rendering and interface work.
+
+Gate latency (Table~\ref{tab:gate-latency}) is the cost of applying one
+dense $k$-qubit gate to an $n$-qubit state. Cost grows by roughly a factor
+of four per additional state qubit and per additional gate qubit, as
+expected for dense unitary application: up to ten qubits every gate width
+completes below timer resolution, while at sixteen qubits a single-qubit
+gate costs about $1$\,ms and a four-qubit universal gate about $12$\,ms.
+
+\begin{table}[h]
+\centering
+\caption{Dense $k$-qubit gate latency (ms) on an $n$-qubit state.}
+\label{tab:gate-latency}
+\begin{tabular}{c|c|cccc}
+$n$ & mem & $k=1$ & $k=2$ & $k=3$ & $k=4$ \\ \hline
+$\le 10$ & $<0.1$\,MB & $<0.01$ & $<0.01$ & $<0.01$ & $<0.01$ \\
+12 & $<0.1$\,MB & $<0.01$ & $<0.01$ & $<0.01$ & 0.53 \\
+14 & 0.1\,MB & $<0.01$ & $<0.01$ & 1.00 & 3.00 \\
+16 & 0.5\,MB & 1.00 & 2.99 & 5.99 & 12.00 \\
+\end{tabular}
+\end{table}
+
+For a representative frame of engine work -- merging the single-qubit
+systems, one Hadamard layer, and one CNOT ladder -- a full recomputation
+(Table~\ref{tab:pipeline}) costs far below a millisecond up to ten qubits,
+$4.00$\,ms at twelve qubits, $15.59$\,ms at fourteen, and $80.00$\,ms at
+sixteen, with cost per added qubit reaching four to five times beyond that
+point. Against a 16.7\,ms frame budget the qubit ceiling is therefore
+approximately fourteen qubits at 60\,fps, and approximately fifteen qubits
+at 30\,fps.
+
+\begin{table}[h]
+\centering
+\caption{Representative-frame engine cost (ms) vs qubit count.}
+\label{tab:pipeline}
+\begin{tabular}{c|c|ccc|c|c}
+$n$ & mem & merge & H layer & CX ladder & total & $\approx$fps \\ \hline
+$\le 10$ & $<0.1$\,MB & $\approx 0$ & $\approx 0$ & $\approx 0$ & $\approx 0$ & $>10000$ \\
+12 & $<0.1$\,MB & 0.00 & 2.00 & 2.00 & 4.00 & 250 \\
+14 & 0.1\,MB & 0.00 & 9.59 & 6.01 & 15.59 & 64 \\
+16 & 0.5\,MB & 1.00 & 46.00 & 33.00 & 80.00 & 13 \\
+18 & 2.1\,MB & 4.00 & 188.61 & 141.09 & 333.70 & 3 \\
+20 & 8.4\,MB & 17.11 & 909.12 & 626.71 & 1552.94 & 1 \\
+\end{tabular}
+\end{table}
+
+These ceilings are engine-only: in-app rendering draws one cell per
+amplitude, so the real interactive ceiling lies at or below the reported
+values. Memory is never the binding constraint -- the state vector
+occupies only 8.4\,MB at twenty qubits while compute already exceeds one
+and a half seconds -- and individual frames vary with gate count and
+width. Agreement between the measured scaling and the theoretical
+expectations for state-vector simulation increases confidence that no
+hidden overhead dominates the engine.

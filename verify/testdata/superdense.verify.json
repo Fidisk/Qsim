@@ -1,0 +1,330 @@
+{
+  "name": "Superdense",
+  "n_qubits": 2,
+  "qasm": "superdense.qasm",
+  "qubits": [
+    {
+      "qasm": 0,
+      "modifier": 0,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    },
+    {
+      "qasm": 1,
+      "modifier": 1,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "gate": "h",
+      "qubits": [
+        0
+      ],
+      "label": "H"
+    },
+    {
+      "gate": "cx",
+      "qubits": [
+        0,
+        1
+      ],
+      "label": "CX"
+    },
+    {
+      "gate": "unitary",
+      "qubits": [
+        1,
+        0
+      ],
+      "matrix": [
+        [
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": -1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": -1,
+            "imag": 0
+          }
+        ]
+      ],
+      "label": "Z"
+    },
+    {
+      "gate": "unitary",
+      "qubits": [
+        1,
+        0
+      ],
+      "matrix": [
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ]
+      ],
+      "label": "X",
+      "custom": 1
+    },
+    {
+      "gate": "cx",
+      "qubits": [
+        0,
+        1
+      ],
+      "label": "CX"
+    },
+    {
+      "gate": "unitary",
+      "qubits": [
+        1,
+        0
+      ],
+      "matrix": [
+        [
+          {
+            "real": 0.7071067690849304,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0.7071067690849304,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0.7071067690849304,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0.7071067690849304,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0.7071067690849304,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": -0.7071067690849304,
+            "imag": -0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0.7071067690849304,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": -0.7071067690849304,
+            "imag": -0
+          }
+        ]
+      ],
+      "label": "H",
+      "custom": 2
+    }
+  ],
+  "expected": [
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": -0.9999999403953552,
+      "imag": 0
+    }
+  ],
+  "notes": [
+    "M2: deterministic outcome 1, exact; terminal readout stripped, pre-measurement state compared",
+    "M2: deterministic outcome 1, exact; terminal readout stripped, pre-measurement state compared"
+  ]
+}

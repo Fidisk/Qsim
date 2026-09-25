@@ -1,0 +1,145 @@
+{
+  "name": "Custom",
+  "n_qubits": 2,
+  "qasm": "custom.qasm",
+  "qubits": [
+    {
+      "qasm": 0,
+      "modifier": 2,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    },
+    {
+      "qasm": 1,
+      "modifier": 3,
+      "init": [
+        {
+          "real": 1,
+          "imag": 0
+        },
+        {
+          "real": 0,
+          "imag": 0
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "gate": "x",
+      "qubits": [
+        1
+      ],
+      "label": "X"
+    },
+    {
+      "gate": "unitary",
+      "qubits": [
+        1,
+        0
+      ],
+      "matrix": [
+        [
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 1,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ]
+      ],
+      "label": "U"
+    }
+  ],
+  "expected": [
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 0,
+      "imag": 0
+    },
+    {
+      "real": 1,
+      "imag": 0
+    }
+  ],
+  "notes": []
+}

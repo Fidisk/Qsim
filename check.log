@@ -1,0 +1,26 @@
+step log for Telepor2: replay state vs Qiskit after each op
+  #  op           gate     qubits             fidelity    max|err|
+---  ------------ -------- ------------ --------------  ----------
+  0  H            h        [0]            1.0000000000    1.11e-16
+  1  CX           cx       [0, 1]         1.0000000000    1.11e-16
+  2  CX           cx       [2, 0]         1.0000000000    1.11e-16
+  3  H            h        [2]            1.0000000000    5.55e-17
+  4  ControlledGate cx       [0, 1]         1.0000000000    5.55e-17
+  5  ControlledGate cz       [2, 1]         1.0000000000    5.55e-17
+  6  M2           measure               (compiled away)   p0=0.5000
+  7  M2           measure               (compiled away)   p0=0.5000
+Telepor2: fidelity=1.000000000000 infidelity=0 (tol 1e-06) -> PASS  (worst |err| 5.55e-17 at i=0)
+  note: copy Get: no input, output ignored
+  note: M2: control(s) compiled to quantum control (deferred measurement); outcome statistics not verified
+  note: M2: control(s) compiled to quantum control (deferred measurement); outcome statistics not verified
+final statevectors for Telepor2 (Qiskit order, qubit 0 = LSB):
+    i  bits     expected               qiskit                      |err|
+  ---  -------- ---------------------- ---------------------- ----------
+    0  000      +0.400000+0.000000j    +0.400000+0.000000j      5.55e-17 *
+    1  001      +0.400000+0.000000j    +0.400000+0.000000j      5.55e-17
+    2  010      +0.300000+0.000000j    +0.300000+0.000000j      5.55e-17
+    3  011      +0.300000+0.000000j    +0.300000+0.000000j      5.55e-17
+    4  100      +0.400000+0.000000j    +0.400000+0.000000j      5.55e-17
+    5  101      +0.400000+0.000000j    +0.400000+0.000000j      5.55e-17
+    6  110      +0.300000+0.000000j    +0.300000+0.000000j      5.55e-17
+    7  111      +0.300000+0.000000j    +0.300000+0.000000j      5.55e-17
