@@ -97,6 +97,10 @@ func NewControlledUGate(x, y float32, color rl.Color) *ControlledUGate {
 
 func (c *ControlledUGate) GetID() int32 { return c.ID }
 
+func (c *ControlledUGate) IsEditing() bool {
+	return c.editing || c.editingCell || c.renaming || c.sizeEditing
+}
+
 // GetHooks exposes the hooks to the zip helpers (hookOwner interface), in
 // serialization order: qubit inputs I0.., then the control, then the output.
 func (c *ControlledUGate) GetHooks() []*Hook {

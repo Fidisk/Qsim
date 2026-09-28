@@ -51,5 +51,8 @@ func applyLoadedState(data string) *windows.RenderWindow {
 			panel = rw
 		}
 	}
+	if panel != nil {
+		windows.SetFocusedWindow(panel)
+	}
 	return panel
 }

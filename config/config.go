@@ -12,6 +12,7 @@ import (
 // at runtime via window.qsimSetConfig(key, value).
 var MaxZoom float32 = 10.0
 var MinZoom float32 = 0.1
+var KeyboardPanSpeed float32 = 500.0
 
 var QubitSystemStatePause bool = true
 
@@ -114,6 +115,6 @@ var ComputeGateAppearDur = 1.0 // gate matrix fade-in
 var ComputeIterBaseDur = 1.5   // seconds for the first iteration
 var ComputeIterDecay = 0.7     // per-iteration speed-up factor
 var ComputeIterFloorDur = 0.15 // fastest per-iteration duration
-var ComputeIterCap int32 = 64   // max visualized iterations before fast-forward
-var ComputeCollapseDur = 1.6    // sum columns collapsing into the result column
-var ComputeMaxRows int32 = 8    // visible rows per column before "..." is used
+var ComputeIterCap int32 = 64  // max visualized iterations before fast-forward
+var ComputeCollapseDur = 1.6   // sum columns collapsing into the result column
+var ComputeMaxRows int32 = 8   // visible rows per column before "..." is used

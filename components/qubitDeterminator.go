@@ -27,6 +27,8 @@ func (c *QubitDeterminator) GetID() int32 {
 	return c.ID
 }
 
+func (c *QubitDeterminator) IsEditing() bool { return c.editing }
+
 // DisplayName returns the qubit's user-facing name (renamed display name when
 // one is set, otherwise the raw modifier ID). Used by off-screen wire markers.
 func (c *QubitDeterminator) DisplayName() string {

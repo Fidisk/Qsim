@@ -75,6 +75,8 @@ func NewM4Gate(x, y, radius float32, color rl.Color) *M4Gate {
 	return tmp
 }
 
+func (m *M4Gate) IsEditing() bool { return m.editing }
+
 func (m *M4Gate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	if m.editing {
 		m.processEditing(isCursorAvailable)

@@ -620,6 +620,10 @@ func (c *Gate) GetID() int32 {
 	return c.ID
 }
 
+func (c *Gate) IsEditing() bool {
+	return c.editing || c.editingCell || c.renaming || c.sizeEditing
+}
+
 // GetHooks exposes the hook list to the zip helpers (hookOwner interface).
 func (c *Gate) GetHooks() []*Hook {
 	return c.HookList

@@ -125,6 +125,8 @@ func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp
 func (sg *SourceGate) GetID() int32       { return sg.ID }
 func (sg *SourceGate) GetCircle() *Circle { return &sg.Circle }
 
+func (sg *SourceGate) IsEditing() bool { return sg.editing }
+
 // getTableRect returns the rectangle occupied by the table.
 func (sg *SourceGate) getTableRect() rl.Rectangle {
 	return rl.Rectangle{

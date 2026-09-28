@@ -50,6 +50,7 @@ func DeleteWindowByID(id int32) {
 			break
 		}
 	}
+	windows.ClearFocusedWindow(id)
 	utils.DeleteObjectWithID(id)
 }
 

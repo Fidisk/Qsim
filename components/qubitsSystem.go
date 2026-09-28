@@ -62,6 +62,15 @@ func (c *QubitsSystem) GetID() int32 {
 	return c.ID
 }
 
+func (c *QubitsSystem) IsEditing() bool {
+	for _, d := range c.QubitDeterminatorList {
+		if d != nil && d.IsEditing() {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *QubitsSystem) CheckCollide(worldMouse rl.Vector2) bool {
 	return rl.CheckCollisionPointRec(worldMouse, rl.Rectangle{X: c.startX, Y: c.startY, Width: float32(c.cols) * glob.QubitSystemCellWidth, Height: float32(c.rows) * glob.QubitSystemCellHeight})
 }

@@ -20,6 +20,18 @@ import (
 // a qubit name each time and make spawned-qubit IDs skip every other number.
 var previewModID int32 = -1
 
+var focusedWindow *RenderWindow
+
+func SetFocusedWindow(rw *RenderWindow) {
+	focusedWindow = rw
+}
+
+func ClearFocusedWindow(id int32) {
+	if focusedWindow != nil && focusedWindow.ID == id {
+		focusedWindow = nil
+	}
+}
+
 type RenderWindow struct {
 	Window
 	Camera rl.Camera2D
@@ -31,6 +43,7 @@ type RenderWindow struct {
 	panStartTarget rl.Vector2 // camera target on press
 
 	CanPan                bool
+	CanKeyboardPan        bool
 	CanSpawn              bool
 	IsHorizontalScrolling bool
 	IsVerticalScrolling   bool
@@ -72,6 +85,7 @@ func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 		Window:            *NewWindow(x, y, width, height),
 		WComp:             nil,
 		CanPan:            true,
+		CanKeyboardPan:    true,
 		CanSpawn:          true,
 		ShowGrid:          true,
 		postEffect:        nil,
@@ -85,6 +99,9 @@ func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 		Zoom:     1.0,
 	}
 	rw.updateCameraOffset()
+	if focusedWindow == nil && rw.CanPan && rw.CanKeyboardPan {
+		focusedWindow = rw
+	}
 	return rw
 }
 
@@ -444,6 +461,9 @@ func (rw *RenderWindow) Update() {
 
 	if rw.holdingCursor && rl.IsMouseButtonDown(rl.MouseButtonLeft) {
 		rw.activate = true
+		if rw.CanPan && rw.CanKeyboardPan {
+			focusedWindow = rw
+		}
 	}
 
 	// Window resize/drag in screen space
@@ -491,6 +511,7 @@ func (rw *RenderWindow) Update() {
 	// --- Pan, Scroll, and Zoom ---
 	rw.handlePanning(mousePos)
 	rw.handleScroll(mousePos)
+	rw.handleKeyboardPan()
 
 	contentRect := rw.GetContentRect()
 
@@ -791,6 +812,63 @@ func (rw *RenderWindow) handlePanning(mousePos rl.Vector2) {
 	}
 }
 
+func (rw *RenderWindow) isTyping() bool {
+	if rw.isEditingTitle {
+		return true
+	}
+	for _, c := range rw.WComp {
+		if ed, ok := c.(interface{ IsEditing() bool }); ok && ed.IsEditing() {
+			return true
+		}
+	}
+	return false
+}
+
+func (rw *RenderWindow) handleKeyboardPan() {
+	if !rw.CanPan || !rw.CanKeyboardPan {
+		return
+	}
+	if rw.pinPosition != nil {
+		return
+	}
+	if focusedWindow != rw {
+		return
+	}
+	if rw.isTyping() {
+		return
+	}
+
+	var dx, dy float32
+	if rl.IsKeyDown(rl.KeyA) || rl.IsKeyDown(rl.KeyLeft) {
+		dx--
+	}
+	if rl.IsKeyDown(rl.KeyD) || rl.IsKeyDown(rl.KeyRight) {
+		dx++
+	}
+	if rl.IsKeyDown(rl.KeyW) || rl.IsKeyDown(rl.KeyUp) {
+		dy--
+	}
+	if rl.IsKeyDown(rl.KeyS) || rl.IsKeyDown(rl.KeyDown) {
+		dy++
+	}
+	if dx == 0 && dy == 0 {
+		return
+	}
+	if dx != 0 && dy != 0 {
+		const invSqrt2 = 0.70710678
+		dx *= invSqrt2
+		dy *= invSqrt2
+	}
+
+	zoom := rw.Camera.Zoom
+	if zoom <= 0 {
+		zoom = 1
+	}
+	step := config.KeyboardPanSpeed * rl.GetFrameTime() / zoom
+	rw.Camera.Target.X += dx * step
+	rw.Camera.Target.Y += dy * step
+}
+
 // handleScroll processes mouse‑wheel axis‑constrained scrolling.
 func (rw *RenderWindow) handleScroll(mousePos rl.Vector2) {
 	if !rw.IsHorizontalScrolling && !rw.IsVerticalScrolling {
@@ -811,7 +889,11 @@ func (rw *RenderWindow) handleScroll(mousePos rl.Vector2) {
 }
 
 func (rw *RenderWindow) IsPanAllow(val bool) {
-	rw.CanPan = true
+	rw.CanPan = val
+}
+
+func (rw *RenderWindow) IsKeyboardPanAllow(val bool) {
+	rw.CanKeyboardPan = val
 }
 
 func (rw *RenderWindow) IsHorizontalScrollAllow(val bool) {

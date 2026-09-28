@@ -42,6 +42,8 @@ func NewTextBox(x, y, width, height float32, fontSize int32) *TextBox {
 
 func (tb *TextBox) GetID() int32 { return tb.ID }
 
+func (tb *TextBox) IsEditing() bool { return tb.Active || tb.sizeEditing }
+
 // fontControls returns the +/- buttons and the editable size field above
 // the box: [-] [ size ] [+].
 func (tb *TextBox) fontControls(rect rl.Rectangle) (minus, sizeField, plus rl.Rectangle) {

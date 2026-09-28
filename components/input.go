@@ -18,16 +18,18 @@ type Input struct {
 func NewInput(x, y, width, height float32, fontSize int32, maxChars int, onSubmit func(string)) *Input {
 	radius := max(width, height) / 2
 	return &Input{
-		Circle:    NewCircle(x, y, radius, rl.Blank),
-		Width:     width,
-		Height:    height,
-		Text:      "",
-		FontSize:  fontSize,
-		MaxChars:  maxChars,
-		OnSubmit:  onSubmit,
-		Active:    false,
+		Circle:   NewCircle(x, y, radius, rl.Blank),
+		Width:    width,
+		Height:   height,
+		Text:     "",
+		FontSize: fontSize,
+		MaxChars: maxChars,
+		OnSubmit: onSubmit,
+		Active:   false,
 	}
 }
+
+func (in *Input) IsEditing() bool { return in.Active }
 
 func (in *Input) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
 	rect := rl.NewRectangle(
