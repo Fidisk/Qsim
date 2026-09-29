@@ -24,7 +24,14 @@ type QubitsSystem struct {
 	ID                    int32
 	HookID                int32
 	QubitDeterminatorList []*QubitDeterminator
-	DetOrder              []int
+	AmpOrder              []int
+	QubitPerm             []int
+	orderPopupOpen        bool
+	orderPopupItems       []int
+	orderPopupOrig        []int
+	orderPopupDrag        int
+	orderPopupHeld        bool
+	orderPopupPointerX    float32
 
 	Probability float64
 	rows        int32
@@ -350,6 +357,10 @@ func (c *QubitsSystem) enforceSingleGate() {
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.orderPopupOpen {
+		c.updateOrderPopup(worldMouse, holdingCursor, isCursorAvailable)
+		return
+	}
 	for _, d := range c.QubitList {
 		d.Update()
 	}
@@ -363,6 +374,9 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 	if c.CheckCollide(worldMouse) {
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
 			c.onClick(worldMouse, isCursorAvailable)
+		}
+		if !c.dragging && rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
+			c.openOrderPopup()
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -415,7 +429,7 @@ func (c *QubitsSystem) UpdateDeterminators(worldMouse rl.Vector2, holdingCursor 
 		if !c.isDeterminatorVisible(d) {
 			continue
 		}
-		c.pullToQubitSystem(d, c.slotOf(i))
+		c.pullToQubitSystem(d, i)
 
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
 	}
@@ -562,7 +576,7 @@ func (c *QubitsSystem) Draw() {
 	for row := int32(0); row < c.rows; row++ {
 		for col := int32(0); col < c.cols; col++ {
 			index := row*c.cols + col
-			v := c.Origin.Amptitude[index]
+			v := c.Origin.Amptitude[c.ampAt(int(index))]
 			p := real(v)*real(v) + imag(v)*imag(v)
 			if p > 1 {
 				p = 1
@@ -617,10 +631,10 @@ func (c *QubitsSystem) Draw() {
 			cellCenterX := c.startX + float32(col)*float32(n) + float32(n)/2
 			cellCenterY := c.startY + float32(row)*float32(m) + float32(m)/2
 
-			// Linear index (row-major order)
 			index := row*c.cols + col
-			r := real(c.Origin.Amptitude[index])
-			img := imag(c.Origin.Amptitude[index])
+			ampIdx := c.ampAt(int(index))
+			r := real(c.Origin.Amptitude[ampIdx])
+			img := imag(c.Origin.Amptitude[ampIdx])
 			numberStr := formatCellAmplitude(complex(r, img))
 
 			// Fade out states with negligible probability
@@ -665,9 +679,18 @@ func (c *QubitsSystem) Draw() {
 	// branch probability (the product of its inputs' probabilities through
 	// gates, times the outcome probability after a measurement).
 	if c.hovered && c.Origin != nil {
-		names := make([]string, len(c.Origin.ModifierID))
-		for i, id := range c.Origin.ModifierID {
-			names[i] = modifierLabel(id)
+		c.ensureQubitPerm()
+		names := make([]string, 0, len(c.Origin.ModifierID))
+		for _, pos := range c.QubitPerm {
+			if pos >= 0 && pos < len(c.Origin.ModifierID) {
+				names = append(names, modifierLabel(c.Origin.ModifierID[pos]))
+			}
+		}
+		if len(names) != len(c.Origin.ModifierID) {
+			names = names[:0]
+			for _, id := range c.Origin.ModifierID {
+				names = append(names, modifierLabel(id))
+			}
 		}
 		label := strings.Join(names, " + ")
 		if c.Origin.Size == 1 && c.HookID == 0 {
@@ -684,6 +707,35 @@ func (c *QubitsSystem) Draw() {
 		rl.DrawRectangleRec(box, config.ColorBg)
 		rl.DrawRectangleLinesEx(box, 2, c.Color)
 		rl.DrawText(label, int32(box.X+6), int32(box.Y+4), fontSize, c.Color)
+	}
+
+	if c.orderPopupOpen && c.Origin != nil {
+		x, y, w, h := c.orderPopupGeom()
+		rl.DrawRectangleRounded(rl.NewRectangle(x, y, w, h), 0.15, 4, rl.NewColor(30, 30, 30, 255))
+		rl.DrawRectangleRoundedLinesEx(rl.NewRectangle(x, y, w, h), 0.15, 4, 1.5, c.Color)
+		fontSize := int32(16)
+		for i := range c.orderPopupItems {
+			if i == c.orderPopupDrag && c.orderPopupHeld {
+				continue
+			}
+			r := c.orderPopupButtonRect(x, y, i)
+			rl.DrawRectangleRounded(r, 0.35, 4, rl.NewColor(50, 50, 50, 255))
+			rl.DrawRectangleRoundedLinesEx(r, 0.35, 4, 2, c.Color)
+			label := c.popupQubitLabel(c.orderPopupItems[i])
+			rl.DrawText(label, int32(r.X)+int32(r.Width)/2-rl.MeasureText(label, fontSize)/2, int32(r.Y)+int32(r.Height)/2-fontSize/2, fontSize, rl.White)
+		}
+		if c.orderPopupHeld && c.orderPopupDrag >= 0 {
+			i := c.orderPopupDrag
+			r := c.orderPopupButtonRect(x, y, i)
+			r.X = c.orderPopupPointerX - r.Width/2
+			rl.DrawRectangleRounded(r, 0.35, 4, rl.NewColor(70, 80, 110, 255))
+			rl.DrawRectangleRoundedLinesEx(r, 0.35, 4, 2, rl.White)
+			label := c.popupQubitLabel(c.orderPopupItems[i])
+			rl.DrawText(label, int32(r.X)+int32(r.Width)/2-rl.MeasureText(label, fontSize)/2, int32(r.Y)+int32(r.Height)/2-fontSize/2, fontSize, rl.White)
+		}
+		hintSize := int32(12)
+		hint := "Enter: apply   Esc: cancel"
+		rl.DrawText(hint, int32(x)+8, int32(y+h)-hintSize-6, hintSize, rl.LightGray)
 	}
 
 	// (Commented‑out old drawing code remains unchanged)
@@ -783,7 +835,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 			c.QubitDeterminatorList = append(c.QubitDeterminatorList, q)
 		}
 	}
-	c.SyncDetOrder()
+	c.SyncAmpOrder()
 
 	for i := range p.Amptitude {
 		rotation := rand.Float32() * 2 * math.Pi
@@ -951,67 +1003,198 @@ func determinatorSlotY(centerY float32, i, size int) float32 {
 	return utils.SnapToGrid(centerY+(float32(i)-float32(size-1)/2)*stride, stride)
 }
 
-func (c *QubitsSystem) SyncDetOrder() {
-	if len(c.DetOrder) != len(c.QubitDeterminatorList) {
-		c.DetOrder = make([]int, len(c.QubitDeterminatorList))
-		for i := range c.DetOrder {
-			c.DetOrder[i] = i
+func (c *QubitsSystem) qubitCount() int {
+	if c.Origin == nil {
+		return 0
+	}
+	return int(c.Origin.Size)
+}
+
+func (c *QubitsSystem) ampCount() int {
+	if c.Origin == nil {
+		return 0
+	}
+	return len(c.Origin.Amptitude)
+}
+
+func (c *QubitsSystem) ensureQubitPerm() {
+	if len(c.QubitPerm) != c.qubitCount() {
+		c.QubitPerm = make([]int, c.qubitCount())
+		for i := range c.QubitPerm {
+			c.QubitPerm[i] = i
 		}
 	}
 }
 
-func (c *QubitsSystem) slotOf(i int) int {
-	c.SyncDetOrder()
-	return c.DetOrder[i]
-}
-
-func (c *QubitsSystem) removeDeterminatorAt(i int) {
-	c.SyncDetOrder()
-	removed := c.DetOrder[i]
-	c.QubitDeterminatorList = append(c.QubitDeterminatorList[:i], c.QubitDeterminatorList[i+1:]...)
-	c.DetOrder = append(c.DetOrder[:i], c.DetOrder[i+1:]...)
-	for j := range c.DetOrder {
-		if c.DetOrder[j] > removed {
-			c.DetOrder[j]--
+func (c *QubitsSystem) rebuildAmpOrder() {
+	c.ensureQubitPerm()
+	n := c.qubitCount()
+	total := 1 << n
+	if len(c.AmpOrder) != total {
+		c.AmpOrder = make([]int, total)
+	}
+	for i := 0; i < total; i++ {
+		disp := 0
+		for k := 0; k < n; k++ {
+			j := c.QubitPerm[k]
+			if j < 0 || j >= n {
+				j = k
+			}
+			bit := (i >> (n - 1 - j)) & 1
+			disp |= bit << (n - 1 - k)
 		}
+		c.AmpOrder[disp] = i
 	}
 }
 
-func (c *QubitsSystem) reorderSlot(d *QubitDeterminator) {
-	if d.HookID != 0 {
+func (c *QubitsSystem) SyncAmpOrder() {
+	c.rebuildAmpOrder()
+}
+
+func (c *QubitsSystem) ampAt(pos int) int {
+	if pos < 0 || pos >= len(c.AmpOrder) {
+		return pos
+	}
+	return c.AmpOrder[pos]
+}
+
+func (c *QubitsSystem) openOrderPopup() {
+	c.ensureQubitPerm()
+	n := len(c.QubitPerm)
+	if n < 2 {
 		return
 	}
-	c.SyncDetOrder()
-	self := -1
-	for i, o := range c.QubitDeterminatorList {
-		if o == d {
-			self = i
+	c.orderPopupItems = append([]int{}, c.QubitPerm...)
+	c.orderPopupOrig = append([]int{}, c.QubitPerm...)
+	c.orderPopupDrag = -1
+	c.orderPopupHeld = false
+	c.orderPopupOpen = true
+}
+
+func (c *QubitsSystem) applyPopupOrder() {
+	c.ensureQubitPerm()
+	if len(c.orderPopupItems) == len(c.QubitPerm) {
+		copy(c.QubitPerm, c.orderPopupItems)
+	}
+	c.rebuildAmpOrder()
+}
+
+func (c *QubitsSystem) commitOrderPopup() {
+	c.applyPopupOrder()
+	c.orderPopupOpen = false
+	c.orderPopupHeld = false
+	c.orderPopupDrag = -1
+}
+
+func (c *QubitsSystem) revertOrderPopup() {
+	c.ensureQubitPerm()
+	if len(c.orderPopupOrig) == len(c.QubitPerm) {
+		copy(c.QubitPerm, c.orderPopupOrig)
+	}
+	c.rebuildAmpOrder()
+	c.orderPopupOpen = false
+	c.orderPopupHeld = false
+	c.orderPopupDrag = -1
+}
+
+func (c *QubitsSystem) popupQubitLabel(storagePos int) string {
+	if c.Origin == nil || storagePos < 0 || storagePos >= len(c.Origin.ModifierID) {
+		return ""
+	}
+	return modifierLabel(c.Origin.ModifierID[storagePos])
+}
+
+func (c *QubitsSystem) orderPopupBtnW() float32 {
+	fontSize := int32(16)
+	btnW := float32(80)
+	for _, pos := range c.orderPopupItems {
+		if tw := float32(rl.MeasureText(c.popupQubitLabel(pos), fontSize)) + 32; tw > btnW {
+			btnW = tw
+		}
+	}
+	return btnW
+}
+
+func (c *QubitsSystem) orderPopupGeom() (x, y, w, h float32) {
+	btnW := c.orderPopupBtnW()
+	w = float32(len(c.orderPopupItems))*(btnW+6) + 6
+	h = 30 + 12 + 20
+	x = c.Center.X - w/2
+	y = c.startY - h - 12
+	return x, y, w, h
+}
+
+func (c *QubitsSystem) orderPopupButtonRect(x, y float32, i int) rl.Rectangle {
+	btnW := c.orderPopupBtnW()
+	return rl.NewRectangle(x+6+float32(i)*(btnW+6), y+6, btnW, 30)
+}
+
+func (c *QubitsSystem) moveOrderPopupItem(from int, pointerX, listX float32) {
+	n := len(c.orderPopupItems)
+	to := int((pointerX - (listX + 6)) / (c.orderPopupBtnW() + 6))
+	if to < 0 {
+		to = 0
+	}
+	if to > n-1 {
+		to = n - 1
+	}
+	if to == from {
+		return
+	}
+	it := c.orderPopupItems[from]
+	if to > from {
+		copy(c.orderPopupItems[from:], c.orderPopupItems[from+1:to+1])
+	} else {
+		copy(c.orderPopupItems[to+1:], c.orderPopupItems[to:from])
+	}
+	c.orderPopupItems[to] = it
+	c.orderPopupDrag = to
+	c.applyPopupOrder()
+}
+
+func (c *QubitsSystem) updateOrderPopup(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	x, y, _, _ := c.orderPopupGeom()
+	overIdx := -1
+	for i := range c.orderPopupItems {
+		if rl.CheckCollisionPointRec(worldMouse, c.orderPopupButtonRect(x, y, i)) {
+			overIdx = i
 			break
 		}
 	}
-	if self < 0 {
+	if c.orderPopupHeld {
+		if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
+			c.orderPopupHeld = false
+			c.orderPopupDrag = -1
+			*isCursorAvailable = true
+			return
+		}
+		if c.orderPopupDrag >= 0 {
+			c.orderPopupPointerX = worldMouse.X
+			c.moveOrderPopupItem(c.orderPopupDrag, worldMouse.X, x)
+		}
 		return
 	}
-	best := -1
-	bestDist := config.SnapToGridInterval * 0.75
-	for i, o := range c.QubitDeterminatorList {
-		if i == self || o.HookID != 0 || !c.isDeterminatorVisible(o) {
-			continue
-		}
-		if dist := utils.Dist(c.determinatorHome(c.DetOrder[i]), d.Center); dist < bestDist {
-			bestDist = dist
-			best = i
-		}
-	}
-	if best < 0 {
+	if rl.IsKeyPressed(rl.KeyEscape) {
+		c.revertOrderPopup()
 		return
 	}
-	c.DetOrder[self], c.DetOrder[best] = c.DetOrder[best], c.DetOrder[self]
-	d.Center = c.determinatorHome(c.DetOrder[self])
-	d.VirtualCenter = d.Center
-	other := c.QubitDeterminatorList[best]
-	other.Center = c.determinatorHome(c.DetOrder[best])
-	other.VirtualCenter = other.Center
+	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
+		c.commitOrderPopup()
+		return
+	}
+	if rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (c.holdingCursor || *isCursorAvailable) && c.CheckCollide(worldMouse) {
+		c.commitOrderPopup()
+		return
+	}
+	if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && holdingCursor && (*isCursorAvailable || c.holdingCursor) {
+		if overIdx >= 0 {
+			c.orderPopupHeld = true
+			c.orderPopupDrag = overIdx
+			c.orderPopupPointerX = worldMouse.X
+			*isCursorAvailable = false
+		}
+		return
+	}
 }
 
 // determinatorHome returns the laid-out position for the i-th determinator:
@@ -1069,7 +1252,7 @@ func (c *QubitsSystem) CopyFromState(state *qub.QubitStateManager) {
 		c.Origin = qub.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	}
 	c.Origin.CopyFrom(state)
-	c.SyncDetOrder()
+	c.SyncAmpOrder()
 	c.InvalidateDownstreamGates()
 }
 

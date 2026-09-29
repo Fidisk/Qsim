@@ -102,18 +102,20 @@ var steps = []Step{
 					if !ok || cm["type"] != "QubitsSystem" {
 						continue
 					}
-					if cm["detOrder"] != nil {
+					if cm["qubitPerm"] != nil {
 						continue
 					}
 					n := 0
-					if dets, ok := cm["qubitDeterminators"].([]interface{}); ok {
-						n = len(dets)
+					if origin, ok := cm["origin"].(map[string]interface{}); ok {
+						if mods, ok := origin["modifierIDs"].([]interface{}); ok {
+							n = len(mods)
+						}
 					}
-					order := make([]interface{}, n)
-					for i := range order {
-						order[i] = float64(i)
+					perm := make([]interface{}, n)
+					for i := range perm {
+						perm[i] = float64(i)
 					}
-					cm["detOrder"] = order
+					cm["qubitPerm"] = perm
 				}
 			}
 		},

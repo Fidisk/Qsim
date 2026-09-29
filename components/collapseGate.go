@@ -354,7 +354,7 @@ func (c *CollapseGate) ConsumeMeasuredInput() {
 	// rendered, updated, or available for hooking.
 	for i, d := range qp.QubitDeterminatorList {
 		if d == QD {
-			qp.removeDeterminatorAt(i)
+			qp.QubitDeterminatorList = append(qp.QubitDeterminatorList[:i], qp.QubitDeterminatorList[i+1:]...)
 			break
 		}
 	}

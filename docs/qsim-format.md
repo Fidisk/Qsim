@@ -220,7 +220,7 @@ system every frame.
      {"center": {...}, "radius": 15, "color": {...},
       "modifierID": 0, "id": 15, "hookID": 19, "qubitSystemID": 14}
    ],
-  "detOrder": [0]
+  "qubitPerm": [0]
 }
 ```
 
@@ -240,11 +240,16 @@ system every frame.
   inputs. Each has `modifierID` (matching one entry of
   `origin.modifierIDs`), its own `id`, `hookID` (the gate input hook it is
   plugged into, 0 if free) and `qubitSystemID`.
-- `detOrder` is the visual column order: `detOrder[i]` is the top-to-bottom
-  display slot of `qubitDeterminators[i]`. It is display-only — bit
-  significance still comes from `origin.modifierIDs` order. Dragging a free
-  determinator onto another slot swaps the two; omit it (or send old saves)
-  and the loader/migration default to identity order.
+- `qubitPerm` is the display-only qubit order: display ket digit `k` shows
+  the qubit at `origin.modifierIDs[qubitPerm[k]]`, so swapping the first two
+  entries turns a displayed `100` into `010`. Grid cells keep fixed
+  row-major ket labels while the amplitudes behind them are remapped by
+  bit-permuting; `origin` itself never changes — gates, measurement,
+  animation and export all keep reading `origin` in storage order.
+  Right-clicking the system grid opens a popup with one button per qubit in
+  a horizontal row — drag the buttons to rearrange; releasing only drops the
+  button, `Enter` commits and closes, `Esc` cancels. Omit it (or send old
+  saves) and the loader/migration default to identity order.
 - On load the system is rebuilt with `QubitsSystem.Assign(origin)`, which
   regenerates determinators and the animated qubit visuals (random orbits —
   cosmetic); the serialized `qubitDeterminators` entries are then used to

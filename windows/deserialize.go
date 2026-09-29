@@ -452,9 +452,9 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 		}
 	}
 
-	if v, ok := raw["detOrder"].([]interface{}); ok && len(v) == len(qs.QubitDeterminatorList) && len(v) > 0 {
+	if v, ok := raw["qubitPerm"].([]interface{}); ok && qs.Origin != nil && len(v) == int(qs.Origin.Size) && len(v) > 0 {
 		seen := make([]bool, len(v))
-		order := make([]int, len(v))
+		perm := make([]int, len(v))
 		valid := true
 		for i, e := range v {
 			s := int(e.(float64))
@@ -463,13 +463,13 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 				break
 			}
 			seen[s] = true
-			order[i] = s
+			perm[i] = s
 		}
 		if valid {
-			qs.DetOrder = order
+			qs.QubitPerm = perm
 		}
 	}
-	qs.SyncDetOrder()
+	qs.SyncAmpOrder()
 
 	if qs.Origin == nil {
 		if len(qs.QubitDeterminatorList) > 0 {
