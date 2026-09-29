@@ -452,6 +452,25 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 		}
 	}
 
+	if v, ok := raw["detOrder"].([]interface{}); ok && len(v) == len(qs.QubitDeterminatorList) && len(v) > 0 {
+		seen := make([]bool, len(v))
+		order := make([]int, len(v))
+		valid := true
+		for i, e := range v {
+			s := int(e.(float64))
+			if s < 0 || s >= len(v) || seen[s] {
+				valid = false
+				break
+			}
+			seen[s] = true
+			order[i] = s
+		}
+		if valid {
+			qs.DetOrder = order
+		}
+	}
+	qs.SyncDetOrder()
+
 	if qs.Origin == nil {
 		if len(qs.QubitDeterminatorList) > 0 {
 			modIDs := make([]int32, len(qs.QubitDeterminatorList))

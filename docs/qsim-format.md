@@ -36,7 +36,7 @@ format version — see §3 "Save versioning".
 ```json
 {
   "type": "RenderWindow",
-  "saveVersion": "0.8.0",
+  "saveVersion": "0.8.2",
   "window": { ...base window fields... },
   "cameraZoom": 1,
   "cameraTargetX": 0, "cameraTargetY": 0,
@@ -63,7 +63,7 @@ the grid survives a save/load round trip.
 ## 3. Save versioning
 
 Every `RenderWindow` line carries the format version in `saveVersion`
-(currently `globals.SaveVersion`, "0.8.0"). When a file is loaded:
+(currently `globals.SaveVersion`, "0.8.2"). When a file is loaded:
 
 1. `qsim/migration.Migrate` runs first: each line whose `saveVersion` is
    missing (unnumbered) or lower than the current version is rewritten
@@ -217,9 +217,10 @@ system every frame.
     "size": 1
   },
   "qubitDeterminators": [
-    {"center": {...}, "radius": 15, "color": {...},
-     "modifierID": 0, "id": 15, "hookID": 19, "qubitSystemID": 14}
-  ]
+     {"center": {...}, "radius": 15, "color": {...},
+      "modifierID": 0, "id": 15, "hookID": 19, "qubitSystemID": 14}
+   ],
+  "detOrder": [0]
 }
 ```
 
@@ -239,6 +240,11 @@ system every frame.
   inputs. Each has `modifierID` (matching one entry of
   `origin.modifierIDs`), its own `id`, `hookID` (the gate input hook it is
   plugged into, 0 if free) and `qubitSystemID`.
+- `detOrder` is the visual column order: `detOrder[i]` is the top-to-bottom
+  display slot of `qubitDeterminators[i]`. It is display-only — bit
+  significance still comes from `origin.modifierIDs` order. Dragging a free
+  determinator onto another slot swaps the two; omit it (or send old saves)
+  and the loader/migration default to identity order.
 - On load the system is rebuilt with `QubitsSystem.Assign(origin)`, which
   regenerates determinators and the animated qubit visuals (random orbits —
   cosmetic); the serialized `qubitDeterminators` entries are then used to

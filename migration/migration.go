@@ -89,6 +89,35 @@ var steps = []Step{
 			}
 		},
 	},
+	{
+		To: "0.8.2",
+		Apply: func(w map[string]interface{}) {
+			if w["type"] != "RenderWindow" {
+				return
+			}
+			w["saveVersion"] = "0.8.2"
+			if comps, ok := w["components"].([]interface{}); ok {
+				for _, c := range comps {
+					cm, ok := c.(map[string]interface{})
+					if !ok || cm["type"] != "QubitsSystem" {
+						continue
+					}
+					if cm["detOrder"] != nil {
+						continue
+					}
+					n := 0
+					if dets, ok := cm["qubitDeterminators"].([]interface{}); ok {
+						n = len(dets)
+					}
+					order := make([]interface{}, n)
+					for i := range order {
+						order[i] = float64(i)
+					}
+					cm["detOrder"] = order
+				}
+			}
+		},
+	},
 }
 
 // parseVersion splits "major.minor.patch" into a comparable value; missing

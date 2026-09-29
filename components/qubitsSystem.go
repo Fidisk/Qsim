@@ -24,10 +24,8 @@ type QubitsSystem struct {
 	ID                    int32
 	HookID                int32
 	QubitDeterminatorList []*QubitDeterminator
-	// Probability is the branch weight of this system: 1 for fresh inputs,
-	// the product of its inputs' probabilities after a gate, and the input
-	// probability times the outcome probability after a measurement. Shown
-	// on hover.
+	DetOrder              []int
+
 	Probability float64
 	rows        int32
 	cols        int32
@@ -417,7 +415,7 @@ func (c *QubitsSystem) UpdateDeterminators(worldMouse rl.Vector2, holdingCursor 
 		if !c.isDeterminatorVisible(d) {
 			continue
 		}
-		c.pullToQubitSystem(d, i)
+		c.pullToQubitSystem(d, c.slotOf(i))
 
 		d.Update(worldMouse, holdingCursor, isCursorAvailable)
 	}
@@ -785,6 +783,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 			c.QubitDeterminatorList = append(c.QubitDeterminatorList, q)
 		}
 	}
+	c.SyncDetOrder()
 
 	for i := range p.Amptitude {
 		rotation := rand.Float32() * 2 * math.Pi
@@ -952,6 +951,69 @@ func determinatorSlotY(centerY float32, i, size int) float32 {
 	return utils.SnapToGrid(centerY+(float32(i)-float32(size-1)/2)*stride, stride)
 }
 
+func (c *QubitsSystem) SyncDetOrder() {
+	if len(c.DetOrder) != len(c.QubitDeterminatorList) {
+		c.DetOrder = make([]int, len(c.QubitDeterminatorList))
+		for i := range c.DetOrder {
+			c.DetOrder[i] = i
+		}
+	}
+}
+
+func (c *QubitsSystem) slotOf(i int) int {
+	c.SyncDetOrder()
+	return c.DetOrder[i]
+}
+
+func (c *QubitsSystem) removeDeterminatorAt(i int) {
+	c.SyncDetOrder()
+	removed := c.DetOrder[i]
+	c.QubitDeterminatorList = append(c.QubitDeterminatorList[:i], c.QubitDeterminatorList[i+1:]...)
+	c.DetOrder = append(c.DetOrder[:i], c.DetOrder[i+1:]...)
+	for j := range c.DetOrder {
+		if c.DetOrder[j] > removed {
+			c.DetOrder[j]--
+		}
+	}
+}
+
+func (c *QubitsSystem) reorderSlot(d *QubitDeterminator) {
+	if d.HookID != 0 {
+		return
+	}
+	c.SyncDetOrder()
+	self := -1
+	for i, o := range c.QubitDeterminatorList {
+		if o == d {
+			self = i
+			break
+		}
+	}
+	if self < 0 {
+		return
+	}
+	best := -1
+	bestDist := config.SnapToGridInterval * 0.75
+	for i, o := range c.QubitDeterminatorList {
+		if i == self || o.HookID != 0 || !c.isDeterminatorVisible(o) {
+			continue
+		}
+		if dist := utils.Dist(c.determinatorHome(c.DetOrder[i]), d.Center); dist < bestDist {
+			bestDist = dist
+			best = i
+		}
+	}
+	if best < 0 {
+		return
+	}
+	c.DetOrder[self], c.DetOrder[best] = c.DetOrder[best], c.DetOrder[self]
+	d.Center = c.determinatorHome(c.DetOrder[self])
+	d.VirtualCenter = d.Center
+	other := c.QubitDeterminatorList[best]
+	other.Center = c.determinatorHome(c.DetOrder[best])
+	other.VirtualCenter = other.Center
+}
+
 // determinatorHome returns the laid-out position for the i-th determinator:
 // a column one cell to the right of the state grid, matching Assign.
 func (c *QubitsSystem) determinatorHome(i int) rl.Vector2 {
@@ -1007,6 +1069,7 @@ func (c *QubitsSystem) CopyFromState(state *qub.QubitStateManager) {
 		c.Origin = qub.NewQubitStateManagerFrom([]complex64{}, []int32{})
 	}
 	c.Origin.CopyFrom(state)
+	c.SyncDetOrder()
 	c.InvalidateDownstreamGates()
 }
 

@@ -157,6 +157,11 @@ func (c *QubitDeterminator) Update(worldMouse rl.Vector2, holdingCursor bool, is
 		*isCursorAvailable = true
 
 		c.zipToHook()
+		if c.HookID == 0 {
+			if qp := c.GetQubitParent(); qp != nil {
+				qp.reorderSlot(c)
+			}
+		}
 	}
 	if c.dragging {
 		raw := rl.Vector2Add(worldMouse, c.offset)

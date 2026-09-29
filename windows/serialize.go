@@ -155,6 +155,7 @@ func serializeQubitsSystem(qs *components.QubitsSystem) map[string]interface{} {
 		"probability":        qs.Probability,
 		"origin":             serializeQubitStateManager(qs.Origin),
 		"qubitDeterminators": dets,
+		"detOrder":           qs.DetOrder,
 	}
 }
 

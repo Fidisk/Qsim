@@ -14,8 +14,8 @@ func TestMigrateUnnumberedSave(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &w); err != nil {
 		t.Fatalf("migrated output is not valid JSON: %v", err)
 	}
-	if w["saveVersion"] != "0.8.1" {
-		t.Fatalf("saveVersion = %v, want 0.8.1", w["saveVersion"])
+	if w["saveVersion"] != "0.8.2" {
+		t.Fatalf("saveVersion = %v, want 0.8.2", w["saveVersion"])
 	}
 	if w["showGrid"] != true {
 		t.Fatalf("showGrid = %v, want true", w["showGrid"])
@@ -25,6 +25,9 @@ func TestMigrateUnnumberedSave(t *testing.T) {
 	if qs["probability"] != float64(1) {
 		t.Fatalf("QubitsSystem probability = %v, want 1", qs["probability"])
 	}
+	if qs["detOrder"] == nil {
+		t.Fatal("QubitsSystem detOrder missing after migration")
+	}
 	m4 := comps[1].(map[string]interface{})
 	if m4["storedProb"] != float64(1) {
 		t.Fatalf("M4Gate storedProb = %v, want 1", m4["storedProb"])
@@ -32,7 +35,7 @@ func TestMigrateUnnumberedSave(t *testing.T) {
 }
 
 func TestMigrateCurrentPassesThrough(t *testing.T) {
-	cur := `{"type":"RenderWindow","saveVersion":"0.8.1","showGrid":true,"window":{"name":"c"},"components":[{"type":"QubitsSystem","id":2,"probability":0.25}]}`
+	cur := `{"type":"RenderWindow","saveVersion":"0.8.2","showGrid":true,"window":{"name":"c"},"components":[{"type":"QubitsSystem","id":2,"probability":0.25,"detOrder":[0]}]}`
 	if got := Migrate(cur); got != cur {
 		t.Fatalf("current-version save was rewritten:\n%s", got)
 	}
