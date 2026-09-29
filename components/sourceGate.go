@@ -3,8 +3,8 @@ package components
 import (
 	"fmt"
 	"math"
-	"math/cmplx"
 	"qsim/config"
+	"qsim/symbolic"
 	"strconv"
 	"strings"
 
@@ -23,7 +23,7 @@ type SourceGate struct {
 	Label      string
 	Color      rl.Color
 	OutHook    *Hook
-	Amplitude  []complex64 // index 0 = |0⟩, index 1 = |1⟩
+	Amplitude  []symbolic.SymbolicValue // index 0 = |0⟩, index 1 = |1⟩
 	ModifierID int32
 
 	modifierGenerated bool
@@ -70,9 +70,9 @@ const (
 )
 
 // NewSourceGate creates a source gate.
-func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []complex64) *SourceGate {
+func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []symbolic.SymbolicValue) *SourceGate {
 	if len(amp) != 2 {
-		amp = []complex64{complex(1, 0), complex(0, 0)}
+		amp = []symbolic.SymbolicValue{symbolic.New(1, 0), symbolic.Zero()}
 	}
 	sg := &SourceGate{
 		Circle:    *NewCircle(x, y, radius, color),
@@ -95,9 +95,9 @@ func NewSourceGate(x, y, radius float32, color rl.Color, label string, amp []com
 	return sg
 }
 
-func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp []complex64, modID int32) *SourceGate {
+func NewSourceGateWithID(x, y, radius float32, color rl.Color, label string, amp []symbolic.SymbolicValue, modID int32) *SourceGate {
 	if len(amp) != 2 {
-		amp = []complex64{complex(1, 0), complex(0, 0)}
+		amp = []symbolic.SymbolicValue{symbolic.New(1, 0), symbolic.Zero()}
 	}
 	sg := &SourceGate{
 		Circle:            *NewCircle(x, y, radius, color),
@@ -182,10 +182,10 @@ func (sg *SourceGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursor
 		if rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (sg.holdingCursor || *isCursorAvailable) {
 			// Enter edit mode
 			sg.editing = true
-			sg.real0Str = fmt.Sprintf("%.4f", real(sg.Amplitude[0]))
-			sg.imag0Str = fmt.Sprintf("%.4f", imag(sg.Amplitude[0]))
-			sg.real1Str = fmt.Sprintf("%.4f", real(sg.Amplitude[1]))
-			sg.imag1Str = fmt.Sprintf("%.4f", imag(sg.Amplitude[1]))
+			sg.real0Str = fmt.Sprintf("%.4f", sg.Amplitude[0].Real())
+			sg.imag0Str = fmt.Sprintf("%.4f", sg.Amplitude[0].Imag())
+			sg.real1Str = fmt.Sprintf("%.4f", sg.Amplitude[1].Real())
+			sg.imag1Str = fmt.Sprintf("%.4f", sg.Amplitude[1].Imag())
 			sg.editField = 0
 			*isCursorAvailable = false
 			sg.holdingCursor = true
@@ -316,8 +316,8 @@ func (sg *SourceGate) processEditing(isCursorAvailable *bool) {
 		i0, _ := strconv.ParseFloat(sg.imag0Str, 64)
 		r1, _ := strconv.ParseFloat(sg.real1Str, 64)
 		i1, _ := strconv.ParseFloat(sg.imag1Str, 64)
-		sg.Amplitude[0] = complex64(complex(r0, i0))
-		sg.Amplitude[1] = complex64(complex(r1, i1))
+		sg.Amplitude[0] = symbolic.New(float32(r0), float32(i0))
+		sg.Amplitude[1] = symbolic.New(float32(r1), float32(i1))
 		qubits.Normalize(sg.Amplitude)
 		sg.editing = false
 		sg.holdingCursor = false
@@ -383,8 +383,7 @@ func (sg *SourceGate) Draw() {
 		rl.DrawText(lbl, lblX, lblY, fontSize, rl.White)
 
 		// Column 2 – probability bar
-		amp := complex128(sg.Amplitude[i])
-		prob := float32(cmplx.Abs(amp))
+		prob := float32(sg.Amplitude[i].Abs())
 		prob = prob * prob // probability (0..1)
 		barX := col1Right + sgPaddingLeft
 		barW := col2Right - barX - sgPaddingLeft
@@ -398,7 +397,7 @@ func (sg *SourceGate) Draw() {
 		}
 
 		// Column 3 – complex amplitude
-		complexStr := formatComplex(amp)
+		complexStr := formatComplex(sg.Amplitude[i].ToComplex128())
 		cTextW := rl.MeasureText(complexStr, fontSize)
 		remainingWidth := (rect.X + rect.Width) - col2Right - 2*sgPaddingLeft
 		cTextX := int32(col2Right + sgPaddingLeft + (remainingWidth-float32(cTextW))/2)

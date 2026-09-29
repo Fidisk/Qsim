@@ -8,6 +8,7 @@ import (
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -598,7 +599,7 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 
 		// Fresh qubits start at |0>; clicking the system cycles
 		// |0> -> |1> -> |+> -> |-> -> |i> -> |-i>.
-		qState := qubits.NewQubitStateManager([]complex64{1, 0}, 1)
+		qState := qubits.NewQubitStateManager([]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, 1)
 
 		q.Assign(qState)
 
@@ -606,27 +607,27 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 		// A determinator spawned on top of a hook auto-connects.
 		q.ZipDeterminatorsToHooks()
 	case utils.IsSpawnState(glob.Hadamard):
-		t := complex(float32(1/math.Sqrt(2)), 0)
-		H1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		t := symbolic.New(float32(1/math.Sqrt(2)), 0)
+		H1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "H", [][]symbolic.SymbolicValue{{t, t}, {t, t.Neg()}}, 1)
 		rw.PushComponent(H1)
 	case utils.IsSpawnState(glob.X):
-		X1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+		X1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "X", [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.One()}, {symbolic.One(), symbolic.Zero()}}, 1)
 		rw.PushComponent(X1)
 	case utils.IsSpawnState(glob.Y):
-		Y1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+		Y1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Y", [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.New(0, -1)}, {symbolic.New(0, 1), symbolic.Zero()}}, 1)
 		rw.PushComponent(Y1)
 	case utils.IsSpawnState(glob.Z):
-		Z1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+		Z1 := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "Z", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.New(-1, 0)}}, 1)
 		rw.PushComponent(Z1)
 	case utils.IsSpawnState(glob.CX):
-		CX := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		CX := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CX", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}}, 2)
 		rw.PushComponent(CX)
 	case utils.IsSpawnState(glob.CY):
-		t := complex64(complex(0, 1))
-		CY := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+		t := symbolic.New(0, 1)
+		CY := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CY", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), t.Neg()}, {symbolic.Zero(), symbolic.Zero(), t, symbolic.Zero()}}, 2)
 		rw.PushComponent(CY)
 	case utils.IsSpawnState(glob.CZ):
-		CZ := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+		CZ := components.NewGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "CZ", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.New(-1, 0)}}, 2)
 		rw.PushComponent(CZ)
 	case utils.IsSpawnState(glob.Measurement):
 		m := components.NewMeasurementGate(snapped.X, snapped.Y, glob.GateRadius, config.GateColor, "M")
@@ -680,7 +681,7 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, config.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
 	case utils.IsSpawnState(glob.GQubit):
-		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, config.GateColor, "Test", []complex64{0, 1})
+		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, config.GateColor, "Test", []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()})
 		rw.PushComponent(testSource)
 	case utils.IsSpawnState(glob.TextBox):
 		tb := components.NewTextBox(snapped.X, snapped.Y, 200, 30, 16)
@@ -698,24 +699,24 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 		if previewModID < 0 {
 			previewModID = attributes.GenerateQubitModifierID()
 		}
-		q.Assign(qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{previewModID}))
+		q.Assign(qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{previewModID}))
 		return q
 	case state&glob.Hadamard != 0:
-		t := complex(float32(1/math.Sqrt(2)), 0)
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
+		t := symbolic.New(float32(1/math.Sqrt(2)), 0)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "H", [][]symbolic.SymbolicValue{{t, t}, {t, t.Neg()}}, 1)
 	case state&glob.X != 0:
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "X", [][]complex64{{0, 1}, {1, 0}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "X", [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.One()}, {symbolic.One(), symbolic.Zero()}}, 1)
 	case state&glob.Y != 0:
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "Y", [][]complex64{{0, complex64(complex(0, -1))}, {complex64(complex(0, 1)), 0}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "Y", [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.New(0, -1)}, {symbolic.New(0, 1), symbolic.Zero()}}, 1)
 	case state&glob.Z != 0:
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "Z", [][]complex64{{1, 0}, {0, -1}}, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "Z", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.New(-1, 0)}}, 1)
 	case state&glob.CX != 0:
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CX", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}}, 2)
 	case state&glob.CY != 0:
-		t := complex64(complex(0, 1))
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CY", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, -t}, {0, 0, t, 0}}, 2)
+		t := symbolic.New(0, 1)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CY", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), t.Neg()}, {symbolic.Zero(), symbolic.Zero(), t, symbolic.Zero()}}, 2)
 	case state&glob.CZ != 0:
-		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
+		return components.NewGate(0, 0, glob.GateRadius, config.GateColor, "CZ", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.New(-1, 0)}}, 2)
 	case state&glob.Measurement != 0:
 		return components.NewMeasurementGate(0, 0, glob.GateRadius, config.GateColor, "M")
 	case state&glob.Measure2 != 0:
@@ -751,7 +752,7 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 	case state&glob.Info != 0:
 		return components.NewInfoTable(0, 0, 260, 40, config.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:
-		return components.NewSourceGate(0, 0, 100, config.GateColor, "Test", []complex64{0, 1})
+		return components.NewSourceGate(0, 0, 100, config.GateColor, "Test", []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()})
 	case state&glob.TextBox != 0:
 		return components.NewTextBox(0, 0, 200, 30, 16)
 	case state&glob.LineDraw != 0:

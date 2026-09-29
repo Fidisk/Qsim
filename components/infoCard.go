@@ -227,7 +227,7 @@ func (it *InfoTable) RebuildRowsFromStateManager(sm *qub.QubitStateManager) {
 	rows := make([]InfoRow, 0, total)
 
 	for i := 0; i < total; i++ {
-		amp := complex128(sm.Amptitude[i])
+		amp := sm.Amptitude[i].ToComplex128()
 		progress := float32(cmplx.Abs(amp)) // |amplitude|
 		progress *= progress
 

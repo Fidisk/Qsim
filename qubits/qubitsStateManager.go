@@ -1,22 +1,21 @@
 package qubits
 
 import (
-	"math"
-
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 )
 
 type QubitStateManager struct {
 	//It's this shit all over again
-	Amptitude []complex64
+	Amptitude []symbolic.SymbolicValue
 
 	ModifierID []int32
 	Size       int32
 	ID         int32
 }
 
-func NewQubitStateManager(amplitudes []complex64, size int32) *QubitStateManager {
+func NewQubitStateManager(amplitudes []symbolic.SymbolicValue, size int32) *QubitStateManager {
 	id := []int32{}
 	for _ = range size {
 		id = append(id, attributes.GenerateQubitModifierID())
@@ -30,7 +29,7 @@ func NewQubitStateManager(amplitudes []complex64, size int32) *QubitStateManager
 	return &tmp
 }
 
-func NewQubitStateManagerFrom(amplitudes []complex64, modifierID []int32) *QubitStateManager {
+func NewQubitStateManagerFrom(amplitudes []symbolic.SymbolicValue, modifierID []int32) *QubitStateManager {
 	tmp := QubitStateManager{
 		Amptitude:  amplitudes,
 		ModifierID: modifierID,
@@ -43,7 +42,7 @@ func NewQubitStateManagerFrom(amplitudes []complex64, modifierID []int32) *Qubit
 func (c *QubitStateManager) SwapColumn(l, r int32) {
 	l = c.Size - l - 1
 	r = c.Size - r - 1
-	replacement := make([]complex64, len(c.Amptitude))
+	replacement := make([]symbolic.SymbolicValue, len(c.Amptitude))
 	for i := range c.Amptitude {
 		j := i
 		a := (j >> l) & 1
@@ -65,11 +64,11 @@ func (c *QubitStateManager) Merge(d *QubitStateManager) {
 	}
 	n := c.Size
 	m := d.Size
-	replacement := make([]complex64, len(c.Amptitude)*len(d.Amptitude))
+	replacement := make([]symbolic.SymbolicValue, len(c.Amptitude)*len(d.Amptitude))
 	for i := range c.Amptitude {
 		for j := range d.Amptitude {
 			idx := (i << m) + j
-			replacement[idx] = c.Amptitude[i] * d.Amptitude[j]
+			replacement[idx] = c.Amptitude[i].Mul(d.Amptitude[j])
 		}
 	}
 	replacementModifier := []int32{}
@@ -95,26 +94,26 @@ func (c *QubitStateManager) FindID(x int32) int32 {
 	return -1
 }
 
-func (c *QubitStateManager) Multiply(val [][]complex64, n int32) {
-	result := make([]complex64, 1<<c.Size)
+func (c *QubitStateManager) Multiply(val [][]symbolic.SymbolicValue, n int32) {
+	result := make([]symbolic.SymbolicValue, 1<<c.Size)
 	for i := 0; i < (1 << n); i++ {
 		for j := 0; j < (1 << n); j++ {
 			for l := 0; l < (1 << (c.Size - n)); l++ {
-				result[(j<<(c.Size-n))+l] += c.Amptitude[(i<<(c.Size-n))+l] * val[j][i]
+				result[(j<<(c.Size-n))+l] = result[(j<<(c.Size-n))+l].Add(c.Amptitude[(i<<(c.Size-n))+l].Mul(val[j][i]))
 			}
 		}
 	}
 	c.Amptitude = result
 }
 
-func (c *QubitStateManager) SetAmplitudes(amps []complex64, ids []int32) {
+func (c *QubitStateManager) SetAmplitudes(amps []symbolic.SymbolicValue, ids []int32) {
 	c.Amptitude = amps
 	c.ModifierID = ids
 	c.Size = int32(len(ids))
 }
 
 func (c *QubitStateManager) CopyFrom(other *QubitStateManager) {
-	c.Amptitude = make([]complex64, len(other.Amptitude))
+	c.Amptitude = make([]symbolic.SymbolicValue, len(other.Amptitude))
 	copy(c.Amptitude, other.Amptitude)
 	c.ModifierID = make([]int32, len(other.ModifierID))
 	copy(c.ModifierID, other.ModifierID)
@@ -126,16 +125,6 @@ func (c *QubitStateManager) CopyFrom(other *QubitStateManager) {
 // values to 1" trick: treated as an n×1 matrix, v = U Σ V† has a single
 // singular value ‖v‖; setting it to 1 yields v/‖v‖. A zero vector is left
 // untouched.
-func Normalize(amplitudes []complex64) {
-	var sumSquares float64
-	for _, a := range amplitudes {
-		sumSquares += float64(real(a)*real(a) + imag(a)*imag(a))
-	}
-	if sumSquares == 0 {
-		return
-	}
-	invNorm := complex64(complex(1/math.Sqrt(sumSquares), 0))
-	for i := range amplitudes {
-		amplitudes[i] *= invNorm
-	}
+func Normalize(amplitudes []symbolic.SymbolicValue) {
+	symbolic.Normalize(amplitudes)
 }

@@ -36,24 +36,48 @@ func circuitHash(wComp []components.Component) uint64 {
 			write("Gate", v.ID, v.InputCount, v.IsMeasurementGate, v.Editable, v.Label)
 			for _, row := range v.Operation {
 				for _, e := range row {
-					write(e)
+					write(e.ToComplex64())
 				}
 			}
 		case *components.SourceGate:
-			write("SourceGate", v.ID, v.ModifierID, v.Amplitude)
+			c64src := make([]complex64, len(v.Amplitude))
+			for i, a := range v.Amplitude {
+				c64src[i] = a.ToComplex64()
+			}
+			write("SourceGate", v.ID, v.ModifierID, c64src)
 		case *components.QubitsSystem:
 			write("QubitsSystem", v.ID, v.Probability)
 			if v.Origin != nil {
-				write(v.Origin.ModifierID, v.Origin.Amptitude)
+				// Amptitude is []symbolic.SymbolicValue: hash its complex64
+				// values so the fingerprint stays stable across the migration.
+				c64 := make([]complex64, len(v.Origin.Amptitude))
+				for i, a := range v.Origin.Amptitude {
+					c64[i] = a.ToComplex64()
+				}
+				write(v.Origin.ModifierID, c64)
 			}
 		case *components.CollapseGate:
 			write("CollapseGate", v.ID, v.ForceMode, v.NormalSystem)
 		case *components.M4Gate:
 			write("M4Gate", v.ID, v.ForceMode, v.SwapInterval)
 		case *components.ControlledGate:
-			write("ControlledGate", v.ID, v.Operation)
+			c64cg := make([][]complex64, len(v.Operation))
+			for i, row := range v.Operation {
+				c64cg[i] = make([]complex64, len(row))
+				for j, e := range row {
+					c64cg[i][j] = e.ToComplex64()
+				}
+			}
+			write("ControlledGate", v.ID, c64cg)
 		case *components.ControlledUGate:
-			write("ControlledUGate", v.ID, v.InputCount, v.Editable, v.Label, v.Operation)
+			c64cu := make([][]complex64, len(v.Operation))
+			for i, row := range v.Operation {
+				c64cu[i] = make([]complex64, len(row))
+				for j, e := range row {
+					c64cu[i][j] = e.ToComplex64()
+				}
+			}
+			write("ControlledUGate", v.ID, v.InputCount, v.Editable, v.Label, c64cu)
 		case *components.CopyGate:
 			write("CopyGate", v.ID, v.InHook.TargetID, v.OutHook.TargetID)
 		case *components.LogicalBit:

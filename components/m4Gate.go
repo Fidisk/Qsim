@@ -4,6 +4,7 @@ import (
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/utils"
 	"strconv"
 
@@ -207,7 +208,7 @@ func (m *M4Gate) storeInput() {
 	m.StoredPos = pos
 	m.StoredSysID = qp.ID
 	m.StoredProb = qp.Probability
-	m.StoredInput = qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	m.StoredInput = qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	m.StoredInput.CopyFrom(qp.Origin)
 }
 

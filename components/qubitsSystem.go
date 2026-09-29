@@ -3,12 +3,12 @@ package components
 import (
 	"fmt"
 	"math"
-	"math/cmplx"
 	"math/rand/v2"
 	"qsim/config"
 	glob "qsim/globals"
 	qub "qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 	"strconv"
 	"strings"
@@ -261,26 +261,26 @@ func gateCalculating(parent PlaceholderWindow, hookID int32) bool {
 // |0> (see SpawnObject), so the first click goes |0> -> |1>.
 var qubitCycle = []struct {
 	name string
-	amps []complex64
+	amps []symbolic.SymbolicValue
 }{
-	{"|0>", []complex64{1, 0}},
-	{"|1>", []complex64{0, 1}},
-	{"|+>", []complex64{h, h}},
-	{"|->", []complex64{h, -h}},
-	{"|i>", []complex64{h, ih}},
-	{"|-i>", []complex64{h, -ih}},
+	{"|0>", []symbolic.SymbolicValue{symbolic.New(1, 0), symbolic.New(0, 0)}},
+	{"|1>", []symbolic.SymbolicValue{symbolic.New(0, 0), symbolic.New(1, 0)}},
+	{"|+>", []symbolic.SymbolicValue{h, h}},
+	{"|->", []symbolic.SymbolicValue{h, h.Neg()}},
+	{"|i>", []symbolic.SymbolicValue{h, ih}},
+	{"|-i>", []symbolic.SymbolicValue{h, ih.Neg()}},
 }
 
-var h = complex64(complex(float32(1/math.Sqrt(2)), 0))  // 1/√2
-var ih = complex64(complex(0, float32(1/math.Sqrt(2)))) // i/√2
+var h = symbolic.New(float32(1/math.Sqrt(2)), 0)  // 1/√2
+var ih = symbolic.New(0, float32(1/math.Sqrt(2))) // i/√2
 
 // qubitStateName returns the cycle name of the given single-qubit state, or
 // "" when it is not one of the six cycle states.
-func qubitStateName(amps []complex64) string {
+func qubitStateName(amps []symbolic.SymbolicValue) string {
 	for _, s := range qubitCycle {
 		ok := len(amps) == len(s.amps)
 		for i := range s.amps {
-			if ok && complexAbs(amps[i]-s.amps[i]) > 1e-4 {
+			if ok && complexAbs(amps[i].Sub(s.amps[i])) > 1e-4 {
 				ok = false
 			}
 		}
@@ -293,11 +293,11 @@ func qubitStateName(amps []complex64) string {
 
 // nextQubitState returns the amplitude vector that follows the given one in
 // the cycle. Unknown states cycle from |0>.
-func nextQubitState(amps []complex64) []complex64 {
+func nextQubitState(amps []symbolic.SymbolicValue) []symbolic.SymbolicValue {
 	for i, s := range qubitCycle {
 		match := len(amps) == len(s.amps)
 		for j := range s.amps {
-			if match && complexAbs(amps[j]-s.amps[j]) > 1e-4 {
+			if match && complexAbs(amps[j].Sub(s.amps[j])) > 1e-4 {
 				match = false
 			}
 		}
@@ -321,8 +321,8 @@ func (c *QubitsSystem) cycleState() {
 	copy(c.Origin.Amptitude, next)
 }
 
-func complexAbs(z complex64) float64 {
-	return math.Hypot(float64(real(z)), float64(imag(z)))
+func complexAbs(z symbolic.SymbolicValue) float64 {
+	return z.Abs()
 }
 
 // enforceSingleGate implements the "one gate at a time" rule: a qubit system
@@ -478,9 +478,9 @@ func trimFloat(f float64) string {
 // the part that is zero: 1+0i -> "1", 0+1i -> "i", 0 -> "0",
 // 0.7+0.3i -> "0.7 + 0.3i", 1-i -> "1 - i". The sign is spaced so it reads
 // as a separate element (and gets its own color in drawAmplitude).
-func formatCellAmplitude(v complex64) string {
-	re := trimFloat(float64(real(v)))
-	im := trimFloat(float64(imag(v)))
+func formatCellAmplitude(v symbolic.SymbolicValue) string {
+	re := trimFloat(float64(v.Real()))
+	im := trimFloat(float64(v.Imag()))
 	if im == "0" {
 		return re
 	}
@@ -494,9 +494,9 @@ func formatCellAmplitude(v complex64) string {
 		return im + "i"
 	}
 	sign := "+"
-	if imag(v) < 0 {
+	if v.Imag() < 0 {
 		sign = "-"
-		im = trimFloat(-float64(imag(v)))
+		im = trimFloat(-float64(v.Imag()))
 	}
 	if im == "1" {
 		im = ""
@@ -577,7 +577,7 @@ func (c *QubitsSystem) Draw() {
 		for col := int32(0); col < c.cols; col++ {
 			index := row*c.cols + col
 			v := c.Origin.Amptitude[c.ampAt(int(index))]
-			p := real(v)*real(v) + imag(v)*imag(v)
+			p := v.AbsSq()
 			if p > 1 {
 				p = 1
 			}
@@ -585,7 +585,7 @@ func (c *QubitsSystem) Draw() {
 				cellRect := rl.NewRectangle(
 					c.startX+float32(col)*n, c.startY+float32(row)*m, n, m,
 				)
-				rl.DrawRectangleRec(cellRect, rl.Fade(rl.SkyBlue, p*0.28))
+				rl.DrawRectangleRec(cellRect, rl.Fade(rl.SkyBlue, float32(p*0.28)))
 			}
 		}
 	}
@@ -633,15 +633,14 @@ func (c *QubitsSystem) Draw() {
 
 			index := row*c.cols + col
 			ampIdx := c.ampAt(int(index))
-			r := real(c.Origin.Amptitude[ampIdx])
-			img := imag(c.Origin.Amptitude[ampIdx])
-			numberStr := formatCellAmplitude(complex(r, img))
+			amp := c.Origin.Amptitude[ampIdx]
+			numberStr := formatCellAmplitude(amp)
 
 			// Fade out states with negligible probability
-			p := r*r + img*img
+			p := amp.AbsSq()
 			textA := float32(0.35)
 			if p > 0 {
-				textA = 0.35 + 0.65*min(p*2, 1)
+				textA = 0.35 + 0.65*float32(min(p*2, 1))
 			}
 			textCol := rl.Fade(c.Color, textA)
 
@@ -861,7 +860,7 @@ func (c *QubitsSystem) Assign(p *qub.QubitStateManager) {
 		pathRotation := rand.Float32() * 2 * math.Pi
 		pathRotationDelta := rand.Float32()*0.001 + 0.001
 
-		size := float32(cmplx.Abs(complex128(p.Amptitude[i]))) / 2.0
+		size := float32(p.Amptitude[i].Abs()) / 2.0
 		radius := 0.95 - size
 
 		q := NewQubit(rotation, rotationDelta, pathRotation, pathRotationDelta, radius, angle, angleDelta, size, ratio, int32(i), p.ModifierID, int32(len(p.ModifierID)))
@@ -1249,7 +1248,7 @@ func (c *QubitsSystem) pullToQubitSystem(d *QubitDeterminator, i int) {
 // then invalidates any downstream gates so they recalculate with the new state.
 func (c *QubitsSystem) CopyFromState(state *qub.QubitStateManager) {
 	if c.Origin == nil {
-		c.Origin = qub.NewQubitStateManagerFrom([]complex64{}, []int32{})
+		c.Origin = qub.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	}
 	c.Origin.CopyFrom(state)
 	c.SyncAmpOrder()

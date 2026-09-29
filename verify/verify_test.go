@@ -14,24 +14,25 @@ import (
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/windows"
 )
 
 var (
-	tVal     = complex64(complex(float32(1/math.Sqrt2), 0))
-	hadamard = [][]complex64{{tVal, tVal}, {tVal, -tVal}}
-	cnot     = [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}
-	xGate    = [][]complex64{{0, 1}, {1, 0}}
-	zGate    = [][]complex64{{1, 0}, {0, -1}}
+	tVal     = symbolic.New(float32(1/math.Sqrt2), 0)
+	hadamard = [][]symbolic.SymbolicValue{{tVal, tVal}, {tVal, tVal.Neg()}}
+	cnot     = [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}}
+	xGate    = [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.One()}, {symbolic.One(), symbolic.Zero()}}
+	zGate    = [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.New(-1, 0)}}
 )
 
-func mkSystem(x, y float32, amps []complex64, mods []int32) *components.QubitsSystem {
+func mkSystem(x, y float32, amps []symbolic.SymbolicValue, mods []int32) *components.QubitsSystem {
 	qs := components.NewQubitsSystem(x, y, glob.QubitSystemRadius, config.QubitSystemColor)
-	qs.Assign(qubits.NewQubitStateManagerFrom(append([]complex64{}, amps...), append([]int32{}, mods...)))
+	qs.Assign(qubits.NewQubitStateManagerFrom(append([]symbolic.SymbolicValue{}, amps...), append([]int32{}, mods...)))
 	return qs
 }
 
-func mkGate(x, y float32, label string, op [][]complex64, n int32) *components.Gate {
+func mkGate(x, y float32, label string, op [][]symbolic.SymbolicValue, n int32) *components.Gate {
 	return components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, n)
 }
 
@@ -41,20 +42,20 @@ func bellSave(t *testing.T) string {
 	q0 := attributes.GenerateQubitModifierID()
 	q1 := attributes.GenerateQubitModifierID()
 
-	qsA := mkSystem(-2250, -100, []complex64{1, 0}, []int32{q0})
-	qsB := mkSystem(-1450, 100, []complex64{1, 0}, []int32{q1})
+	qsA := mkSystem(-2250, -100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
+	qsB := mkSystem(-1450, 100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q1})
 
 	hA := mkGate(-1800, -100, "H", hadamard, 1)
 	hA.HookList[0].Connect(qsA.QubitDeterminatorList[0])
 	qsHA := mkSystem(hA.OutPutHook[0].Center.X, hA.OutPutHook[0].Center.Y,
-		[]complex64{tVal, tVal}, []int32{q0})
+		[]symbolic.SymbolicValue{tVal, tVal}, []int32{q0})
 	hA.OutPutHook[0].Connect(qsHA)
 
 	cx := mkGate(-1400, 0, "CX", cnot, 2)
 	cx.HookList[0].Connect(qsHA.QubitDeterminatorList[0])
 	cx.HookList[1].Connect(qsB.QubitDeterminatorList[0])
 	qsBell := mkSystem(cx.OutPutHook[0].Center.X, cx.OutPutHook[0].Center.Y,
-		[]complex64{tVal, 0, 0, tVal}, []int32{q0, q1})
+		[]symbolic.SymbolicValue{tVal, symbolic.Zero(), symbolic.Zero(), tVal}, []int32{q0, q1})
 	cx.OutPutHook[0].Connect(qsBell)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -65,14 +66,14 @@ func bellSave(t *testing.T) string {
 	return rw.SaveState()
 }
 
-func fidelity(a, b []complex64) float64 {
+func fidelity(a []complex64, b []symbolic.SymbolicValue) float64 {
 	if len(a) != len(b) {
 		return -1
 	}
 	var dot complex128
 	var na, nb float64
 	for i := range a {
-		av, bv := complex128(a[i]), complex128(b[i])
+		av, bv := complex128(a[i]), b[i].ToComplex128()
 		dot += cmplx.Conj(av) * bv
 		na += real(av)*real(av) + imag(av)*imag(av)
 		nb += real(bv)*real(bv) + imag(bv)*imag(bv)
@@ -112,7 +113,7 @@ func TestExtractBell(t *testing.T) {
 	if c.Ops[1].Gate != "cx" || len(c.Ops[1].Qubits) != 2 || c.Ops[1].Qubits[0] != 0 || c.Ops[1].Qubits[1] != 1 {
 		t.Fatalf("op1 = %+v, want cx on [0 1]", c.Ops[1])
 	}
-	want := []complex64{tVal, 0, 0, tVal}
+	want := []symbolic.SymbolicValue{tVal, symbolic.Zero(), symbolic.Zero(), tVal}
 	if f := fidelity(c.Expected, want); f < 1-1e-9 {
 		t.Fatalf("Expected = %v, fidelity to Bell = %v", c.Expected, f)
 	}
@@ -146,26 +147,26 @@ func TestExtractBell(t *testing.T) {
 
 // flipTarget is a CNOT with the control on I1 (matrix LSB): it flips I0
 // when I1 is 1. |01> -> |11>.
-var flipTarget = [][]complex64{{1, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}, {0, 1, 0, 0}}
+var flipTarget = [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}}
 
 func TestExtractCustomUnitary(t *testing.T) {
 	q0 := attributes.GenerateQubitModifierID()
 	q1 := attributes.GenerateQubitModifierID()
 
-	qsA := mkSystem(-2250, -100, []complex64{1, 0}, []int32{q0})
-	qsB := mkSystem(-1450, 100, []complex64{1, 0}, []int32{q1})
+	qsA := mkSystem(-2250, -100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
+	qsB := mkSystem(-1450, 100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q1})
 
 	xB := mkGate(-1800, 100, "X", xGate, 1)
 	xB.HookList[0].Connect(qsB.QubitDeterminatorList[0])
 	qsBX := mkSystem(xB.OutPutHook[0].Center.X, xB.OutPutHook[0].Center.Y,
-		[]complex64{0, 1}, []int32{q1})
+		[]symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, []int32{q1})
 	xB.OutPutHook[0].Connect(qsBX)
 
 	cu := mkGate(-1400, 0, "U", flipTarget, 2)
 	cu.HookList[0].Connect(qsA.QubitDeterminatorList[0])
 	cu.HookList[1].Connect(qsBX.QubitDeterminatorList[0])
 	qsOut := mkSystem(cu.OutPutHook[0].Center.X, cu.OutPutHook[0].Center.Y,
-		[]complex64{0, 0, 0, 1}, []int32{q0, q1})
+		[]symbolic.SymbolicValue{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}, []int32{q0, q1})
 	cu.OutPutHook[0].Connect(qsOut)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -184,7 +185,7 @@ func TestExtractCustomUnitary(t *testing.T) {
 	if u.Gate != "unitary" || len(u.Qubits) != 2 || u.Qubits[0] != 1 || u.Qubits[1] != 0 {
 		t.Fatalf("custom op = %+v, want unitary on [1 0] (reversed input order)", u)
 	}
-	if f := fidelity(c.Expected, []complex64{0, 0, 0, 1}); f < 1-1e-9 {
+	if f := fidelity(c.Expected, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}); f < 1-1e-9 {
 		t.Fatalf("Expected = %v, fidelity to |11> = %v", c.Expected, f)
 	}
 	files, err := WriteBundle(c)
@@ -198,15 +199,15 @@ func TestExtractSourcePrep(t *testing.T) {
 	// SourceGate emitting |+> followed by H: exercises source-seeded input
 	// (prep op) and must decode back to |0>.
 	sg := components.NewSourceGateWithID(-2250, -100, glob.GateRadius, config.GateColor, "S",
-		[]complex64{tVal, tVal}, attributes.GenerateQubitModifierID())
+		[]symbolic.SymbolicValue{tVal, tVal}, attributes.GenerateQubitModifierID())
 	qsS := mkSystem(sg.OutHook.Center.X, sg.OutHook.Center.Y,
-		[]complex64{tVal, tVal}, []int32{sg.ModifierID})
+		[]symbolic.SymbolicValue{tVal, tVal}, []int32{sg.ModifierID})
 	sg.OutHook.Connect(qsS)
 
 	hA := mkGate(-1800, -100, "H", hadamard, 1)
 	hA.HookList[0].Connect(qsS.QubitDeterminatorList[0])
 	qsH := mkSystem(hA.OutPutHook[0].Center.X, hA.OutPutHook[0].Center.Y,
-		[]complex64{1, 0}, []int32{sg.ModifierID})
+		[]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{sg.ModifierID})
 	hA.OutPutHook[0].Connect(qsH)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -221,7 +222,7 @@ func TestExtractSourcePrep(t *testing.T) {
 	if len(c.Ops) != 2 || c.Ops[0].Gate != "prep" || c.Ops[1].Gate != "h" {
 		t.Fatalf("Ops = %+v, want [prep h]", c.Ops)
 	}
-	if f := fidelity(c.Expected, []complex64{1, 0}); f < 1-1e-9 {
+	if f := fidelity(c.Expected, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}); f < 1-1e-9 {
 		t.Fatalf("Expected = %v, fidelity to |0> = %v", c.Expected, f)
 	}
 	files, err := WriteBundle(c)
@@ -285,7 +286,7 @@ func TestExtractSuperdense(t *testing.T) {
 		t.Fatalf("expected stripped-measurement notes, got %v", c.Notes)
 	}
 	// The generator encodes "11": the pre-measurement state must be |11>.
-	if f := fidelity(c.Expected, []complex64{0, 0, 0, 1}); f < 1-1e-9 {
+	if f := fidelity(c.Expected, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}); f < 1-1e-9 {
 		t.Fatalf("Expected = %v, fidelity to |11> = %v", c.Expected, f)
 	}
 	files, err := WriteBundle(c)
@@ -298,20 +299,20 @@ func TestExtractSuperdense(t *testing.T) {
 func TestExtractBranchFanoutErrors(t *testing.T) {
 	// Both M1 branches feeding different gates: fan-out of one state.
 	q0 := attributes.GenerateQubitModifierID()
-	qs := mkSystem(0, 0, []complex64{1, 0}, []int32{q0})
+	qs := mkSystem(0, 0, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
 	m1 := components.NewMeasurementGate(300, 0, glob.GateRadius, config.GateColor, "M1")
 	m1.HookList[0].Connect(qs.QubitDeterminatorList[0])
-	b0 := mkSystem(600, -100, []complex64{1, 0}, []int32{q0})
+	b0 := mkSystem(600, -100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
 	m1.OutPutHook[0].Connect(b0)
-	b1 := mkSystem(600, 100, []complex64{0, 1}, []int32{q0})
+	b1 := mkSystem(600, 100, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, []int32{q0})
 	m1.OutPutHook[1].Connect(b1)
 	g0 := mkGate(900, -100, "X", xGate, 1)
 	g0.HookList[0].Connect(b0.QubitDeterminatorList[0])
-	out0 := mkSystem(1200, -100, []complex64{0, 1}, []int32{q0})
+	out0 := mkSystem(1200, -100, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, []int32{q0})
 	g0.OutPutHook[0].Connect(out0)
 	g1 := mkGate(900, 100, "Z", zGate, 1)
 	g1.HookList[0].Connect(b1.QubitDeterminatorList[0])
-	out1 := mkSystem(1200, 100, []complex64{0, 1}, []int32{q0})
+	out1 := mkSystem(1200, 100, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, []int32{q0})
 	g1.OutPutHook[0].Connect(out1)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -327,12 +328,12 @@ func TestExtractBranchFanoutErrors(t *testing.T) {
 func TestExtractStoredControl(t *testing.T) {
 	// Undriven control bit with stored value 1: applies X like the engine.
 	q0 := attributes.GenerateQubitModifierID()
-	qs := mkSystem(0, 0, []complex64{1, 0}, []int32{q0})
+	qs := mkSystem(0, 0, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
 	bit := components.NewLogicalBit(300, -200, glob.QubitSystemRadius/2, 1)
 	cg := components.NewControlledGate(300, 0, config.GateColor, components.CtrlX)
 	cg.InQubit.Connect(qs.QubitDeterminatorList[0])
 	cg.InControl.Connect(bit)
-	out := mkSystem(600, 0, []complex64{0, 1}, []int32{q0})
+	out := mkSystem(600, 0, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, []int32{q0})
 	cg.OutHook.Connect(out)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -343,7 +344,7 @@ func TestExtractStoredControl(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
-	if f := fidelity(c.Expected, []complex64{0, 1}); f < 1-1e-9 {
+	if f := fidelity(c.Expected, []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}); f < 1-1e-9 {
 		t.Fatalf("Expected = %v, fidelity to |1> = %v", c.Expected, f)
 	}
 }
@@ -351,7 +352,7 @@ func TestExtractStoredControl(t *testing.T) {
 func TestExtractLogicControlErrors(t *testing.T) {
 	// Logic-driven control bit: value not statically known.
 	q0 := attributes.GenerateQubitModifierID()
-	qs := mkSystem(0, 0, []complex64{1, 0}, []int32{q0})
+	qs := mkSystem(0, 0, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
 	bitIn := components.NewLogicalBit(0, -400, glob.QubitSystemRadius/2, 1)
 	bitOut := components.NewLogicalBit(300, -200, glob.QubitSystemRadius/2, 0)
 	lg := components.NewLogicGate(150, -300, config.GateColor, components.LogicNot)
@@ -360,7 +361,7 @@ func TestExtractLogicControlErrors(t *testing.T) {
 	cg := components.NewControlledGate(300, 0, config.GateColor, components.CtrlX)
 	cg.InQubit.Connect(qs.QubitDeterminatorList[0])
 	cg.InControl.Connect(bitOut)
-	out := mkSystem(600, 0, []complex64{1, 0}, []int32{q0})
+	out := mkSystem(600, 0, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
 	cg.OutHook.Connect(out)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -379,20 +380,20 @@ func TestExtractTeleportDriven(t *testing.T) {
 	q0 := attributes.GenerateQubitModifierID()
 	q1 := attributes.GenerateQubitModifierID()
 
-	qsA := mkSystem(-2250, -100, []complex64{1, 0}, []int32{q0})
-	qsB := mkSystem(-1450, 100, []complex64{1, 0}, []int32{q1})
+	qsA := mkSystem(-2250, -100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q0})
+	qsB := mkSystem(-1450, 100, []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{q1})
 
 	hA := mkGate(-1800, -100, "H", hadamard, 1)
 	hA.HookList[0].Connect(qsA.QubitDeterminatorList[0])
 	qsHA := mkSystem(hA.OutPutHook[0].Center.X, hA.OutPutHook[0].Center.Y,
-		[]complex64{tVal, tVal}, []int32{q0})
+		[]symbolic.SymbolicValue{tVal, tVal}, []int32{q0})
 	hA.OutPutHook[0].Connect(qsHA)
 
 	cx := mkGate(-1400, 0, "CX", cnot, 2)
 	cx.HookList[0].Connect(qsHA.QubitDeterminatorList[0])
 	cx.HookList[1].Connect(qsB.QubitDeterminatorList[0])
 	qsBell := mkSystem(cx.OutPutHook[0].Center.X, cx.OutPutHook[0].Center.Y,
-		[]complex64{tVal, 0, 0, tVal}, []int32{q0, q1})
+		[]symbolic.SymbolicValue{tVal, symbolic.Zero(), symbolic.Zero(), tVal}, []int32{q0, q1})
 	cx.OutPutHook[0].Connect(qsBell)
 
 	m2 := components.NewCollapseGate(-1000, 0, glob.GateRadius, config.GateColor, "M2")
@@ -403,7 +404,7 @@ func TestExtractTeleportDriven(t *testing.T) {
 	cx2 := components.NewControlledGate(-400, 100, config.GateColor, components.CtrlX)
 	cx2.InQubit.Connect(qsBell.QubitDeterminatorList[1])
 	cx2.InControl.Connect(bit)
-	qsOut := mkSystem(-100, 100, []complex64{tVal, 0, tVal, 0}, []int32{q0, q1})
+	qsOut := mkSystem(-100, 100, []symbolic.SymbolicValue{tVal, symbolic.Zero(), tVal, symbolic.Zero()}, []int32{q0, q1})
 	cx2.OutHook.Connect(qsOut)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
@@ -417,7 +418,7 @@ func TestExtractTeleportDriven(t *testing.T) {
 	}
 	// CX(control q0) on (|00> + |11>)/sqrt2 = (|00> + |01>)/sqrt2:
 	// the control ends in |+>, the target in |0>.
-	if f := fidelity(c.Expected, []complex64{tVal, tVal, 0, 0}); f < 1-1e-9 {
+	if f := fidelity(c.Expected, []symbolic.SymbolicValue{tVal, tVal, symbolic.Zero(), symbolic.Zero()}); f < 1-1e-9 {
 		t.Fatalf("Expected = %v, fidelity to want = %v", c.Expected, f)
 	}
 	found := false

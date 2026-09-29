@@ -34,49 +34,50 @@ import (
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 	"qsim/windows"
 )
 
-var h = complex64(complex(float32(1/math.Sqrt(2)), 0)) // 1/√2
+var h = symbolic.New(float32(1/math.Sqrt(2)), 0) // 1/√2
 
 var (
 	// 1-qubit Hadamard.
-	hadamard = [][]complex64{{h, h}, {h, -h}}
+	hadamard = [][]symbolic.SymbolicValue{{h, h}, {h, h.Neg()}}
 	// CNOT with control = qubit 0 (first column) and target = qubit 1.
-	cnot = [][]complex64{
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 0, 1},
-		{0, 0, 1, 0},
+	cnot = [][]symbolic.SymbolicValue{
+		{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()},
+		{symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()},
 	}
 	// Pauli Z acting on qubit 0 only (Z ⊗ I on |q0,q1>).
-	zOnQ0 = [][]complex64{
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, -1, 0},
-		{0, 0, 0, -1},
+	zOnQ0 = [][]symbolic.SymbolicValue{
+		{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.Zero(), symbolic.New(-1, 0), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.New(-1, 0)},
 	}
 	// Pauli X acting on qubit 0 only (X ⊗ I on |q0,q1>).
-	xOnQ0 = [][]complex64{
-		{0, 0, 1, 0},
-		{0, 0, 0, 1},
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
+	xOnQ0 = [][]symbolic.SymbolicValue{
+		{symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()},
+		{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()},
+		{symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()},
 	}
 	// Hadamard acting on qubit 0 only (H ⊗ I on |q0,q1>).
-	hOnQ0 = [][]complex64{
-		{h, 0, h, 0},
-		{0, h, 0, h},
-		{h, 0, -h, 0},
-		{0, h, 0, -h},
+	hOnQ0 = [][]symbolic.SymbolicValue{
+		{h, symbolic.Zero(), h, symbolic.Zero()},
+		{symbolic.Zero(), h, symbolic.Zero(), h},
+		{h, symbolic.Zero(), h.Neg(), symbolic.Zero()},
+		{symbolic.Zero(), h, symbolic.Zero(), h.Neg()},
 	}
 )
 
 // gate returns a new Gate component at (x,y) with the given label, operation
 // matrix and input count. Hooks are positioned by the constructor at
 // x±GateToHookDist on the snap grid.
-func gate(x, y float32, label string, op [][]complex64, inputCount int32) *components.Gate {
+func gate(x, y float32, label string, op [][]symbolic.SymbolicValue, inputCount int32) *components.Gate {
 	g := components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
 	g.Editable = true
 	g.Tooltip = "Universal gate: inspect the operation matrix and the nearby TextBox annotation"
@@ -94,7 +95,7 @@ func system(x, y float32, state *qubits.QubitStateManager) *components.QubitsSys
 // amplitudes and modifier order) so each stage owns its own origin.
 func cloneState(src *qubits.QubitStateManager) *qubits.QubitStateManager {
 	return qubits.NewQubitStateManagerFrom(
-		append([]complex64{}, src.Amptitude...),
+		symbolic.CloneSlice(src.Amptitude),
 		append([]int32{}, src.ModifierID...),
 	)
 }
@@ -116,7 +117,7 @@ func separator(x, y0, y1 float32) *components.LineDraw {
 
 // oneQubit simulates a 1-qubit gate exactly like the engine: copy, then
 // Multiply with the 2×2 matrix.
-func oneQubit(src *qubits.QubitStateManager, op [][]complex64) *qubits.QubitStateManager {
+func oneQubit(src *qubits.QubitStateManager, op [][]symbolic.SymbolicValue) *qubits.QubitStateManager {
 	out := cloneState(src)
 	out.Multiply(op, 1)
 	return out
@@ -125,8 +126,8 @@ func oneQubit(src *qubits.QubitStateManager, op [][]complex64) *qubits.QubitStat
 // twoQubit simulates a 2-qubit gate exactly like the engine: merge both
 // single-qubit states (first operand becomes the high bit), then Multiply
 // with the 4×4 matrix.
-func twoQubit(a, b *qubits.QubitStateManager, op [][]complex64) *qubits.QubitStateManager {
-	out := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+func twoQubit(a, b *qubits.QubitStateManager, op [][]symbolic.SymbolicValue) *qubits.QubitStateManager {
+	out := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	out.Merge(a)
 	out.Merge(b)
 	out.Multiply(op, 2)
@@ -134,7 +135,7 @@ func twoQubit(a, b *qubits.QubitStateManager, op [][]complex64) *qubits.QubitSta
 }
 
 // twoQubitOnState applies a 4×4 matrix to an existing 2-qubit state.
-func twoQubitOnState(src *qubits.QubitStateManager, op [][]complex64) *qubits.QubitStateManager {
+func twoQubitOnState(src *qubits.QubitStateManager, op [][]symbolic.SymbolicValue) *qubits.QubitStateManager {
 	out := cloneState(src)
 	out.Multiply(op, 2)
 	return out
@@ -153,7 +154,7 @@ func main() {
 	q0 := attributes.GenerateQubitModifierID()
 	q1 := attributes.GenerateQubitModifierID()
 
-	zero := []complex64{1, 0}
+	zero := []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}
 
 	stA0 := qubits.NewQubitStateManagerFrom(zero, []int32{q0}) // |0>_A
 	stB0 := qubits.NewQubitStateManagerFrom(zero, []int32{q1}) // |0>_B
@@ -167,7 +168,7 @@ func main() {
 	// The decoded 2-qubit state must be exactly |11> = index 3.
 	best, bestIdx := float32(0), int32(-1)
 	for i, a := range stHB.Amptitude {
-		p := real(a)*real(a) + imag(a)*imag(a)
+		p := float32(a.AbsSq())
 		if p > best {
 			best, bestIdx = p, int32(i)
 		}
@@ -258,7 +259,7 @@ func main() {
 	mA, bitA := measure(mX, -50, qsHB.QubitDeterminatorList[0])
 	// The decoded state is -|11>; after measuring q0=1 the conditioned
 	// remainder is -|1> on q1, with its phase retained in the saved state.
-	stR := qubits.NewQubitStateManagerFrom([]complex64{0, -1}, []int32{q1})
+	stR := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{symbolic.Zero(), symbolic.New(-1, 0)}, []int32{q1})
 	mA.OutPutHook[1].Hidden = false
 	mA.HasRemainder = true
 	qsR := system(mA.OutPutHook[1].Center.X, mA.OutPutHook[1].Center.Y, stR)

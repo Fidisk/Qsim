@@ -4,6 +4,7 @@ import (
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -170,7 +171,7 @@ func (cg *CopyGate) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAv
 		if !ok || qs.Origin == nil {
 			return
 		}
-		state := qubits.NewQubitStateManagerFrom([]complex64{}, qs.Origin.ModifierID)
+		state := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, qs.Origin.ModifierID)
 		state.CopyFrom(qs.Origin)
 
 		if cg.OutHook.IsHooked {

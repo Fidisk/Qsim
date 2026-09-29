@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"qsim/components"
+	"qsim/symbolic"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 func TestCircuitHashSensitivity(t *testing.T) {
-	x := [][]complex64{{0, 1}, {1, 0}}
-	z := [][]complex64{{1, 0}, {0, -1}}
+	x := [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.One()}, {symbolic.One(), symbolic.Zero()}}
+	z := [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.New(-1, 0)}}
 	g := components.NewGate(0, 0, 30, rl.Lime, "X", x, 1)
 	g.Editable = true
 

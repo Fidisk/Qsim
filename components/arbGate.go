@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"qsim/config"
 	glob "qsim/globals"
+	"qsim/symbolic"
 	"qsim/unitary"
 	"qsim/utils"
 	"strconv"
@@ -16,7 +17,7 @@ import (
 // inline editor where the user sets the qubit count and the full operation
 // matrix. It spawns as the 1-qubit identity labeled "U".
 func NewArbGate(x, y, radius float32, color rl.Color) *Gate {
-	g := NewGate(x, y, radius, color, "U", [][]complex64{{1, 0}, {0, 1}}, 1)
+	g := NewGate(x, y, radius, color, "U", [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One()}}, 1)
 	g.Editable = true
 	g.Tooltip = "Arbitrary gate: right-click to rename, then edit size and the matrix table; non-unitary matrices are auto-fixed on close; hover to preview"
 	return g
@@ -28,7 +29,7 @@ func NewArbGate(x, y, radius float32, color rl.Color) *Gate {
 //
 // where each row holds 2^n whitespace-separated entries and each entry is
 // "re" or "re,im". Example (1-qubit X):  "1; 0 1; 1 0".
-func ParseMatrixSpec(spec string) (int32, [][]complex64, error) {
+func ParseMatrixSpec(spec string) (int32, [][]symbolic.SymbolicValue, error) {
 	parts := strings.Split(spec, ";")
 	if len(parts) < 2 {
 		return 0, nil, fmt.Errorf("expected 'n; row; row; ...'")
@@ -43,13 +44,13 @@ func ParseMatrixSpec(spec string) (int32, [][]complex64, error) {
 	if len(rows) != size {
 		return 0, nil, fmt.Errorf("expected %d rows, got %d", size, len(rows))
 	}
-	op := make([][]complex64, size)
+	op := make([][]symbolic.SymbolicValue, size)
 	for i, row := range rows {
 		fields := strings.Fields(row)
 		if len(fields) != size {
 			return 0, nil, fmt.Errorf("row %d: expected %d entries, got %d", i, size, len(fields))
 		}
-		op[i] = make([]complex64, size)
+		op[i] = make([]symbolic.SymbolicValue, size)
 		for j, f := range fields {
 			v, err := parseMatrixEntry(f)
 			if err != nil {
@@ -67,85 +68,15 @@ func ParseMatrixSpec(spec string) (int32, [][]complex64, error) {
 //	"a+bi" / "a-bi" / "i"    (math form:   0.7+0.3i, 1-i, i, -i, 2i)
 //
 // Exponent signs are respected ("1e-3+2i" splits at the plus, not the e-).
-func parseMatrixEntry(s string) (complex64, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, fmt.Errorf("empty entry")
-	}
-
-	if strings.Contains(s, ",") {
-		parts := strings.Split(s, ",")
-		if len(parts) != 2 {
-			return 0, fmt.Errorf("bad entry %q (want re, re,im or a+bi)", s)
-		}
-		re, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-		if err != nil {
-			return 0, fmt.Errorf("bad entry %q", s)
-		}
-		im, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if err != nil {
-			return 0, fmt.Errorf("bad entry %q", s)
-		}
-		return complex64(complex(re, im)), nil
-	}
-
-	hasImag := strings.HasSuffix(s, "i")
-	body := s
-	if hasImag {
-		body = s[:len(s)-1]
-		switch body {
-		case "":
-			return complex64(1i), nil // "i"
-		case "+":
-			return complex64(1i), nil
-		case "-":
-			return complex64(-1i), nil // "-i"
-		}
-		// Split real/imag at the last sign that is not an exponent sign.
-		split := -1
-		for i := len(body) - 1; i > 0; i-- {
-			c := body[i]
-			if (c == '+' || c == '-') && body[i-1] != 'e' && body[i-1] != 'E' {
-				split = i
-				break
-			}
-		}
-		if split == -1 {
-			im, err := strconv.ParseFloat(body, 64) // pure imaginary: "2i"
-			if err != nil {
-				return 0, fmt.Errorf("bad entry %q", s)
-			}
-			return complex64(complex(0, im)), nil
-		}
-		re, err := strconv.ParseFloat(body[:split], 64)
-		if err != nil {
-			return 0, fmt.Errorf("bad entry %q", s)
-		}
-		if split == len(body)-1 {
-			// Trailing sign means the imaginary coefficient is 1: "1-i".
-			im := float64(1)
-			if body[split] == '-' {
-				im = -1
-			}
-			return complex64(complex(re, im)), nil
-		}
-		im, err := strconv.ParseFloat(body[split:], 64)
-		if err != nil {
-			return 0, fmt.Errorf("bad entry %q", s)
-		}
-		return complex64(complex(re, im)), nil
-	}
-
-	re, err := strconv.ParseFloat(s, 64) // pure real: "1", "-0.5", "1e-3"
-	if err != nil {
-		return 0, fmt.Errorf("bad entry %q (want re, re,im or a+bi)", s)
-	}
-	return complex64(complex(re, 0)), nil
+// The numeric core lives in symbolic.Parse; this wrapper keeps the
+// components-local call sites typed on SymbolicValue.
+func parseMatrixEntry(s string) (symbolic.SymbolicValue, error) {
+	return symbolic.Parse(s)
 }
 
 // formatMatrixSpec renders the gate's current matrix in the edit-buffer
 // format, so right-clicking starts from the existing operation.
-func formatMatrixSpec(n int32, op [][]complex64) string {
+func formatMatrixSpec(n int32, op [][]symbolic.SymbolicValue) string {
 	var b strings.Builder
 	b.WriteString(strconv.Itoa(int(n)))
 	for _, row := range op {
@@ -154,12 +85,7 @@ func formatMatrixSpec(n int32, op [][]complex64) string {
 			if j > 0 {
 				b.WriteString(" ")
 			}
-			re := strconv.FormatFloat(float64(real(v)), 'g', -1, 32)
-			if imag(v) == 0 {
-				b.WriteString(re)
-			} else {
-				b.WriteString(re + "," + strconv.FormatFloat(float64(imag(v)), 'g', -1, 32))
-			}
+			b.WriteString(v.Format())
 		}
 	}
 	return b.String()
@@ -409,10 +335,10 @@ var LastSelectedGate Component
 
 // cloneOperation deep-copies a matrix so the clone and the source never
 // share backing arrays.
-func cloneOperation(op [][]complex64) [][]complex64 {
-	out := make([][]complex64, len(op))
+func cloneOperation(op [][]symbolic.SymbolicValue) [][]symbolic.SymbolicValue {
+	out := make([][]symbolic.SymbolicValue, len(op))
 	for i, row := range op {
-		out[i] = append([]complex64{}, row...)
+		out[i] = append([]symbolic.SymbolicValue{}, row...)
 	}
 	return out
 }
@@ -572,15 +498,15 @@ func (c *Gate) DrawEditPanel() {
 
 // resizeGateOperation returns a new op matrix resized to 2^n x 2^n: growing
 // pads with the identity, shrinking truncates to the top-left block.
-func resizeGateOperation(op [][]complex64, n int32) [][]complex64 {
+func resizeGateOperation(op [][]symbolic.SymbolicValue, n int32) [][]symbolic.SymbolicValue {
 	size := int32(1) << n
-	out := make([][]complex64, size)
+	out := make([][]symbolic.SymbolicValue, size)
 	for i := int32(0); i < size; i++ {
-		out[i] = make([]complex64, size)
+		out[i] = make([]symbolic.SymbolicValue, size)
 		if i < int32(len(op)) {
 			copy(out[i], op[i][:min(size, int32(len(op[i])))])
 		} else {
-			out[i][i] = 1
+			out[i][i] = symbolic.One()
 		}
 	}
 	return out
@@ -588,12 +514,8 @@ func resizeGateOperation(op [][]complex64, n int32) [][]complex64 {
 
 // formatCellValue renders one matrix cell in the edit form "re" or "re,im"
 // consumed by parseMatrixEntry.
-func formatCellValue(v complex64) string {
-	re := strconv.FormatFloat(float64(real(v)), 'g', -1, 32)
-	if imag(v) == 0 {
-		return re
-	}
-	return re + "," + strconv.FormatFloat(float64(imag(v)), 'g', -1, 32)
+func formatCellValue(v symbolic.SymbolicValue) string {
+	return v.Format()
 }
 
 // processRename handles the inline rename editor (right-click on the gate),
@@ -638,9 +560,9 @@ func (c *Gate) processRename(isCursorAvailable *bool) {
 
 // formatGateEntry renders one complex matrix entry compactly, e.g. "1",
 // "1+i", "-0.5i", so the hover matrix table stays readable at small sizes.
-func formatGateEntry(v complex64) string {
-	re := real(v)
-	im := imag(v)
+func formatGateEntry(v symbolic.SymbolicValue) string {
+	re := v.Real()
+	im := v.Imag()
 	if im == 0 {
 		return strconv.FormatFloat(float64(re), 'g', -1, 32)
 	}
@@ -719,7 +641,7 @@ func (c *Gate) DrawValuePanel() {
 // Reconfigure swaps the gate's operation and qubit count, rebuilding the
 // input hooks. The output hook (and its label/flags) is kept; the stale
 // output system is destroyed since its size may no longer match.
-func (c *Gate) Reconfigure(op [][]complex64, inputCount int32) {
+func (c *Gate) Reconfigure(op [][]symbolic.SymbolicValue, inputCount int32) {
 	c.DestroyOutPut()
 
 	var out *Hook

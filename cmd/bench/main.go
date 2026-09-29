@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"qsim/qubits"
+	"qsim/symbolic"
 )
 
 func main() {
@@ -51,17 +52,17 @@ func timeIt(reps int, f func()) time.Duration {
 
 func randState(n int32) *qubits.QubitStateManager {
 	size := 1 << n
-	amps := make([]complex64, size)
+	amps := make([]symbolic.SymbolicValue, size)
 	var norm float64
 	for i := range amps {
 		re := rand.Float32()*2 - 1
 		im := rand.Float32()*2 - 1
-		amps[i] = complex(re, im)
+		amps[i] = symbolic.New(re, im)
 		norm += float64(re*re + im*im)
 	}
-	inv := complex(float32(1/math.Sqrt(norm)), 0)
+	inv := symbolic.New(float32(1/math.Sqrt(norm)), 0)
 	for i := range amps {
-		amps[i] *= inv
+		amps[i] = amps[i].Mul(inv)
 	}
 	mods := make([]int32, n)
 	for i := range mods {
@@ -70,18 +71,18 @@ func randState(n int32) *qubits.QubitStateManager {
 	return qubits.NewQubitStateManagerFrom(amps, mods)
 }
 
-func kronIdentity(k int32) [][]complex64 {
+func kronIdentity(k int32) [][]symbolic.SymbolicValue {
 	// k-qubit "busy" unitary: dense Hadamard-like matrix so Multiply cannot
 	// shortcut on sparsity (worst case, like universal gates).
 	sz := 1 << k
-	t := complex(float32(1/math.Sqrt(float64(sz))), 0)
-	m := make([][]complex64, sz)
+	t := symbolic.New(float32(1/math.Sqrt(float64(sz))), 0)
+	m := make([][]symbolic.SymbolicValue, sz)
 	for i := range m {
-		m[i] = make([]complex64, sz)
+		m[i] = make([]symbolic.SymbolicValue, sz)
 		for j := range m[i] {
 			m[i][j] = t
 			if (i*j)%2 == 1 {
-				m[i][j] = -t
+				m[i][j] = t.Neg()
 			}
 		}
 	}
@@ -109,7 +110,7 @@ func gateLatency() {
 			st := randState(n)
 			d := timeIt(reps, func() {
 				cp := qubits.NewQubitStateManagerFrom(
-					append([]complex64{}, st.Amptitude...),
+					symbolic.CloneSlice(st.Amptitude),
 					append([]int32{}, st.ModifierID...))
 				cp.Multiply(op, k)
 			})
@@ -125,33 +126,33 @@ func gateLatency() {
 func pipeline() {
 	fmt.Println("\n## pipeline: merge + H layer + CX ladder (ms, best of 5)")
 	fmt.Println("n | state_mem | merge | H-layer | CX-ladder | total | ~fps@engine-only")
-	sqrt2 := complex(float32(1/math.Sqrt2), 0)
-	had := [][]complex64{{sqrt2, sqrt2}, {sqrt2, -sqrt2}}
-	cnot := [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}
+	sqrt2 := symbolic.New(float32(1/math.Sqrt2), 0)
+	had := [][]symbolic.SymbolicValue{{sqrt2, sqrt2}, {sqrt2, sqrt2.Neg()}}
+	cnot := [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One(), symbolic.Zero(), symbolic.Zero()}, {symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}, {symbolic.Zero(), symbolic.Zero(), symbolic.One(), symbolic.Zero()}}
 	for _, n := range []int32{2, 4, 6, 8, 10, 12, 14, 16, 18, 20} {
 		memMB := float64(int64(1)<<n) * 8 / 1e6
 		mkSingles := func() []*qubits.QubitStateManager {
 			ss := make([]*qubits.QubitStateManager, n)
 			for i := range ss {
 				ss[i] = qubits.NewQubitStateManagerFrom(
-					[]complex64{1, 0}, []int32{int32(1000 + i)})
+					[]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{int32(1000 + i)})
 			}
 			return ss
 		}
 		dMerge := timeIt(5, func() {
-			res := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+			res := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 			for _, s := range mkSingles() {
 				res.Merge(s)
 			}
 		})
 		// H layer on a merged state, engine-style per qubit.
-		base := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+		base := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 		for _, s := range mkSingles() {
 			base.Merge(s)
 		}
 		dH := timeIt(5, func() {
 			st := qubits.NewQubitStateManagerFrom(
-				append([]complex64{}, base.Amptitude...),
+				symbolic.CloneSlice(base.Amptitude),
 				append([]int32{}, base.ModifierID...))
 			for q := int32(0); q < n; q++ {
 				pos := st.FindID(1000 + q)
@@ -163,7 +164,7 @@ func pipeline() {
 		// CX ladder on adjacent pairs, engine-style (gate qubits to front).
 		dCX := timeIt(5, func() {
 			st := qubits.NewQubitStateManagerFrom(
-				append([]complex64{}, base.Amptitude...),
+				symbolic.CloneSlice(base.Amptitude),
 				append([]int32{}, base.ModifierID...))
 			for q := int32(0); q+1 < n; q += 2 {
 				for i, mod := range []int32{1000 + q, 1000 + q + 1} {

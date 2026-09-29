@@ -3,6 +3,7 @@ package components
 import (
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 	"testing"
 
@@ -41,7 +42,7 @@ func mkTwoQD() *QubitsSystem {
 	}
 	qs := NewQubitsSystem(0, 0, 30, rl.White)
 	qs.Assign(qubits.NewQubitStateManagerFrom(
-		[]complex64{0.4, 0.3, 0.3, 0.4, 0.4, -0.3, -0.3, 0.4}, mods))
+		[]symbolic.SymbolicValue{symbolic.New(0.4, 0), symbolic.New(0.3, 0), symbolic.New(0.3, 0), symbolic.New(0.4, 0), symbolic.New(0.4, 0), symbolic.New(-0.3, 0), symbolic.New(-0.3, 0), symbolic.New(0.4, 0)}, mods))
 	return qs
 }
 
@@ -99,7 +100,7 @@ func TestCollapseGateForcedStable(t *testing.T) {
 				win := &stubWindow{}
 				qs := NewQubitsSystem(0, 0, 30, rl.White)
 				qs.Assign(qubits.NewQubitStateManagerFrom(
-					[]complex64{0.7, 0.7}, mods))
+					[]symbolic.SymbolicValue{symbolic.New(0.7, 0), symbolic.New(0.7, 0)}, mods))
 				win.PushComponent(qs)
 				g := tc.fn()
 				win.PushComponent(g)
@@ -125,7 +126,7 @@ func TestCollapseGateForcesOnce(t *testing.T) {
 	win := &stubWindow{}
 	qs := NewQubitsSystem(0, 0, 30, rl.White)
 	qs.Assign(qubits.NewQubitStateManagerFrom(
-		[]complex64{0.7, 0.7}, mods))
+		[]symbolic.SymbolicValue{symbolic.New(0.7, 0), symbolic.New(0.7, 0)}, mods))
 	win.PushComponent(qs)
 	g := NewCollapseGate(0, 0, 30, rl.White, "M2")
 	win.PushComponent(g)
@@ -152,7 +153,7 @@ func TestCollapseGateForceOverridesRandom(t *testing.T) {
 		win := &stubWindow{}
 		qs := NewQubitsSystem(0, 0, 30, rl.White)
 		qs.Assign(qubits.NewQubitStateManagerFrom(
-			[]complex64{0.7, 0.7}, mods))
+			[]symbolic.SymbolicValue{symbolic.New(0.7, 0), symbolic.New(0.7, 0)}, mods))
 		win.PushComponent(qs)
 		g := NewCollapseGate(0, 0, 30, rl.White, "M2")
 		win.PushComponent(g)

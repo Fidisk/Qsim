@@ -5,6 +5,7 @@ import (
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/unitary"
 	"qsim/utils"
 	"strconv"
@@ -34,7 +35,7 @@ type ControlledUGate struct {
 	Height  float32
 
 	InputCount int32
-	Operation  [][]complex64
+	Operation  [][]symbolic.SymbolicValue
 	Editable   bool
 
 	QubitHooks []*Hook
@@ -69,7 +70,7 @@ func NewControlledUGate(x, y float32, color rl.Color) *ControlledUGate {
 		Width:      w,
 		Height:     h,
 		InputCount: 1,
-		Operation:  [][]complex64{{1, 0}, {0, 1}},
+		Operation:  [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.One()}},
 		Editable:   true,
 		Tooltip:    "Bit-controlled universal gate: applies the operation only while the control bit is 1; right-click to edit the matrix",
 	}
@@ -306,7 +307,7 @@ func (c *ControlledUGate) updateOutput() {
 		}
 	}
 
-	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	result := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	for i := range QSM {
 		result.Merge(QSM[i])
 	}
@@ -904,7 +905,7 @@ func (c *ControlledUGate) processRename(isCursorAvailable *bool) {
 // reconfigureOperation swaps the gate's operation and qubit count, rebuilding
 // the qubit input hooks. The control and output hooks are kept; the stale
 // output system is destroyed since its size may no longer match.
-func (c *ControlledUGate) reconfigureOperation(op [][]complex64, inputCount int32) {
+func (c *ControlledUGate) reconfigureOperation(op [][]symbolic.SymbolicValue, inputCount int32) {
 	c.DestroyOutPut()
 	for _, h := range c.QubitHooks {
 		h.Disconnect()

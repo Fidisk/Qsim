@@ -51,6 +51,7 @@ import (
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 	"qsim/windows"
 )
@@ -59,10 +60,10 @@ import (
 // |I0 I1 I2 I3> = |c_out a b c_in>; the target qubits are c_out (bit 3,
 // gets majority ⊕ input) and b (bit 1, gets the sum). The map is a
 // bijection, so the matrix is a valid unitary.
-func adderGateOp() [][]complex64 {
-	m := make([][]complex64, 16)
+func adderGateOp() [][]symbolic.SymbolicValue {
+	m := make([][]symbolic.SymbolicValue, 16)
 	for i := range m {
-		m[i] = make([]complex64, 16)
+		m[i] = make([]symbolic.SymbolicValue, 16)
 	}
 	for x := 0; x < 16; x++ {
 		cino := (x >> 3) & 1
@@ -72,12 +73,12 @@ func adderGateOp() [][]complex64 {
 		maj := (a & b) ^ (a & cin) ^ (b & cin)
 		s := a ^ b ^ cin
 		y := ((maj ^ cino) << 3) | (a << 2) | (s << 1) | cin
-		m[y][x] = 1
+		m[y][x] = symbolic.One()
 	}
 	return m
 }
 
-func gate(x, y float32, label string, op [][]complex64, inputCount int32) *components.Gate {
+func gate(x, y float32, label string, op [][]symbolic.SymbolicValue, inputCount int32) *components.Gate {
 	g := components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
 	// Custom operations are always editable universal gates with a caption.
 	g.Editable = true
@@ -91,11 +92,11 @@ func system(x, y float32, state *qubits.QubitStateManager) *components.QubitsSys
 	return qs
 }
 
-func basisState(value int) []complex64 {
+func basisState(value int) []symbolic.SymbolicValue {
 	if value == 1 {
-		return []complex64{0, 1}
+		return []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}
 	}
-	return []complex64{1, 0}
+	return []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}
 }
 
 func detOf(qs *components.QubitsSystem, modID int32) *components.QubitDeterminator {
@@ -122,7 +123,7 @@ func measureOut(st *qubits.QubitStateManager, id int32) (value int, rest *qubits
 	bitPos := st.Size - 1 - pos
 	idx := 0
 	for i, a := range st.Amptitude {
-		if a != 0 {
+		if !a.IsZero() {
 			idx = i
 			break
 		}
@@ -132,8 +133,8 @@ func measureOut(st *qubits.QubitStateManager, id int32) (value int, rest *qubits
 	newMods = append(newMods, st.ModifierID[pos+1:]...)
 	hi := (idx >> (bitPos + 1)) << bitPos
 	lo := idx & ((1 << bitPos) - 1)
-	amps := make([]complex64, 1<<(st.Size-1))
-	amps[hi|lo] = 1
+	amps := make([]symbolic.SymbolicValue, 1<<(st.Size-1))
+	amps[hi|lo] = symbolic.One()
 	rest = qubits.NewQubitStateManagerFrom(amps, newMods)
 	return
 }
@@ -232,7 +233,7 @@ func main() {
 	// Mirror the engine's Gate.CalculateOutPut: merge the input parent
 	// systems in hook order (deduplicated by system), SwapColumn inputs to
 	// the top, Multiply, and keep the merged state as the output system.
-	apply := func(ids []int32, op [][]complex64, x, y float32, name string) {
+	apply := func(ids []int32, op [][]symbolic.SymbolicValue, x, y float32, name string) {
 		var parts []*qubits.QubitStateManager
 		for _, id := range ids {
 			st := states[id]
@@ -247,7 +248,7 @@ func main() {
 				parts = append(parts, st)
 			}
 		}
-		merged := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+		merged := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 		for _, p := range parts {
 			merged.Merge(p)
 		}
@@ -404,7 +405,7 @@ func main() {
 	for _, st := range states {
 		ones := 0
 		for _, a := range st.Amptitude {
-			if a != 0 {
+			if !a.IsZero() {
 				ones++
 			}
 		}

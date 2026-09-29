@@ -1,10 +1,5 @@
 package globals
 
-// SaveVersion is the current .qsim save-format version. Every saved window
-// object carries this in its "saveVersion" key; on load, files with a lower
-// or unnumbered version are upgraded through the steps in qsim/migration
-// (see that package). Bump this whenever the serialized format changes and
-// add a matching migration step.
 const SaveVersion = "0.8.2"
 
 var CursorLock bool = false
@@ -12,9 +7,6 @@ var HookDist float32 = 80
 var CurrentID int32 = 0
 var ForceDecay float32 = 0.85
 var FrictionDelta float32 = 1
-
-// TooltipText carries the hover tooltip for the current frame. Buttons write
-// it while hovered; the tooltip window reads and clears it once per frame.
 var TooltipText string = ""
 
 var QubitSystemWeight float32 = 100

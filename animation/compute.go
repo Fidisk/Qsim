@@ -6,6 +6,7 @@ import (
 	"qsim/components"
 	"qsim/config"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -22,21 +23,21 @@ type ComputeDemo struct {
 	N      int32 // qubits the gate acts on (gate matrix is 2^N x 2^N)
 	Shift  int32 // Size - N
 	Label  string
-	Matrix [][]complex64
+	Matrix [][]symbolic.SymbolicValue
 
 	// Merged input system before the column reorder.
-	MergedAmps []complex64
+	MergedAmps []symbolic.SymbolicValue
 	PreMods    []int32 // modifier IDs in display order (top -> bottom)
 
 	// After the reorder the gate qubits occupy the top N display positions.
 	PostMods  []int32
 	DigitDest []int32 // DigitDest[oldPos] = new display position of a qubit
 	Perm      []int32 // Perm[oldRow] = row the amplitude content moves to
-	InAmps    []complex64
-	OutAmps   []complex64
+	InAmps    []symbolic.SymbolicValue
+	OutAmps   []symbolic.SymbolicValue
 
 	// Per-source columns (pre-merge), for the merge phase.
-	SrcAmps  [][]complex64
+	SrcAmps  [][]symbolic.SymbolicValue
 	SrcMods  [][]int32
 	SrcSizes []int32
 
@@ -57,7 +58,7 @@ type ComputeDemo struct {
 
 type computeStep struct {
 	I, L, J int32
-	Contrib complex64 // InAmps[(I<<Shift)+L] * Matrix[J][I]
+	Contrib symbolic.SymbolicValue // InAmps[(I<<Shift)+L] * Matrix[J][I]
 }
 
 // BuildComputeDemo snapshots the gate's inputs and precomputes the whole
@@ -101,7 +102,7 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 		}
 		seen[qp.Origin.ID] = true
 		cp := *qp.Origin
-		cp.Amptitude = append([]complex64(nil), cp.Amptitude...)
+		cp.Amptitude = symbolic.CloneSlice(cp.Amptitude)
 		cp.ModifierID = append([]int32(nil), cp.ModifierID...)
 		qsms = append(qsms, &cp)
 		idx = append(idx, qd.ModifierID)
@@ -113,7 +114,7 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 	d := &ComputeDemo{N: n, Label: g.Label, Matrix: g.Operation}
 
 	for _, q := range qsms {
-		d.SrcAmps = append(d.SrcAmps, append([]complex64(nil), q.Amptitude...))
+		d.SrcAmps = append(d.SrcAmps, symbolic.CloneSlice(q.Amptitude))
 		d.SrcMods = append(d.SrcMods, append([]int32(nil), q.ModifierID...))
 		d.SrcSizes = append(d.SrcSizes, q.Size)
 	}
@@ -128,7 +129,7 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 		}
 	}
 
-	merged := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	merged := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	for _, q := range qsms {
 		merged.Merge(q)
 	}
@@ -137,7 +138,7 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 	if d.Shift < 0 || d.Size <= 0 || d.Size > 10 {
 		return nil
 	}
-	d.MergedAmps = append([]complex64(nil), merged.Amptitude...)
+	d.MergedAmps = symbolic.CloneSlice(merged.Amptitude)
 	d.PreMods = append([]int32(nil), merged.ModifierID...)
 
 	// Reorder: bring the gate input qubits to the top display positions.
@@ -187,10 +188,10 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 	d.PostMods = post
 	d.DigitDest = dest
 	d.Perm = perm
-	d.InAmps = append([]complex64(nil), merged.Amptitude...)
+	d.InAmps = symbolic.CloneSlice(merged.Amptitude)
 
 	out := qubits.NewQubitStateManagerFrom(
-		append([]complex64(nil), merged.Amptitude...),
+		symbolic.CloneSlice(merged.Amptitude),
 		append([]int32(nil), merged.ModifierID...),
 	)
 	out.Multiply(g.Operation, n)
@@ -211,7 +212,7 @@ func BuildComputeDemo(g *components.Gate) *ComputeDemo {
 		for l := int32(0); l < dimL && int32(len(d.Steps)) < count; l++ {
 			a := d.InAmps[(i<<uint(d.Shift))+l]
 			for j := int32(0); j < dimI && int32(len(d.Steps)) < count; j++ {
-				d.Steps = append(d.Steps, computeStep{I: i, L: l, J: j, Contrib: a * g.Operation[j][i]})
+				d.Steps = append(d.Steps, computeStep{I: i, L: l, J: j, Contrib: a.Mul(g.Operation[j][i])})
 				d.IterStart = append(d.IterStart, t)
 				t += dur
 				dur *= float64(config.ComputeIterDecay)
@@ -435,16 +436,16 @@ func drawBrackets(d *ComputeDemo, leftX, rightX, top, height float32, mods []int
 	}
 }
 
-func fmtC(v complex64) string {
-	return fmt.Sprintf("%.2f%+.2fi", real(v), imag(v))
+func fmtC(v symbolic.SymbolicValue) string {
+	return fmt.Sprintf("%.2f%+.2fi", v.Real(), v.Imag())
 }
 
-func drawAmp(x, y float32, v complex64, alpha float32) {
+func drawAmp(x, y float32, v symbolic.SymbolicValue, alpha float32) {
 	s := fmtC(v)
 	w := rl.MeasureText(s, 13)
 	rl.DrawText(s, int32(x+dAmpW-6)-w, int32(y+6), 13, fadeA(rl.White, alpha))
 	// probability bar under the amplitude: width ~ |amp|^2
-	p := real(v)*real(v) + imag(v)*imag(v)
+	p := float32(v.AbsSq())
 	if p > 1 {
 		p = 1
 	}
@@ -534,7 +535,7 @@ func drawTag(d *ComputeDemo, x, y float32, m int32, alpha float32, glow bool) {
 // drawStateColumn draws amplitude + ket rows of a state at (ampX, ketX, top),
 // wrapped in tall Dirac brackets so the stack reads as one ket.
 // hiRow >= 0 highlights that row.
-func drawStateColumn(d *ComputeDemo, ampX, ketX, top float32, amps []complex64, mods []int32, alpha float32, hiRow int32) {
+func drawStateColumn(d *ComputeDemo, ampX, ketX, top float32, amps []symbolic.SymbolicValue, mods []int32, alpha float32, hiRow int32) {
 	rows := visRows(int32(1) << uint(d.Size))
 	ketW := 26 + float32(d.Size)*dDigitW
 	for slot, r := range rows {
@@ -597,7 +598,7 @@ func drawMatrix(d *ComputeDemo, l demoLayout, alpha float32, hiRow, hiCol int32)
 // result[(j<<shift)+l] += InAmps[(i<<shift)+l] * Matrix[j][i]. Rows that have
 // received no contribution yet are dimmed; pend (if non-nil) is the step
 // currently arriving, crossfading into its target row with factor pop.
-func drawResultColumn(d *ComputeDemo, ampX, ketX, top float32, grid []complex64, written []bool, alpha float32, pend *computeStep, pop float32) {
+func drawResultColumn(d *ComputeDemo, ampX, ketX, top float32, grid []symbolic.SymbolicValue, written []bool, alpha float32, pend *computeStep, pop float32) {
 	rows := visRows(int32(1) << uint(d.Size))
 	ketW := 26 + float32(d.Size)*dDigitW
 	for slot, r := range rows {
@@ -617,7 +618,7 @@ func drawResultColumn(d *ComputeDemo, ampX, ketX, top float32, grid []complex64,
 			if written[r] {
 				drawAmp(ampX, y, grid[r], alpha*(1-pop))
 			}
-			drawAmp(ampX, y, grid[r]+pend.Contrib, alpha*pop)
+			drawAmp(ampX, y, grid[r].Add(pend.Contrib), alpha*pop)
 			drawKet(d, ketX, y, r, d.Size, d.PostMods, alpha)
 			continue
 		}
@@ -837,13 +838,13 @@ func drawIterate(d *ComputeDemo, l demoLayout, it float32) {
 	}
 
 	// Accumulate the completed steps into the sum grid.
-	grid := make([]complex64, dimJ*dimL)
+	grid := make([]symbolic.SymbolicValue, dimJ*dimL)
 	written := make([]bool, dimJ*dimL)
 	for s := 0; s < k; s++ {
 		prev := d.Steps[s]
 		v := prev.Contrib
-		grid[prev.J*dimL+prev.L] += v
-		if real(v) != 0 || imag(v) != 0 {
+		grid[prev.J*dimL+prev.L] = grid[prev.J*dimL+prev.L].Add(v)
+		if !v.IsZero() {
 			written[prev.J*dimL+prev.L] = true
 		}
 	}

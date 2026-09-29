@@ -3,11 +3,11 @@ package components
 import (
 	"fmt"
 	"math"
-	"math/cmplx"
 	"math/rand/v2"
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -290,8 +290,8 @@ func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32, 
 	// emits the collapsed measured qubit as a normal single-qubit system
 	// (|0> or |1> on the realized outcome).
 	if c.NormalSystem {
-		amps := make([]complex64, 2)
-		amps[k] = 1
+		amps := make([]symbolic.SymbolicValue, 2)
+		amps[k] = symbolic.New(1, 0)
 		state := qubits.NewQubitStateManagerFrom(amps, []int32{QSM.ModifierID[pos]})
 		c.spawnOrUpdateNormal(0, state)
 		if qs, ok := utils.GetObjectFromID(c.OutPutHook[0].TargetID).(*QubitsSystem); ok {
@@ -310,16 +310,16 @@ func (c *CollapseGate) emitOutcome(QSM *qubits.QubitStateManager, pos, k int32, 
 	}
 	shift := QSM.Size - 1 - pos
 	restSize := int32(1) << (QSM.Size - 1)
-	restAmps := make([]complex64, restSize)
+	restAmps := make([]symbolic.SymbolicValue, restSize)
 	if p > 0 {
-		inv := complex64(cmplx.Sqrt(complex128(complex(1/p, 0))))
+		inv := symbolic.InvSqrtProb(p)
 		for j := int32(0); j < restSize; j++ {
 			// Insert the measured bit k at position shift into j: bits of
 			// j at or above shift move up one, the bits below stay.
 			high := (j >> shift) << (shift + 1)
 			low := j & ((1 << shift) - 1)
 			idx := high | (k << shift) | low
-			restAmps[j] = QSM.Amptitude[idx] * inv
+			restAmps[j] = QSM.Amptitude[idx].Mul(inv)
 		}
 	}
 	rest := qubits.NewQubitStateManagerFrom(restAmps, restMods)
@@ -379,15 +379,15 @@ func (c *CollapseGate) MeasureOutput() {
 	QSM := qp.Origin
 
 	// p(measuring 0)
-	var l complex64
+	var l float64
 	n := QSM.Size - 1
 	for i, d := range QSM.Amptitude {
 		if ((i >> (n - pos)) & 1) == 0 {
-			l += complex(real(d)*real(d)+imag(d)*imag(d), 0)
+			l += d.AbsSq()
 		}
 	}
-	c.OutcomeProbs[0] = cmplx.Abs(complex128(l))
-	c.OutcomeProbs[1] = cmplx.Abs(complex128(complex(1, 0) - l))
+	c.OutcomeProbs[0] = l
+	c.OutcomeProbs[1] = 1 - l
 
 	// Realize one outcome: forced by the click setting, or a fresh random
 	// sample each call (random mode re-measures every tick).

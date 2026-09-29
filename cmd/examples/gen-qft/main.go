@@ -36,26 +36,27 @@ import (
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 	"qsim/windows"
 )
 
-var h = complex64(complex(float32(1/math.Sqrt(2)), 0)) // 1/√2
+var h = symbolic.New(float32(1/math.Sqrt(2)), 0) // 1/√2
 
 var (
 	// 1-qubit Hadamard.
-	hadamard = [][]complex64{{h, h}, {h, -h}}
+	hadamard = [][]symbolic.SymbolicValue{{h, h}, {h, h.Neg()}}
 )
 
 // kron builds the n-qubit operation that applies the 2×2 op to bit position
 // `bit` (0 = LSB) and identity to all other qubits. In the running 3-qubit
 // system the modifier order is (q0, q1, q2), so q0 = bit 2, q1 = bit 1,
 // q2 = bit 0.
-func kron(n, bit int, op [][]complex64) [][]complex64 {
+func kron(n, bit int, op [][]symbolic.SymbolicValue) [][]symbolic.SymbolicValue {
 	size := 1 << n
-	m := make([][]complex64, size)
+	m := make([][]symbolic.SymbolicValue, size)
 	for i := range m {
-		m[i] = make([]complex64, size)
+		m[i] = make([]symbolic.SymbolicValue, size)
 	}
 	for i := 0; i < size; i++ {
 		for j := 0; j < size; j++ {
@@ -71,12 +72,12 @@ func kron(n, bit int, op [][]complex64) [][]complex64 {
 // index k by v wherever both the control and the target bit are set. The
 // index maps are per gate: in the 3-qubit space q0 = bit 2, q1 = bit 1,
 // q2 = bit 0.
-func cpDiag(n int, entries map[int]complex64) [][]complex64 {
+func cpDiag(n int, entries map[int]symbolic.SymbolicValue) [][]symbolic.SymbolicValue {
 	size := 1 << n
-	m := make([][]complex64, size)
+	m := make([][]symbolic.SymbolicValue, size)
 	for i := 0; i < size; i++ {
-		m[i] = make([]complex64, size)
-		m[i][i] = 1
+		m[i] = make([]symbolic.SymbolicValue, size)
+		m[i][i] = symbolic.One()
 	}
 	for idx, v := range entries {
 		m[idx][idx] = v
@@ -87,7 +88,7 @@ func cpDiag(n int, entries map[int]complex64) [][]complex64 {
 // gate returns a new Gate component at (x,y) with the given label, operation
 // matrix and input count. Hooks are positioned by the constructor at
 // x±GateToHookDist on the snap grid.
-func gate(x, y float32, label string, op [][]complex64, inputCount int32) *components.Gate {
+func gate(x, y float32, label string, op [][]symbolic.SymbolicValue, inputCount int32) *components.Gate {
 	g := components.NewGate(x, y, glob.GateRadius, config.GateColor, label, op, inputCount)
 	g.Editable = true
 	g.Tooltip = "Universal gate: inspect the operation matrix and the nearby TextBox annotation"
@@ -105,7 +106,7 @@ func system(x, y float32, state *qubits.QubitStateManager) *components.QubitsSys
 // amplitudes and modifier order) so each stage owns its own origin.
 func cloneState(src *qubits.QubitStateManager) *qubits.QubitStateManager {
 	return qubits.NewQubitStateManagerFrom(
-		append([]complex64{}, src.Amptitude...),
+		symbolic.CloneSlice(src.Amptitude),
 		append([]int32{}, src.ModifierID...),
 	)
 }
@@ -138,7 +139,7 @@ func main() {
 	q1 := attributes.GenerateQubitModifierID()
 	q2 := attributes.GenerateQubitModifierID()
 
-	zero := []complex64{1, 0}
+	zero := []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}
 
 	stQ0 := qubits.NewQubitStateManagerFrom(zero, []int32{q0}) // |0>_A
 	stQ1 := qubits.NewQubitStateManagerFrom(zero, []int32{q1}) // |0>_B
@@ -149,19 +150,19 @@ func main() {
 	stH.Multiply(hadamard, 1)
 
 	// Stage 2: CR(π/2) on (q0,q1). 2-qubit diagonal: e^{iπ/2} at |11>.
-	cr2 := cpDiag(2, map[int]complex64{3: 1i})
-	stCR2 := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	cr2 := cpDiag(2, map[int]symbolic.SymbolicValue{3: symbolic.I()})
+	stCR2 := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	stCR2.Merge(stH)  // q0 = high bit
 	stCR2.Merge(stQ1) // q1 = low bit
 	stCR2.Multiply(cr2, 2)
 
 	// Stage 3: CR(π/4) control q0 target q2. Fires at |101> and |111>
 	// (bits 2 and 0 set), i.e. indices 5 and 7.
-	crQ0Q2 := cpDiag(3, map[int]complex64{
-		5: complex64(complex(float32(math.Cos(math.Pi/4)), float32(math.Sin(math.Pi/4)))),
-		7: complex64(complex(float32(math.Cos(math.Pi/4)), float32(math.Sin(math.Pi/4)))),
+	crQ0Q2 := cpDiag(3, map[int]symbolic.SymbolicValue{
+		5: symbolic.New(float32(math.Cos(math.Pi/4)), float32(math.Sin(math.Pi/4))),
+		7: symbolic.New(float32(math.Cos(math.Pi/4)), float32(math.Sin(math.Pi/4))),
 	})
-	stCR4 := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	stCR4 := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	stCR4.Merge(stCR2)
 	stCR4.Merge(stQ2)
 	stCR4.Multiply(crQ0Q2, 3)
@@ -172,7 +173,7 @@ func main() {
 
 	// Stage 5: CR(π/2) control q1 target q2. Fires at |011> and |111>
 	// (bits 1 and 0 set), i.e. indices 3 and 7.
-	crQ1Q2 := cpDiag(3, map[int]complex64{3: 1i, 7: 1i})
+	crQ1Q2 := cpDiag(3, map[int]symbolic.SymbolicValue{3: symbolic.I(), 7: symbolic.I()})
 	stCR2b := cloneState(stHQ1)
 	stCR2b.Multiply(crQ1Q2, 3)
 
@@ -184,15 +185,15 @@ func main() {
 	// equals 1/√8 (0.353553...).
 	ok := true
 	for _, a := range stHQ2.Amptitude {
-		if math.Abs(float64(real(a))-1/math.Sqrt2/math.Sqrt2/math.Sqrt2) > 1e-6 ||
-			math.Abs(float64(imag(a))) > 1e-6 {
+		if math.Abs(float64(a.Real())-1/math.Sqrt2/math.Sqrt2/math.Sqrt2) > 1e-6 ||
+			math.Abs(float64(a.Imag())) > 1e-6 {
 			ok = false
 		}
 	}
 	if !ok {
 		fmt.Println("warning: QFT|0> is not the uniform superposition")
 		for i, a := range stHQ2.Amptitude {
-			fmt.Printf("  %d: %+.5f%+.5fi\n", i, real(a), imag(a))
+			fmt.Printf("  %d: %+.5f%+.5fi\n", i, a.Real(), a.Imag())
 		}
 	} else {
 		fmt.Println("QFT check: final state is the uniform superposition over 8 basis states")
@@ -213,7 +214,7 @@ func main() {
 	// of its output system (1, 2, then 3 qubits) clears the next gate; the
 	// pitch therefore grows as the running system grows.
 	stageX := float32(-1800)
-	stage := func(n int, label string, op [][]complex64, k int32, y float32) *components.Gate {
+	stage := func(n int, label string, op [][]symbolic.SymbolicValue, k int32, y float32) *components.Gate {
 		g := gate(stageX, y, label, op, k)
 		stageX = layout.AfterOutput(stageX, n, 100)
 		return g

@@ -8,6 +8,7 @@ import (
 	glob "qsim/globals"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -113,8 +114,8 @@ func vec2Map(v rl.Vector2) map[string]float32 {
 	return map[string]float32{"x": v.X, "y": v.Y}
 }
 
-func complexMap(c complex64) map[string]float32 {
-	return map[string]float32{"real": real(c), "imag": imag(c)}
+func complexMap(c symbolic.SymbolicValue) map[string]float32 {
+	return map[string]float32{"real": c.Real(), "imag": c.Imag()}
 }
 
 func serializeCircle(c *components.Circle) map[string]interface{} {

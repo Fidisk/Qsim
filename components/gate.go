@@ -3,10 +3,10 @@ package components
 import (
 	"fmt"
 	"math"
-	"math/cmplx"
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/utils"
 	"strconv"
 
@@ -22,7 +22,7 @@ type Gate struct {
 	Label             string
 	Tooltip           string
 	HookList          []*Hook
-	Operation         [][]complex64
+	Operation         [][]symbolic.SymbolicValue
 	InputCount        int32
 	OutputCount       int32
 	OutPutHook        []*Hook
@@ -55,7 +55,7 @@ type Gate struct {
 	noticeTimer float32
 }
 
-func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]complex64, inputCount int32) *Gate {
+func NewGate(x, y, radius float32, color rl.Color, label string, operation [][]symbolic.SymbolicValue, inputCount int32) *Gate {
 	tmp := Gate{
 		Circle:      *NewCircle(x, y, radius, color),
 		Label:       label,
@@ -255,20 +255,20 @@ func (c *Gate) MeasureOutput() {
 		}
 	}
 
-	var l complex64
+	var l symbolic.SymbolicValue
 	n := QSM.Size - 1
 	for i, d := range QSM.Amptitude {
 		if ((i >> (n - pos)) & 1) == 0 {
-			l += complex(real(d)*real(d)+imag(d)*imag(d), 0)
+			l = l.Add(symbolic.New(d.Real()*d.Real()+d.Imag()*d.Imag(), 0))
 		}
 	}
 
 	for hit := 0; hit <= 1; hit++ {
 		var prob float64
 		if hit == 0 {
-			prob = cmplx.Abs(complex128(l))
+			prob = l.Abs()
 		} else {
-			prob = cmplx.Abs(complex128(complex(1, 0) - l))
+			prob = symbolic.One().Sub(l).Abs()
 		}
 		c.OutcomeProbs[hit] = prob
 		c.OutcomeLabels[hit] = fmt.Sprintf("|%d>", hit)
@@ -281,8 +281,8 @@ func (c *Gate) MeasureOutput() {
 
 		var result *qubits.QubitStateManager
 		if QSM.Size == 1 {
-			amps := make([]complex64, 2)
-			amps[hit] = 1
+			amps := make([]symbolic.SymbolicValue, 2)
+			amps[hit] = symbolic.One()
 			result = qubits.NewQubitStateManagerFrom(amps, []int32{QSM.ModifierID[pos]})
 		} else {
 			restMods := make([]int32, 0, QSM.Size-1)
@@ -293,16 +293,16 @@ func (c *Gate) MeasureOutput() {
 			}
 			shift := QSM.Size - 1 - pos
 			restSize := int32(1) << (QSM.Size - 1)
-			restAmps := make([]complex64, restSize)
+			restAmps := make([]symbolic.SymbolicValue, restSize)
 			if prob > 0 {
-				inv := complex64(cmplx.Sqrt(complex128(complex(1/prob, 0))))
+				inv := symbolic.InvSqrtProb(prob)
 				for j := int32(0); j < restSize; j++ {
 					// Insert the outcome bit at position shift into j: bits of
 					// j at or above shift move up one, the bits below stay.
 					high := (j >> shift) << (shift + 1)
 					low := j & ((1 << shift) - 1)
 					idx := high | (int32(hit) << shift) | low
-					restAmps[j] = QSM.Amptitude[idx] * inv
+					restAmps[j] = QSM.Amptitude[idx].Mul(inv)
 				}
 			}
 			result = qubits.NewQubitStateManagerFrom(restAmps, restMods)
@@ -375,7 +375,7 @@ func (c *Gate) CalculateOutPut() bool {
 		}
 		c.Measured = true
 	}
-	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	result := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	for i := range QSM {
 		result.Merge(QSM[i])
 	}

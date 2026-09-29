@@ -1,9 +1,9 @@
 package components
 
 import (
-	"math/cmplx"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 	"testing"
 
@@ -16,7 +16,7 @@ import (
 // compares them for every measured qubit position and both outcomes.
 func TestM1M2Agree(t *testing.T) {
 	// Teleportation-style state: [a,b,b,a, a,-b,-b,a]/2 with a=0.8, b=0.6.
-	amps := []complex64{0.4, 0.3, 0.3, 0.4, 0.4, -0.3, -0.3, 0.4}
+	amps := []symbolic.SymbolicValue{symbolic.New(0.4, 0), symbolic.New(0.3, 0), symbolic.New(0.3, 0), symbolic.New(0.4, 0), symbolic.New(0.4, 0), symbolic.New(-0.3, 0), symbolic.New(-0.3, 0), symbolic.New(0.4, 0)}
 
 	for pos := int32(0); pos < 3; pos++ {
 		for k := int32(0); k <= 1; k++ {
@@ -26,7 +26,7 @@ func TestM1M2Agree(t *testing.T) {
 				t.Fatalf("pos=%d k=%d: remainder sizes differ (%d vs %d)", pos, k, len(m1Rest), len(m2Rest))
 			}
 			for j := range m1Rest {
-				if cmplx.Abs(complex128(m1Rest[j]-m2Rest[j])) > 1e-4 {
+				if m1Rest[j].Sub(m2Rest[j]).Abs() > 1e-4 {
 					t.Fatalf("pos=%d k=%d j=%d: M gives %v, M2 gives %v", pos, k, j, m1Rest[j], m2Rest[j])
 				}
 			}
@@ -34,7 +34,7 @@ func TestM1M2Agree(t *testing.T) {
 	}
 }
 
-func measureWithM1(t *testing.T, amps []complex64, pos int32, branch int32) []complex64 {
+func measureWithM1(t *testing.T, amps []symbolic.SymbolicValue, pos int32, branch int32) []symbolic.SymbolicValue {
 	t.Helper()
 	QD := makeSystemWithState(amps, pos)
 	g := NewMeasurementGate(0, 0, 30, rl.White, "M")
@@ -44,7 +44,7 @@ func measureWithM1(t *testing.T, amps []complex64, pos int32, branch int32) []co
 	return qs.Origin.Amptitude
 }
 
-func measureWithM2(t *testing.T, amps []complex64, pos int32, k int32) []complex64 {
+func measureWithM2(t *testing.T, amps []symbolic.SymbolicValue, pos int32, k int32) []symbolic.SymbolicValue {
 	t.Helper()
 	QD := makeSystemWithState(amps, pos)
 	g := NewCollapseGate(0, 0, 30, rl.White, "M2")
@@ -61,12 +61,12 @@ func measureWithM2(t *testing.T, amps []complex64, pos int32, k int32) []complex
 // makeSystemWithState builds a 3-qubit system with the given amplitudes and
 // returns the determinator at logical position pos (determinators are built
 // in ModifierID order, so list index == logical position).
-func makeSystemWithState(amps []complex64, pos int32) *QubitDeterminator {
+func makeSystemWithState(amps []symbolic.SymbolicValue, pos int32) *QubitDeterminator {
 	mods := make([]int32, 3)
 	for i := range mods {
 		mods[i] = attributes.GenerateQubitModifierID()
 	}
-	cp := make([]complex64, len(amps))
+	cp := make([]symbolic.SymbolicValue, len(amps))
 	copy(cp, amps)
 	qs := NewQubitsSystem(0, 0, 30, rl.White)
 	qs.Assign(qubits.NewQubitStateManagerFrom(cp, mods))

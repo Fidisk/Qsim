@@ -8,6 +8,7 @@ import (
 
 	"qsim/components"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/windows"
 )
 
@@ -312,9 +313,9 @@ func (x *extractor) seedStandalone(sys *components.QubitsSystem) error {
 	if o.Size != 1 || len(o.Amptitude) != 2 {
 		return errf("standalone %d-qubit system (id %d) is not supported; use 1-qubit inputs", o.Size, sys.ID)
 	}
-	amps := append([]complex64{}, o.Amptitude...)
+	amps := append([]symbolic.SymbolicValue{}, o.Amptitude...)
 	qubits.Normalize(amps)
-	if amps[0] == 0 && amps[1] == 0 {
+	if amps[0].IsZero() && amps[1].IsZero() {
 		return errf("standalone input system (id %d) is a zero vector", sys.ID)
 	}
 	x.managers[sys.ID] = qubits.NewQubitStateManagerFrom(amps, append([]int32{}, o.ModifierID...))
@@ -328,9 +329,9 @@ func (x *extractor) seedSource(sys *components.QubitsSystem, sg *components.Sour
 	if len(sg.Amplitude) != 2 {
 		return errf("source %q has %d amplitudes, want 2", sg.Label, len(sg.Amplitude))
 	}
-	amps := append([]complex64{}, sg.Amplitude...)
+	amps := append([]symbolic.SymbolicValue{}, sg.Amplitude...)
 	qubits.Normalize(amps)
-	if amps[0] == 0 && amps[1] == 0 {
+	if amps[0].IsZero() && amps[1].IsZero() {
 		return errf("source %q is a zero vector", sg.Label)
 	}
 	x.managers[sys.ID] = qubits.NewQubitStateManagerFrom(amps, []int32{sg.ModifierID})
@@ -769,7 +770,7 @@ func (x *extractor) assignQubits() error {
 		}
 		x.qIndex[mod] = len(x.circuit.Modifiers)
 		x.circuit.Modifiers = append(x.circuit.Modifiers, mod)
-		x.circuit.Init = append(x.circuit.Init, [2]complex128{complex128(m.Amptitude[0]), complex128(m.Amptitude[1])})
+		x.circuit.Init = append(x.circuit.Init, [2]complex128{m.Amptitude[0].ToComplex128(), m.Amptitude[1].ToComplex128()})
 		x.ver[mod] = m
 	}
 	x.circuit.NumQubits = len(x.circuit.Modifiers)
@@ -817,7 +818,7 @@ type job struct {
 	kind    jobKind
 	in      []jobInput
 	out     int32
-	op      [][]complex64
+	op      [][]symbolic.SymbolicValue
 	n       int32
 	label   string
 	ctl     ctlInfo // resolved control for jobControlled
@@ -865,14 +866,14 @@ func (x *extractor) use(mgr *qubits.QubitStateManager, gid int32, what string) e
 
 // controlledMatrix builds the (1+n)-qubit controlled version of mat with
 // the control as MSB: diag(I, U).
-func controlledMatrix(mat [][]complex64) [][]complex64 {
+func controlledMatrix(mat [][]symbolic.SymbolicValue) [][]symbolic.SymbolicValue {
 	n := len(mat)
-	out := make([][]complex64, 2*n)
+	out := make([][]symbolic.SymbolicValue, 2*n)
 	for i := range out {
-		out[i] = make([]complex64, 2*n)
+		out[i] = make([]symbolic.SymbolicValue, 2*n)
 	}
 	for i := 0; i < n; i++ {
-		out[i][i] = 1
+		out[i][i] = symbolic.One()
 		for j := 0; j < n; j++ {
 			out[n+i][n+j] = mat[i][j]
 		}
@@ -882,15 +883,15 @@ func controlledMatrix(mat [][]complex64) [][]complex64 {
 
 // ctrl1Q returns the single-qubit operation for a ControlledGate kind
 // (0/1/2 = X/Y/Z).
-func ctrl1Q(kind int32) ([][]complex64, string) {
-	i := complex64(complex(0, 1))
+func ctrl1Q(kind int32) ([][]symbolic.SymbolicValue, string) {
+	i := symbolic.New(0, 1)
 	switch kind {
 	case components.CtrlY:
-		return [][]complex64{{0, -i}, {i, 0}}, "y"
+		return [][]symbolic.SymbolicValue{{symbolic.Zero(), i.Neg()}, {i, symbolic.Zero()}}, "y"
 	case components.CtrlZ:
-		return [][]complex64{{1, 0}, {0, -1}}, "z"
+		return [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.New(-1, 0)}}, "z"
 	default:
-		return [][]complex64{{0, 1}, {1, 0}}, "x"
+		return [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.One()}, {symbolic.One(), symbolic.Zero()}}, "x"
 	}
 }
 
@@ -1133,7 +1134,7 @@ func (x *extractor) outcomeProb(sys, mod int32) (float64, bool) {
 	bit := mgr.Size - 1 - int32(pos)
 	for i, a := range mgr.Amptitude {
 		if (int32(i)>>bit)&1 == 0 {
-			p0 += float64(real(a)*real(a) + imag(a)*imag(a))
+			p0 += a.AbsSq()
 		}
 	}
 	return p0, true
@@ -1175,7 +1176,7 @@ func (x *extractor) run(j *job) error {
 			x.circuit.Notes = append(x.circuit.Notes, "copy "+j.label+": no input, output ignored")
 			return nil
 		}
-		out := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+		out := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 		out.CopyFrom(inputs[0])
 		x.managers[j.out] = out
 		x.circuit.Notes = append(x.circuit.Notes, "copy "+j.label+": state carried through")
@@ -1256,7 +1257,7 @@ func (x *extractor) run(j *job) error {
 			x.circuit.Ops = append(x.circuit.Ops, Op{Gate: "identity", Label: j.label})
 			return nil
 		}
-		var mat [][]complex64
+		var mat [][]symbolic.SymbolicValue
 		var name string
 		if j.ckind >= 0 {
 			mat, name = ctrl1Q(j.ckind)
@@ -1312,7 +1313,7 @@ func (x *extractor) run(j *job) error {
 				return err
 			}
 		}
-		var mat [][]complex64
+		var mat [][]symbolic.SymbolicValue
 		var name string
 		var qs []int
 		if j.ckind >= 0 {
@@ -1366,7 +1367,7 @@ func (x *extractor) run(j *job) error {
 
 // unitaryOp builds an Op for a (possibly custom) unitary on qiskit-ordered
 // qubits q, reversing multi-qubit lists to little-endian.
-func (x *extractor) unitaryOp(name string, mat [][]complex64, q []int, label string) Op {
+func (x *extractor) unitaryOp(name string, mat [][]symbolic.SymbolicValue, q []int, label string) Op {
 	o := Op{Gate: name, Qubits: q, Label: label}
 	if name == "unitary" {
 		o.Matrix = to128(mat)
@@ -1385,7 +1386,7 @@ func (x *extractor) unitaryOp(name string, mat [][]complex64, q []int, label str
 // replayGate mirrors Gate.CalculateOutPut: merge the unique input states in
 // hook order, swap the gate qubits to the front, and multiply by op (nil
 // op skips the multiply, for unhooked controlled-U passthrough).
-func replayGate(inputs []*qubits.QubitStateManager, mods []int32, op [][]complex64, n int32) (*qubits.QubitStateManager, error) {
+func replayGate(inputs []*qubits.QubitStateManager, mods []int32, op [][]symbolic.SymbolicValue, n int32) (*qubits.QubitStateManager, error) {
 	var uniq []*qubits.QubitStateManager
 	seen := map[*qubits.QubitStateManager]bool{}
 	for _, m := range inputs {
@@ -1397,7 +1398,7 @@ func replayGate(inputs []*qubits.QubitStateManager, mods []int32, op [][]complex
 			uniq = append(uniq, m)
 		}
 	}
-	result := qubits.NewQubitStateManagerFrom([]complex64{}, []int32{})
+	result := qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{}, []int32{})
 	for _, m := range uniq {
 		result.Merge(m)
 	}
@@ -1448,7 +1449,7 @@ func (x *extractor) assemble() error {
 	// Per-carrier product assembly: carriers hold disjoint qubit sets whose
 	// tensor product is the full state.
 	for full := range exp {
-		var amp complex64 = 1
+		amp := symbolic.One()
 		seen := map[*qubits.QubitStateManager]int{}
 		for qi, mod := range x.circuit.Modifiers {
 			c := owners[mod]
@@ -1456,9 +1457,9 @@ func (x *extractor) assemble() error {
 			seen[c.m] |= bit << (c.m.Size - 1 - int32(c.pos))
 		}
 		for m, idx := range seen {
-			amp *= m.Amptitude[idx]
+			amp = amp.Mul(m.Amptitude[idx])
 		}
-		exp[full] = amp
+		exp[full] = amp.ToComplex64()
 	}
 	if x.phased {
 		x.circuit.Notes = append(x.circuit.Notes, "one or more gates matched a standard gate up to global phase")
@@ -1467,12 +1468,12 @@ func (x *extractor) assemble() error {
 	return nil
 }
 
-func to128(op [][]complex64) [][]complex128 {
+func to128(op [][]symbolic.SymbolicValue) [][]complex128 {
 	out := make([][]complex128, len(op))
 	for i, row := range op {
 		out[i] = make([]complex128, len(row))
 		for j, v := range row {
-			out[i][j] = complex128(v)
+			out[i][j] = v.ToComplex128()
 		}
 	}
 	return out
@@ -1481,7 +1482,7 @@ func to128(op [][]complex64) [][]complex128 {
 // classify names a gate matrix: a standard QASM gate when it matches (up to
 // a global phase, which the fidelity check ignores), "id" for identity, or
 // "unitary" for anything else (emitted via the sidecar).
-func classify(op [][]complex64) (name string, phased bool) {
+func classify(op [][]symbolic.SymbolicValue) (name string, phased bool) {
 	n := len(op)
 	if n == 0 || len(op[0]) != n {
 		return "unitary", false
@@ -1521,10 +1522,10 @@ func identity4() [][]complex128 {
 	return m
 }
 
-func matchExact(op [][]complex64, ref [][]complex128) bool {
+func matchExact(op [][]symbolic.SymbolicValue, ref [][]complex128) bool {
 	for i := range ref {
 		for j := range ref[i] {
-			if cmplx.Abs(complex128(op[i][j])-ref[i][j]) > 1e-6 {
+			if op[i][j].Sub(symbolic.FromComplex128(ref[i][j])).Abs() > 1e-6 {
 				return false
 			}
 		}
@@ -1534,7 +1535,7 @@ func matchExact(op [][]complex64, ref [][]complex128) bool {
 
 // matchUpToPhase reports op ~= e^{i*phi} * ref for some phase phi,
 // determined by the largest reference element.
-func matchUpToPhase(op [][]complex64, ref [][]complex128) bool {
+func matchUpToPhase(op [][]symbolic.SymbolicValue, ref [][]complex128) bool {
 	bi, bj := 0, 0
 	best := 0.0
 	for i := range ref {
@@ -1547,14 +1548,14 @@ func matchUpToPhase(op [][]complex64, ref [][]complex128) bool {
 	if best == 0 {
 		return false
 	}
-	phase := complex128(op[bi][bj]) / ref[bi][bj]
-	if cmplx.Abs(phase) == 0 {
+	phase := op[bi][bj].Div(symbolic.FromComplex128(ref[bi][bj]))
+	if phase.Abs() == 0 {
 		return false
 	}
-	phase /= complex(cmplx.Abs(phase), 0)
+	phase = phase.Scale(1 / phase.Abs())
 	for i := range ref {
 		for j := range ref[i] {
-			if cmplx.Abs(complex128(op[i][j])-phase*ref[i][j]) > 1e-6 {
+			if op[i][j].Sub(phase.Mul(symbolic.FromComplex128(ref[i][j]))).Abs() > 1e-6 {
 				return false
 			}
 		}

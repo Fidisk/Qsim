@@ -10,6 +10,7 @@ import (
 	"qsim/migration"
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -43,8 +44,8 @@ func parseVec2(m map[string]interface{}) rl.Vector2 {
 	return rl.Vector2{X: float32(m["x"].(float64)), Y: float32(m["y"].(float64))}
 }
 
-func parseComplex(m map[string]interface{}) complex64 {
-	return complex(float32(m["real"].(float64)), float32(m["imag"].(float64)))
+func parseComplex(m map[string]interface{}) symbolic.SymbolicValue {
+	return symbolic.New(float32(m["real"].(float64)), float32(m["imag"].(float64)))
 }
 
 func LoadState(data string) []interface{} {
@@ -359,7 +360,7 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 	defer func() {
 		if r := recover(); r != nil {
 			qs = components.NewQubitsSystem(100, 100, 30, rl.Purple)
-			qs.Origin = qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{0})
+			qs.Origin = qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{0})
 		}
 	}()
 	center := parseVec2(raw["center"].(map[string]interface{}))
@@ -477,13 +478,13 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 			for i, det := range qs.QubitDeterminatorList {
 				modIDs[i] = det.ModifierID
 			}
-			amps := make([]complex64, 1<<len(qs.QubitDeterminatorList))
+			amps := make([]symbolic.SymbolicValue, 1<<len(qs.QubitDeterminatorList))
 			if len(amps) > 0 {
-				amps[0] = 1
+				amps[0] = symbolic.One()
 			}
 			qs.Origin = qubits.NewQubitStateManagerFrom(amps, modIDs)
 		} else {
-			qs.Origin = qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{0})
+			qs.Origin = qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{0})
 		}
 	}
 
@@ -492,7 +493,7 @@ func unmarshalQubitsSystem(raw map[string]interface{}, ctx *loadCtx) (qs *compon
 
 func unmarshalQubitStateManager(raw map[string]interface{}) *qubits.QubitStateManager {
 	ampsRaw, _ := raw["amplitudes"].([]interface{})
-	amps := make([]complex64, len(ampsRaw))
+	amps := make([]symbolic.SymbolicValue, len(ampsRaw))
 	for i, a := range ampsRaw {
 		amps[i] = parseComplex(a.(map[string]interface{}))
 	}
@@ -755,10 +756,10 @@ func unmarshalControlledUGate(raw map[string]interface{}, ctx *loadCtx) *compone
 	}
 	opRaw, ok := raw["operation"].([]interface{})
 	if ok {
-		op := make([][]complex64, len(opRaw))
+		op := make([][]symbolic.SymbolicValue, len(opRaw))
 		for i, row := range opRaw {
 			rowVals := row.([]interface{})
-			op[i] = make([]complex64, len(rowVals))
+			op[i] = make([]symbolic.SymbolicValue, len(rowVals))
 			for j, val := range rowVals {
 				op[i][j] = parseComplex(val.(map[string]interface{}))
 			}
@@ -891,12 +892,12 @@ func unmarshalGate(raw map[string]interface{}, ctx *loadCtx) *components.Gate {
 		g = components.NewMeasurementGate(center.X, center.Y, radius, color, label)
 	} else {
 		opRaw, ok := raw["operation"].([]interface{})
-		var op [][]complex64
+		var op [][]symbolic.SymbolicValue
 		if ok {
-			op = make([][]complex64, len(opRaw))
+			op = make([][]symbolic.SymbolicValue, len(opRaw))
 			for i, row := range opRaw {
 				rowVals := row.([]interface{})
-				op[i] = make([]complex64, len(rowVals))
+				op[i] = make([]symbolic.SymbolicValue, len(rowVals))
 				for j, val := range rowVals {
 					op[i][j] = parseComplex(val.(map[string]interface{}))
 				}
@@ -904,10 +905,10 @@ func unmarshalGate(raw map[string]interface{}, ctx *loadCtx) *components.Gate {
 		}
 		if !isMeas && (op == nil || len(op) == 0) {
 			sz := 1 << inputCount
-			op = make([][]complex64, sz)
+			op = make([][]symbolic.SymbolicValue, sz)
 			for i := 0; i < sz; i++ {
-				op[i] = make([]complex64, sz)
-				op[i][i] = 1
+				op[i] = make([]symbolic.SymbolicValue, sz)
+				op[i][i] = symbolic.One()
 			}
 		}
 		g = components.NewGate(center.X, center.Y, radius, color, label, op, inputCount)
@@ -1023,14 +1024,14 @@ func unmarshalSourceGate(raw map[string]interface{}, ctx *loadCtx) *components.S
 	label, _ := raw["label"].(string)
 
 	ampsRaw, ok := raw["amplitude"].([]interface{})
-	var amps []complex64
+	var amps []symbolic.SymbolicValue
 	if ok {
-		amps = make([]complex64, len(ampsRaw))
+		amps = make([]symbolic.SymbolicValue, len(ampsRaw))
 		for i, a := range ampsRaw {
 			amps[i] = parseComplex(a.(map[string]interface{}))
 		}
 	} else {
-		amps = []complex64{1, 0}
+		amps = []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}
 	}
 
 	modID := int32(0)

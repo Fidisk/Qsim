@@ -337,8 +337,8 @@ func compareStatesEqual(a, b *qubits.QubitStateManager) bool {
 	var normA, normB float64
 	var dot complex128
 	for i := range a.Amptitude {
-		av := complex128(a.Amptitude[i])
-		bv := complex128(b.Amptitude[i])
+		av := a.Amptitude[i].ToComplex128()
+		bv := b.Amptitude[i].ToComplex128()
 		normA += real(av)*real(av) + imag(av)*imag(av)
 		normB += real(bv)*real(bv) + imag(bv)*imag(bv)
 		dot += cmplx.Conj(av) * bv

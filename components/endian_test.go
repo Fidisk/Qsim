@@ -6,12 +6,13 @@ import (
 
 	"qsim/qubits"
 	"qsim/qubits/attributes"
+	"qsim/symbolic"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-var endianH = complex64(complex(float32(0.70710678), 0))
+var endianH = symbolic.New(float32(0.70710678), 0)
 
 // State |10> + |01> over sqrt(2): ModifierID[0] is documented as the MSB,
 // so index 2 (|10>) means m0=1,m1=0 and index 1 (|01>) means m0=0,m1=1.
@@ -21,14 +22,14 @@ func TestMeasurementBitOrder(t *testing.T) {
 	m1 := attributes.GenerateQubitModifierID()
 	qs := NewQubitsSystem(-400, 0, 30, rl.White)
 	qs.Assign(qubits.NewQubitStateManagerFrom(
-		[]complex64{0, endianH, endianH, 0}, []int32{m0, m1}))
+		[]symbolic.SymbolicValue{symbolic.Zero(), endianH, endianH, symbolic.Zero()}, []int32{m0, m1}))
 	win.PushComponent(qs)
 
 	prob := func(vals [2]float64) bool {
 		return math.Abs(vals[0]-0.5) > 1e-5 || math.Abs(vals[1]-0.5) > 1e-5
 	}
 	amp := func(s *QubitsSystem, i int) float64 {
-		return math.Abs(float64(real(s.Origin.Amptitude[i])))
+		return math.Abs(float64(s.Origin.Amptitude[i].Real()))
 	}
 
 	// Measure m0 (ModifierID[0], the MSB). Correct semantics: p(0) = |01|^2.
@@ -81,7 +82,7 @@ func TestM1BranchBitOrder(t *testing.T) {
 	m1 := attributes.GenerateQubitModifierID()
 	qs := NewQubitsSystem(-400, 0, 30, rl.White)
 	qs.Assign(qubits.NewQubitStateManagerFrom(
-		[]complex64{0, endianH, endianH, 0}, []int32{m0, m1}))
+		[]symbolic.SymbolicValue{symbolic.Zero(), endianH, endianH, symbolic.Zero()}, []int32{m0, m1}))
 	win.PushComponent(qs)
 
 	g := NewMeasurementGate(0, 0, 30, rl.Lime, "M")
@@ -92,11 +93,11 @@ func TestM1BranchBitOrder(t *testing.T) {
 		t.Fatalf("M1 probs = [%v %v], want [0.5 0.5]", g.OutcomeProbs[0], g.OutcomeProbs[1])
 	}
 	branch0 := utils.GetObjectFromID(g.OutPutHook[0].TargetID).(*QubitsSystem)
-	if math.Abs(float64(real(branch0.Origin.Amptitude[1]))) < 0.99 {
+	if math.Abs(float64(branch0.Origin.Amptitude[1].Real())) < 0.99 {
 		t.Fatalf("|0> branch remainder = %v, want |1>_m1", branch0.Origin.Amptitude)
 	}
 	branch1 := utils.GetObjectFromID(g.OutPutHook[1].TargetID).(*QubitsSystem)
-	if math.Abs(float64(real(branch1.Origin.Amptitude[0]))) < 0.99 {
+	if math.Abs(float64(branch1.Origin.Amptitude[0].Real())) < 0.99 {
 		t.Fatalf("|1> branch remainder = %v, want |0>_m1", branch1.Origin.Amptitude)
 	}
 }

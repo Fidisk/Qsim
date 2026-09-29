@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"qsim/qubits"
+	"qsim/symbolic"
 )
 
 // Verify the reorder tracking (PostMods / DigitDest / Perm) against the real
@@ -13,9 +14,9 @@ import (
 // display order (SwapColumn(i, m) swaps display positions i and m).
 func TestReorderTracking(t *testing.T) {
 	// 3-qubit system, modifier IDs as stored (display order top -> bottom)
-	amps := []complex64{0, 1, 2, 3, 4, 5, 6, 7}
+	amps := []symbolic.SymbolicValue{symbolic.New(0, 0), symbolic.New(1, 0), symbolic.New(2, 0), symbolic.New(3, 0), symbolic.New(4, 0), symbolic.New(5, 0), symbolic.New(6, 0), symbolic.New(7, 0)}
 	mods := []int32{10, 11, 12}
-	merged := qubits.NewQubitStateManagerFrom(append([]complex64(nil), amps...), append([]int32(nil), mods...))
+	merged := qubits.NewQubitStateManagerFrom(symbolic.CloneSlice(amps), append([]int32(nil), mods...))
 
 	size := int32(3)
 	idx := []int32{12, 10} // gate acts on Q12 then Q10 (n=2)

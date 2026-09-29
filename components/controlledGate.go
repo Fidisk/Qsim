@@ -4,6 +4,7 @@ import (
 	"qsim/config"
 	glob "qsim/globals"
 	"qsim/qubits"
+	"qsim/symbolic"
 	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -38,7 +39,7 @@ type ControlledGate struct {
 	Width   float32
 	Height  float32
 
-	Operation [][]complex64
+	Operation [][]symbolic.SymbolicValue
 
 	InQubit   *Hook
 	InControl *Hook
@@ -57,19 +58,19 @@ func NewControlledGate(x, y float32, color rl.Color, kind int32) *ControlledGate
 		Width:  w,
 		Height: h,
 	}
-	i := complex64(complex(0, 1))
+	i := symbolic.New(0, 1)
 	switch kind {
 	case CtrlY:
 		cg.Label = "cY"
-		cg.Operation = [][]complex64{{0, -i}, {i, 0}}
+		cg.Operation = [][]symbolic.SymbolicValue{{symbolic.Zero(), i.Neg()}, {i, symbolic.Zero()}}
 		cg.Tooltip = "Bit-controlled Y: applies Y to the qubit while the control bit is 1"
 	case CtrlZ:
 		cg.Label = "cZ"
-		cg.Operation = [][]complex64{{1, 0}, {0, -1}}
+		cg.Operation = [][]symbolic.SymbolicValue{{symbolic.One(), symbolic.Zero()}, {symbolic.Zero(), symbolic.New(-1, 0)}}
 		cg.Tooltip = "Bit-controlled Z: applies Z to the qubit while the control bit is 1"
 	default:
 		cg.Label = "cX"
-		cg.Operation = [][]complex64{{0, 1}, {1, 0}}
+		cg.Operation = [][]symbolic.SymbolicValue{{symbolic.Zero(), symbolic.One()}, {symbolic.One(), symbolic.Zero()}}
 		cg.Tooltip = "Bit-controlled X: applies X to the qubit while the control bit is 1"
 	}
 	cg.ID = utils.GenerateID(cg)
@@ -215,7 +216,7 @@ func (cg *ControlledGate) updateOutput() {
 	src := qp.Origin
 	inProb := qp.Probability
 
-	amps := make([]complex64, len(src.Amptitude))
+	amps := make([]symbolic.SymbolicValue, len(src.Amptitude))
 	copy(amps, src.Amptitude)
 	mods := make([]int32, len(src.ModifierID))
 	copy(mods, src.ModifierID)
