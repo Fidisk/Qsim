@@ -119,97 +119,9 @@ func main() {
 	//panel := windows.NewWindow(200, 150, 400, 300)
 	panel = windows.NewRenderWindow(0, 0, 1500, 800)
 	panel.Rename("Circuit")
-	//panel2 := windows.NewRenderWindow(0, 0, 1600, 900)
+
 	toolBar := windows.NewRenderWindow(0, 800, 1600, 50)
 	toolBar.ShowGrid = false
-
-	/*
-		var create = func(p *windows.RenderWindow) {
-			q1 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, config.QubitSystemColor)
-			q2 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, config.QubitSystemColor)
-			q3 := components.NewQubitsSystem(100, 100, glob.QubitSystemRadius, config.QubitSystemColor)
-
-			q1State := qubits.NewQubitStateManagerFrom([]complex64{0.6, 0.8}, []int32{0})
-			q2State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{1})
-			q3State := qubits.NewQubitStateManagerFrom([]complex64{1, 0}, []int32{2})
-
-			q1.Assign(q1State)
-			q2.Assign(q2State)
-			q3.Assign(q3State)
-
-			p.PushComponent(q1, q2, q3)
-
-			t := complex(float32(1/math.Sqrt(2)), 0)
-			H1 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-			H2 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-			H3 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "H", [][]complex64{{t, t}, {t, -t}}, 1)
-			CNOT1 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-			CNOT2 := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-
-			M1 := components.NewMeasurementGate(100, 100, glob.GateRadius, config.GateColor, "M")
-			M2 := components.NewMeasurementGate(100, 100, glob.GateRadius, config.GateColor, "M")
-
-			CX := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CX", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-			CZ := components.NewGate(100, 100, glob.GateRadius, config.GateColor, "CZ", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}, 2)
-
-			p.PushComponent(H1, H2, H3, CNOT1, CNOT2, M1, M2, CX, CZ)
-		}
-
-		create(panel)
-
-		rows := []components.InfoRow{
-			{"Speed and Something that burn my retina", 0.75, 3 + 4i},
-			{"Power", 0.2, -1 + 2i},
-		}
-		table := components.NewInfoTable(400, 200, 260, 100, config.ColorBg, rows)
-
-		t1 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
-		t2 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
-		t3 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
-		t4 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
-		t5 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
-		t6 := components.NewInfoTable(400, 200, 260, 40, config.ColorBg, []components.InfoRow{})
-
-		testSource := components.NewSourceGate(300, 300, 100, config.GateColor, "Test", []complex64{0, 1}, 4)
-		panel.PushComponent(testSource)
-
-		panel.PushComponent(table, t1, t2, t3, t4, t5, t6)\
-	*/
-
-	//blob := comp.NewBlob(0, 0, 50)
-
-	//circle := comp.NewQubitsSystem(100, 100, 30, rl.Red)
-	//circle2 := comp.NewQubitsSystem(150, 100, 30, rl.Blue)
-
-	//qubit := comp.NewQubit(0, 0.1, 0.6, 0, 0.2, 0.3, 1.75)
-
-	//circle.QubitList = append(circle.QubitList, qubit)
-
-	//test := qub.NewQubitStateManagerFrom([]complex64{0.5, 0.5, 0.5, 0.5}, []int32{0, 4})
-
-	//test2 := qub.NewQubitStateManagerFrom([]complex64{0, 0.6, 0, 0.8}, []int32{0, 2})
-
-	//test2.SwapColumn(0, 1)
-	//test2.SwapColumn(0, 1)
-
-	//circle.Assign(test)
-	//circle2.Assign(test2)
-
-	//circle.SetParent(panel2)
-	//circle2.SetParent(panel2)
-
-	//testHook := comp.NewHook(200, 200, 30, rl.Blue)
-	//testHook2 := comp.NewHook(50, 50, 30, rl.Blue)
-
-	//testGate := comp.NewGate(200, 60, 30, rl.Lime, "CNOT", [][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}}, 2)
-	//testGate.SetParent(panel2)
-
-	//testGate.HookList = append(testGate.HookList, testHook, testHook2)
-
-	//panel2.PushComponent(circle, circle2)
-
-	//panel2.PushComponent(testGate)
-
 	toolBar.IsResizeAllow(false)
 	toolBar.IsPanAllow(false)
 	toolBar.IsZoomAllow(false)
@@ -316,13 +228,9 @@ func main() {
 	spawnBar.AddEffect(func() {
 		effect.PinToSide(spawnBar)
 	})
-	// Keep the buttons at their designed screen positions when the bar is
-	// clamped below its 800px design height, so the top buttons don't slide
-	// under the title bar and get clipped. Scroll input is preserved like the
-	// file browser: the wheel moves the camera and the pin only clamps it
-	// back to the design position when scrolled past the top.
+
 	spawnBar.PinCamera(func() rl.Vector2 {
-		base := (float32(spawnBar.Height) - 800) / 2
+		base := (float32(spawnBar.Height) - 800 - 20) / 2
 		y := spawnBar.Camera.Target.Y
 		if y < base {
 			y = base
@@ -330,6 +238,7 @@ func main() {
 		return rl.Vector2{X: 0, Y: y}
 	})
 	spawnBar.IsVerticalScrollAllow(true)
+	spawnBar.Camera.Target = rl.Vector2{X: 0, Y: -10}
 	spawnBar.Rename("Object")
 
 	butByState := map[glob.SpawnType]*components.ToggleButton{}
