@@ -99,7 +99,7 @@ func NewRenderWindow(x, y, width, height int32) *RenderWindow {
 		Zoom:     1.0,
 	}
 	rw.updateCameraOffset()
-	if focusedWindow == nil && rw.CanPan && rw.CanKeyboardPan {
+	if focusedWindow == nil && ((rw.CanPan && rw.CanKeyboardPan) || rw.CanZoom) {
 		focusedWindow = rw
 	}
 	return rw
@@ -461,7 +461,7 @@ func (rw *RenderWindow) Update() {
 
 	if rw.holdingCursor && rl.IsMouseButtonDown(rl.MouseButtonLeft) {
 		rw.activate = true
-		if rw.CanPan && rw.CanKeyboardPan {
+		if (rw.CanPan && rw.CanKeyboardPan) || rw.CanZoom {
 			focusedWindow = rw
 		}
 	}
@@ -512,6 +512,7 @@ func (rw *RenderWindow) Update() {
 	rw.handlePanning(mousePos)
 	rw.handleScroll(mousePos)
 	rw.handleKeyboardPan()
+	rw.handleKeyboardZoom()
 
 	contentRect := rw.GetContentRect()
 
@@ -867,6 +868,40 @@ func (rw *RenderWindow) handleKeyboardPan() {
 	step := config.KeyboardPanSpeed * rl.GetFrameTime() / zoom
 	rw.Camera.Target.X += dx * step
 	rw.Camera.Target.Y += dy * step
+}
+
+func (rw *RenderWindow) handleKeyboardZoom() {
+	if !rw.CanZoom {
+		return
+	}
+	if rw.pinPosition != nil {
+		return
+	}
+	if focusedWindow != rw {
+		return
+	}
+	if rw.isTyping() {
+		return
+	}
+
+	var dir float32
+	if rl.IsKeyDown(rl.KeyEqual) || rl.IsKeyDown(rl.KeyKpAdd) {
+		dir++
+	}
+	if rl.IsKeyDown(rl.KeyMinus) || rl.IsKeyDown(rl.KeyKpSubtract) {
+		dir--
+	}
+	if dir == 0 {
+		return
+	}
+
+	zoom := rw.Camera.Zoom * (1 + dir*config.KeyboardZoomSpeed*rl.GetFrameTime())
+	if zoom < config.MinZoom {
+		zoom = config.MinZoom
+	} else if zoom > config.MaxZoom {
+		zoom = config.MaxZoom
+	}
+	rw.Camera.Zoom = zoom
 }
 
 // handleScroll processes mouse‑wheel axis‑constrained scrolling.

@@ -13,6 +13,7 @@ import (
 var MaxZoom float32 = 10.0
 var MinZoom float32 = 0.1
 var KeyboardPanSpeed float32 = 500.0
+var KeyboardZoomSpeed float32 = 1.0
 
 var QubitSystemStatePause bool = true
 
