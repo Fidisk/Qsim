@@ -24,7 +24,7 @@ func TestSwapMultiplySwapBack(t *testing.T) {
 	// expect logical0 = |1>, logical1 = |1> -> index 0b11 = 3
 	want := []symbolic.SymbolicValue{symbolic.Zero(), symbolic.Zero(), symbolic.Zero(), symbolic.One()}
 	for i := range want {
-		if qsm.Amptitude[i] != want[i] {
+		if !qsm.Amptitude[i].Equal(want[i]) {
 			t.Fatalf("amps = %v, want %v", qsm.Amptitude, want)
 		}
 	}

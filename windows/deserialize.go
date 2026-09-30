@@ -45,6 +45,11 @@ func parseVec2(m map[string]interface{}) rl.Vector2 {
 }
 
 func parseComplex(m map[string]interface{}) symbolic.SymbolicValue {
+	if e, ok := m["expr"].(string); ok {
+		if v, err := symbolic.Parse(e); err == nil {
+			return v
+		}
+	}
 	return symbolic.New(float32(m["real"].(float64)), float32(m["imag"].(float64)))
 }
 

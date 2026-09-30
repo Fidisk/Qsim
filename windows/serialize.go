@@ -114,8 +114,11 @@ func vec2Map(v rl.Vector2) map[string]float32 {
 	return map[string]float32{"x": v.X, "y": v.Y}
 }
 
-func complexMap(c symbolic.SymbolicValue) map[string]float32 {
-	return map[string]float32{"real": c.Real(), "imag": c.Imag()}
+func complexMap(c symbolic.SymbolicValue) map[string]interface{} {
+	if c.IsClosed() {
+		return map[string]interface{}{"real": c.Real(), "imag": c.Imag()}
+	}
+	return map[string]interface{}{"expr": c.String()}
 }
 
 func serializeCircle(c *components.Circle) map[string]interface{} {
@@ -164,7 +167,7 @@ func serializeQubitStateManager(qm *qubits.QubitStateManager) map[string]interfa
 	if qm == nil {
 		return nil
 	}
-	amps := make([]map[string]float32, len(qm.Amptitude))
+	amps := make([]map[string]interface{}, len(qm.Amptitude))
 	for i, a := range qm.Amptitude {
 		amps[i] = complexMap(a)
 	}
@@ -194,9 +197,9 @@ func serializeGate(g *components.Gate) map[string]interface{} {
 	for i, h := range g.HookList {
 		hooks[i] = serializeHook(h)
 	}
-	op := make([][]map[string]float32, len(g.Operation))
+	op := make([][]map[string]interface{}, len(g.Operation))
 	for i, row := range g.Operation {
-		opRow := make([]map[string]float32, len(row))
+		opRow := make([]map[string]interface{}, len(row))
 		for j, val := range row {
 			opRow[j] = complexMap(val)
 		}
@@ -336,9 +339,9 @@ func serializeControlledUGate(g *components.ControlledUGate) map[string]interfac
 	for i, h := range g.QubitHooks {
 		hooks[i] = serializeHook(h)
 	}
-	op := make([][]map[string]float32, len(g.Operation))
+	op := make([][]map[string]interface{}, len(g.Operation))
 	for i, row := range g.Operation {
-		opRow := make([]map[string]float32, len(row))
+		opRow := make([]map[string]interface{}, len(row))
 		for j, val := range row {
 			opRow[j] = complexMap(val)
 		}
@@ -443,7 +446,7 @@ func serializeInfoTable(it *components.InfoTable) map[string]interface{} {
 }
 
 func serializeSourceGate(sg *components.SourceGate) map[string]interface{} {
-	amps := make([]map[string]float32, len(sg.Amplitude))
+	amps := make([]map[string]interface{}, len(sg.Amplitude))
 	for i, a := range sg.Amplitude {
 		amps[i] = complexMap(a)
 	}

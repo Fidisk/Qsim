@@ -1,0 +1,32 @@
+I not sure who even gonna read this, but anyways
+For symbolic the parse tree route probably the way
+
+SymbolicValue -> Expression
+
+Expression -> Term |
+	          Ops(x) Expression1, Expression2, ..., ExpressionX
+
+Term -> Factor |
+	    TOps(x) Term Factor1, Factor2, ..., FactorX
+	
+Factor -> Expression |
+	      Value	     |
+	      Variable   
+
+Way cleaner
+
+Mfk I'm a idiot
+
+SymbolicValue -> Expression
+
+Expression -> Ops(x) Expression1, Expression2, ..., ExpressionX |
+              Value                                             |
+              Variable
+
+This is a complete representations aint it
+
+SymbolicValue -> Expression //Just wrapper
+
+Maybe this can be remove, but meh
+
+Who know what this will become

@@ -65,7 +65,7 @@ func TestReorderTracking(t *testing.T) {
 	}
 	// every amplitude must have traveled to its permuted row
 	for r := range perm {
-		if merged.Amptitude[perm[r]] != amps[r] {
+		if !merged.Amptitude[perm[r]].Equal(amps[r]) {
 			t.Fatalf("Perm mismatch at row %d: InAmps[%d]=%v want %v", r, perm[r], merged.Amptitude[perm[r]], amps[r])
 		}
 	}

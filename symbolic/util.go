@@ -28,8 +28,14 @@ func (s SymbolicValue) Prob() float64 {
 	return s.AbsSq()
 }
 
-func (s SymbolicValue) IsOne() bool {
-	return s == One()
+func (s SymbolicValue) Abs() float64 {
+	return math.Hypot(float64(s.Real()), float64(s.Imag()))
+}
+
+func (s SymbolicValue) AbsSq() float64 {
+	re := float64(s.Real())
+	im := float64(s.Imag())
+	return re*re + im*im
 }
 
 func (s SymbolicValue) EqualTol(o SymbolicValue, tol float64) bool {
@@ -54,7 +60,7 @@ func ProbOf(amps []SymbolicValue) float64 {
 
 func Normalize(amps []SymbolicValue) {
 	sum := ProbOf(amps)
-	if sum == 0 {
+	if sum == 0 || math.IsNaN(sum) {
 		return
 	}
 	inv := InvNormFactor(sum)
@@ -90,34 +96,29 @@ func CloneMatrix(a [][]SymbolicValue) [][]SymbolicValue {
 }
 
 func (s SymbolicValue) Format() string {
-	re := strconv.FormatFloat(float64(s.Real()), 'g', -1, 32)
-	if s.Imag() == 0 {
-		return re
+	if c, ok := s.closed(); ok {
+		v := complex128(c)
+		re := strconv.FormatFloat(real(v), 'g', -1, 32)
+		if imag(v) == 0 {
+			return re
+		}
+		return re + "," + strconv.FormatFloat(imag(v), 'g', -1, 32)
 	}
-	return re + "," + strconv.FormatFloat(float64(s.Imag()), 'g', -1, 32)
-}
-
-func (s SymbolicValue) String() string {
-	return fmt.Sprintf("%.2f%+.2fi", float64(s.Real()), float64(s.Imag()))
+	return s.String()
 }
 
 func Parse(text string) (SymbolicValue, error) {
-	c, err := parseMatrixEntry(text)
-	if err != nil {
-		return SymbolicValue{}, err
+	if c, err := parseNumericEntry(text); err == nil {
+		return FromComplex64(c), nil
 	}
-	return FromComplex64(c), nil
-}
-
-func (s SymbolicValue) Expr() string {
-	return s.Format()
+	return parseSymbolicEntry(text)
 }
 
 func (s SymbolicValue) Simplify() SymbolicValue {
 	return s
 }
 
-func parseMatrixEntry(s string) (complex64, error) {
+func parseNumericEntry(s string) (complex64, error) {
 	t := strings.TrimSpace(s)
 	if t == "" {
 		return 0, fmt.Errorf("empty entry")
@@ -189,4 +190,214 @@ func parseMatrixEntry(s string) (complex64, error) {
 		return 0, fmt.Errorf("bad entry %q", s)
 	}
 	return complex64(complex(re, 0)), nil
+}
+
+func startsFactor(c byte) bool {
+	return c == '(' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.'
+}
+
+func isIdentStart(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+func isIdentChar(c byte) bool {
+	return isIdentStart(c) || (c >= '0' && c <= '9')
+}
+
+func parseSymbolicEntry(s string) (SymbolicValue, error) {
+	if strings.TrimSpace(s) == "" {
+		return SymbolicValue{}, fmt.Errorf("empty entry")
+	}
+	e := &entryParser{s: s}
+	v, err := e.parseSum()
+	if err != nil {
+		return SymbolicValue{}, err
+	}
+	e.skipSpaces()
+	if e.peek() != 0 {
+		return SymbolicValue{}, fmt.Errorf("bad entry %q", s)
+	}
+	return v, nil
+}
+
+type entryParser struct {
+	s string
+	p int
+}
+
+func (e *entryParser) skipSpaces() {
+	for e.p < len(e.s) && (e.s[e.p] == ' ' || e.s[e.p] == '\t') {
+		e.p++
+	}
+}
+
+func (e *entryParser) peek() byte {
+	if e.p >= len(e.s) {
+		return 0
+	}
+	return e.s[e.p]
+}
+
+func (e *entryParser) parseSum() (SymbolicValue, error) {
+	e.skipSpaces()
+	neg := false
+	if c := e.peek(); c == '+' || c == '-' {
+		neg = c == '-'
+		e.p++
+	}
+	v, err := e.parseTerm()
+	if err != nil {
+		return SymbolicValue{}, err
+	}
+	if neg {
+		v = v.Neg()
+	}
+	for {
+		e.skipSpaces()
+		c := e.peek()
+		if c != '+' && c != '-' {
+			return v, nil
+		}
+		e.p++
+		t, err := e.parseTerm()
+		if err != nil {
+			return SymbolicValue{}, err
+		}
+		if c == '-' {
+			v = v.Sub(t)
+		} else {
+			v = v.Add(t)
+		}
+	}
+}
+
+func (e *entryParser) parseTerm() (SymbolicValue, error) {
+	f, err := e.parseFactor()
+	if err != nil {
+		return SymbolicValue{}, err
+	}
+	for {
+		e.skipSpaces()
+		if e.peek() == '*' {
+			e.p++
+			g, err := e.parseFactor()
+			if err != nil {
+				return SymbolicValue{}, err
+			}
+			f = f.Mul(g)
+			continue
+		}
+		if e.peek() == '/' {
+			e.p++
+			g, err := e.parseFactor()
+			if err != nil {
+				return SymbolicValue{}, err
+			}
+			f = f.Div(g)
+			continue
+		}
+		if startsFactor(e.peek()) {
+			g, err := e.parseFactor()
+			if err != nil {
+				return SymbolicValue{}, err
+			}
+			f = f.Mul(g)
+			continue
+		}
+		return f, nil
+	}
+}
+
+func (e *entryParser) parseFactor() (SymbolicValue, error) {
+	e.skipSpaces()
+	c := e.peek()
+	if c == '+' || c == '-' {
+		e.p++
+		v, err := e.parseFactor()
+		if err != nil {
+			return SymbolicValue{}, err
+		}
+		if c == '-' {
+			return v.Neg(), nil
+		}
+		return v, nil
+	}
+	if c == '(' {
+		e.p++
+		v, err := e.parseSum()
+		if err != nil {
+			return SymbolicValue{}, err
+		}
+		e.skipSpaces()
+		if e.peek() != ')' {
+			return SymbolicValue{}, fmt.Errorf("bad entry %q", e.s)
+		}
+		e.p++
+		return v, nil
+	}
+	if isIdentStart(c) {
+		start := e.p
+		for e.p < len(e.s) && isIdentChar(e.s[e.p]) {
+			e.p++
+		}
+		name := e.s[start:e.p]
+		if name == "i" {
+			return New(0, 1), nil
+		}
+		if name == "conj" {
+			e.skipSpaces()
+			if e.peek() != '(' {
+				return SymbolicValue{}, fmt.Errorf("conj requires (...) in %q", e.s)
+			}
+			e.p++
+			v, err := e.parseSum()
+			if err != nil {
+				return SymbolicValue{}, err
+			}
+			e.skipSpaces()
+			if e.peek() != ')' {
+				return SymbolicValue{}, fmt.Errorf("bad entry %q", e.s)
+			}
+			e.p++
+			return v.Conj(), nil
+		}
+		if name == "sqrt2" {
+			return FromComplex64(complex64(complex(math.Sqrt2, 0))), nil
+		}
+		if name == "pi" {
+			return FromComplex64(complex64(complex(math.Pi, 0))), nil
+		}
+		return Symbol(name), nil
+	}
+	if (c >= '0' && c <= '9') || c == '.' {
+		start := e.p
+		for e.p < len(e.s) && e.s[e.p] >= '0' && e.s[e.p] <= '9' {
+			e.p++
+		}
+		if e.p < len(e.s) && e.s[e.p] == '.' {
+			e.p++
+			for e.p < len(e.s) && e.s[e.p] >= '0' && e.s[e.p] <= '9' {
+				e.p++
+			}
+		}
+		if e.p < len(e.s) && (e.s[e.p] == 'e' || e.s[e.p] == 'E') {
+			q := e.p + 1
+			if q < len(e.s) && (e.s[q] == '+' || e.s[q] == '-') {
+				q++
+			}
+			r := q
+			for r < len(e.s) && e.s[r] >= '0' && e.s[r] <= '9' {
+				r++
+			}
+			if r > q {
+				e.p = r
+			}
+		}
+		v, err := strconv.ParseFloat(e.s[start:e.p], 64)
+		if err != nil {
+			return SymbolicValue{}, fmt.Errorf("bad entry %q", e.s)
+		}
+		return FromComplex128(complex(v, 0)), nil
+	}
+	return SymbolicValue{}, fmt.Errorf("bad entry %q", e.s)
 }
