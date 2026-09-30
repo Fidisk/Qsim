@@ -1,6 +1,8 @@
 package components
 
 import (
+	"qsim/utils"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -61,7 +63,7 @@ func (in *Input) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvail
 		}
 		key = rl.GetCharPressed()
 	}
-	if rl.IsKeyPressed(rl.KeyBackspace) && len(in.Text) > 0 {
+	if utils.DeletePressed() && len(in.Text) > 0 {
 		in.Text = in.Text[:len(in.Text)-1]
 	}
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {

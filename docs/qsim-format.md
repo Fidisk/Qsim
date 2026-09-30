@@ -36,7 +36,7 @@ format version — see §3 "Save versioning".
 ```json
 {
   "type": "RenderWindow",
-  "saveVersion": "0.8.2",
+  "saveVersion": "0.9.0",
   "window": { ...base window fields... },
   "cameraZoom": 1,
   "cameraTargetX": 0, "cameraTargetY": 0,
@@ -63,7 +63,7 @@ the grid survives a save/load round trip.
 ## 3. Save versioning
 
 Every `RenderWindow` line carries the format version in `saveVersion`
-(currently `globals.SaveVersion`, "0.8.2"). When a file is loaded:
+(currently `globals.SaveVersion`, "0.9.0"). When a file is loaded:
 
 1. `qsim/migration.Migrate` runs first: each line whose `saveVersion` is
    missing (unnumbered) or lower than the current version is rewritten
@@ -94,8 +94,7 @@ zero/absent), so hand-written unnumbered saves still load.
   (`config.SnapToGridInterval`). Gate bodies are radius 30; input hooks sit
   `x-300` from the gate center (at `y-50` and `y+50` for 2-input gates);
   the output hook sits `x+300` (a `QubitsSystem` connected to an output hook
-  moves its center onto the hook). A source table's output hook sits at
-  `x+400`. These distances are sized so the drawn state grid of a ≤4-qubit
+  moves its center onto the hook). These distances are sized so the drawn state grid of a ≤4-qubit
   system (2^ceil(n/2)×2^floor(n/2) cells of 100px, centered on the hook)
   clears the producing component. Two hooks connect when within 80px.
 - **Authored text**: explanatory text belongs in a `TextBox` component, not
@@ -104,11 +103,18 @@ zero/absent), so hand-written unnumbered saves still load.
   size) while editing. `Label` remains valid
   for engine/runtime labels, but is not the style-guide choice for authored
   protocol notes.
-- **Normal input qubits**: prefer a standalone `QubitsSystem` for a single
+- **Normal input qubits**: use a standalone `QubitsSystem` for a single
   qubit whose state is one of `|0>`, `|1>`, `|+>`, `|->`, `|i>`, or `|-i>`.
   The user can click it to cycle those states without changing its modifier
-  ID or wiring. Use `SourceGate` when the source must continuously reassert
-  a precise amplitude or when preparing a fine-grained/entangled input.
+  ID or wiring, or right-click it to edit exact amplitudes (plain numbers
+  or symbolic expressions). Precise or entangled inputs are authored
+  directly as `QubitsSystem` origins.
+- **SourceGate removal (0.9.0)**: the `SourceGate` component no longer
+  exists. Saves at older versions are migrated on load: each source's
+  output system becomes a standalone raw qubit carrying the source's
+  (normalized) amplitude with its wiring and determinators intact, and the
+  source entry is dropped. A source with no output system in the file
+  becomes a fresh standalone system at the source position.
 
 ### Placement: keep every system grid clear of other components
 
@@ -165,8 +171,8 @@ Every connection in the engine is a `Hook` pointing at a target:
 
 - `isHooked`/`targetID` are the actual link: `isHooked:true` and a nonzero
   `targetID` pointing at the target component's `id`.
-- `isOutput:true` marks hooks that emit a new system/bit (gate `O`, source
-  `O`, collapse `C`/`R`); `isOutput:false` hooks consume.
+- `isOutput:true` marks hooks that emit a new system/bit (gate `O`,
+  collapse `C`/`R`); `isOutput:false` hooks consume.
 - `hidden:true` marks hooks that are not drawn (e.g. the collapse `R` hook
   before a multi-qubit input is measured); the flag is serialized so it
   survives a save/load round trip.
@@ -181,27 +187,6 @@ Every connection in the engine is a `Hook` pointing at a target:
   them, and a bit may fan out to several hooks.
 
 ## 5. Component types
-
-### SourceGate — emits a fixed single-qubit state
-
-```json
-{
-  "type": "SourceGate", "id": 10,
-  "center": {"x": -1500, "y": -150}, "radius": 90,
-  "color": {...}, "isFixed": false, "weight": 100,
-  "label": "|0> A",
-  "amplitude": [{"real": 1, "imag": 0}, {"real": 0, "imag": 0}],
-  "modifierID": 0,
-  "outHook": { ...hook, isOutput:true, allowQubitSystem:true, label:"O"... }
-}
-```
-
-`amplitude[0]` is `|0>`, `amplitude[1]` is `|1>`. `modifierID` is the global
-qubit identity (must be unique per qubit wire and must match the `modifierID`
-used inside the connected system's `origin.modifierIDs`). The `outHook`
-targets a `QubitsSystem` whose `infoHookID` points back at the source hook.
-While the app runs, the source re-copies its amplitude into the hooked
-system every frame.
 
 ### QubitsSystem — a multi-qubit state grid
 
@@ -233,9 +218,9 @@ system every frame.
   system feeding several inputs of one gate counts once), and the input
   probability times the outcome probability after a measurement. It is
   shown on hover; default `1` for saves predating the field.
-- `hookID` links to the output hook of the gate/source that produced it
-  (0 when the system is a free source). `infoHookID` links a read-only info
-  hook (e.g. a `SourceGate` output or a compare input).
+- `hookID` links to the output hook of the gate that produced it
+  (0 when the system is a free input). `infoHookID` links a read-only info
+  hook (e.g. a compare input).
 - `qubitDeterminators` are the per-qubit handles the user plugs into gate
   inputs. Each has `modifierID` (matching one entry of
   `origin.modifierIDs`), its own `id`, `hookID` (the gate input hook it is
@@ -497,7 +482,7 @@ top row of the gate's grid is the MSB.
     `cmd/examples/gen-superdense/main.go`:
     - create a `windows.NewRenderWindow`, `rw.PushComponent(...)` every
       component,
-    - construct sources/gates/systems with the `components.New*`
+    - construct gates/systems with the `components.New*`
       constructors (they lay out hooks and register IDs),
     - wire with `hook.Connect(det)`, `hook.ConnectInfo(qs)`, output
       `hook.Connect(qs)`,
@@ -510,11 +495,11 @@ top row of the gate's grid is the MSB.
     - write `rw.SaveState()` to a file under `saves/`.
     This guarantees every ID reference is consistent, which is the most
     error-prone part of hand-editing.
-2. **When hand-editing JSON**, copy a working save (e.g. `saves/Test.qsim`
-   or the generated `saves/superdense.qsim`) and modify, keeping: unique
-   ids; `hookID`/`targetID`/`infoHookID` pairs consistent; `modifierIDs`
-   consistent between `origin`, determinators, and sources; `size` and
-   amplitude counts exact powers of two.
+  2. **When hand-editing JSON**, copy a working save (e.g. `saves/Test.qsim`
+  or the generated `saves/superdense.qsim`) and modify, keeping: unique
+  ids; `hookID`/`targetID`/`infoHookID` pairs consistent; `modifierIDs`
+  consistent between `origin` and determinators; `size` and
+  amplitude counts exact powers of two.
  3. **Validate**: load the file through `windows.LoadState` (see the
     round-trip check at the end of the example generator) and confirm every
     `isHooked` hook resolves to a live object.

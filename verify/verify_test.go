@@ -196,23 +196,21 @@ func TestExtractCustomUnitary(t *testing.T) {
 }
 
 func TestExtractSourcePrep(t *testing.T) {
-	// SourceGate emitting |+> followed by H: exercises source-seeded input
+	// Standalone |+> input followed by H: exercises standalone-seeded input
 	// (prep op) and must decode back to |0>.
-	sg := components.NewSourceGateWithID(-2250, -100, glob.GateRadius, config.GateColor, "S",
-		[]symbolic.SymbolicValue{tVal, tVal}, attributes.GenerateQubitModifierID())
-	qsS := mkSystem(sg.OutHook.Center.X, sg.OutHook.Center.Y,
-		[]symbolic.SymbolicValue{tVal, tVal}, []int32{sg.ModifierID})
-	sg.OutHook.Connect(qsS)
+	mod := attributes.GenerateQubitModifierID()
+	qsS := mkSystem(-2250, -100,
+		[]symbolic.SymbolicValue{tVal, tVal}, []int32{mod})
 
 	hA := mkGate(-1800, -100, "H", hadamard, 1)
 	hA.HookList[0].Connect(qsS.QubitDeterminatorList[0])
 	qsH := mkSystem(hA.OutPutHook[0].Center.X, hA.OutPutHook[0].Center.Y,
-		[]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{sg.ModifierID})
+		[]symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}, []int32{mod})
 	hA.OutPutHook[0].Connect(qsH)
 
 	rw := windows.NewRenderWindow(0, 0, 1600, 900)
 	rw.Rename("Prep")
-	for _, c := range []components.Component{sg, qsS, hA, qsH} {
+	for _, c := range []components.Component{qsS, hA, qsH} {
 		rw.PushComponent(c)
 	}
 	c, err := Extract(rw.SaveState(), "Prep")

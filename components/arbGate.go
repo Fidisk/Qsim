@@ -111,7 +111,7 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 			}
 			key = rl.GetCharPressed()
 		}
-		if rl.IsKeyPressed(rl.KeyBackspace) && len(c.cellBuffer) > 0 {
+		if utils.DeletePressed() && len(c.cellBuffer) > 0 {
 			c.cellBuffer = c.cellBuffer[:len(c.cellBuffer)-1]
 		}
 		// Arrow keys commit the current value and move to the neighbour cell.
@@ -243,7 +243,7 @@ func (c *Gate) processEditing(worldMouse rl.Vector2, isCursorAvailable *bool) {
 			}
 			key = rl.GetCharPressed()
 		}
-		if rl.IsKeyPressed(rl.KeyBackspace) && len(c.sizeStr) > 0 {
+		if utils.DeletePressed() && len(c.sizeStr) > 0 {
 			c.sizeStr = c.sizeStr[:len(c.sizeStr)-1]
 		}
 		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
@@ -535,7 +535,7 @@ func (c *Gate) processRename(isCursorAvailable *bool) {
 		}
 		key = rl.GetCharPressed()
 	}
-	if rl.IsKeyPressed(rl.KeyBackspace) && len(c.renameStr) > 0 {
+	if utils.DeletePressed() && len(c.renameStr) > 0 {
 		c.renameStr = c.renameStr[:len(c.renameStr)-1]
 	}
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {

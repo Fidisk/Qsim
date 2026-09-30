@@ -89,7 +89,7 @@ func (tb *TextBox) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAva
 				}
 				key = rl.GetCharPressed()
 			}
-			if rl.IsKeyPressed(rl.KeyBackspace) && len(tb.sizeStr) > 0 {
+			if utils.DeletePressed() && len(tb.sizeStr) > 0 {
 				tb.sizeStr = tb.sizeStr[:len(tb.sizeStr)-1]
 			}
 			if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
@@ -217,7 +217,7 @@ func (tb *TextBox) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAva
 		}
 		key = rl.GetCharPressed()
 	}
-	if rl.IsKeyPressed(rl.KeyBackspace) && len(tb.Text) > 0 {
+	if utils.DeletePressed() && len(tb.Text) > 0 {
 		tb.Text = tb.Text[:len(tb.Text)-1]
 	}
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {

@@ -83,8 +83,6 @@ func serializeComponent(c components.Component) map[string]interface{} {
 		return serializeHook(v)
 	case *components.InfoTable:
 		return serializeInfoTable(v)
-	case *components.SourceGate:
-		return serializeSourceGate(v)
 	case *components.LogicalBit:
 		return serializeLogicalBit(v)
 	case *components.Button:
@@ -442,26 +440,6 @@ func serializeInfoTable(it *components.InfoTable) map[string]interface{} {
 		"width":  it.Width,
 		"height": it.Height,
 		"hook":   serializeHook(it.Hook),
-	}
-}
-
-func serializeSourceGate(sg *components.SourceGate) map[string]interface{} {
-	amps := make([]map[string]interface{}, len(sg.Amplitude))
-	for i, a := range sg.Amplitude {
-		amps[i] = complexMap(a)
-	}
-	return map[string]interface{}{
-		"type":       "SourceGate",
-		"id":         sg.ID,
-		"center":     vec2Map(sg.Center),
-		"radius":     sg.Radius,
-		"color":      colorMap(sg.Color),
-		"isFixed":    sg.IsFixed,
-		"weight":     sg.GetWeight(),
-		"label":      sg.Label,
-		"amplitude":  amps,
-		"modifierID": sg.ModifierID,
-		"outHook":    serializeHook(sg.OutHook),
 	}
 }
 

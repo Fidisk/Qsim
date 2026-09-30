@@ -162,8 +162,6 @@ func (x *extractor) load(data string) error {
 			for _, h := range t.HookList {
 				hook(h, c)
 			}
-		case *components.SourceGate:
-			hook(t.OutHook, c)
 		case *components.CopyGate:
 			hook(t.InHook, c)
 			hook(t.OutHook, c)
@@ -224,10 +222,19 @@ func (x *extractor) producerHook(sys *components.QubitsSystem) (*components.Hook
 	}
 	var viaHook *components.Hook
 	for _, h := range x.sortedHooks() {
-		if h.TargetID == sys.ID {
-			viaHook = h
-			break
+		if h.TargetID != sys.ID {
+			continue
 		}
+		// A copy input only reads its system (compare/info attachments are
+		// not registered at all for the same reason): it never produces it,
+		// so it must not resolve as the producer hook.
+		if owner, ok := x.hookOwner[h.ID]; ok {
+			if cg, ok := owner.(*components.CopyGate); ok && h == cg.InHook {
+				continue
+			}
+		}
+		viaHook = h
+		break
 	}
 	if viaSys != nil && viaHook != nil && viaSys.ID != viaHook.ID {
 		return nil, errf("qubit system (id %d) has conflicting producer links", sys.ID)
@@ -275,13 +282,6 @@ func (x *extractor) producers() error {
 			return errf("qubit system (id %d) links to ownerless hook", sys.ID)
 		}
 		switch t := owner.(type) {
-		case *components.SourceGate:
-			if h != t.OutHook {
-				return errf("qubit system (id %d) links to non-output source hook", sys.ID)
-			}
-			if err := x.seedSource(sys, t); err != nil {
-				return err
-			}
 		case *components.Gate:
 			if t.IsMeasurementGate {
 				x.measChildren[t.ID] = append(x.measChildren[t.ID], sys.ID)
@@ -319,22 +319,6 @@ func (x *extractor) seedStandalone(sys *components.QubitsSystem) error {
 		return errf("standalone input system (id %d) is a zero vector", sys.ID)
 	}
 	x.managers[sys.ID] = qubits.NewQubitStateManagerFrom(amps, append([]int32{}, o.ModifierID...))
-	x.isInit[sys.ID] = true
-	return nil
-}
-
-// seedSource seeds the replay from a SourceGate, mirroring SourceGate.Update
-// (normalize, then assert the configured amplitudes).
-func (x *extractor) seedSource(sys *components.QubitsSystem, sg *components.SourceGate) error {
-	if len(sg.Amplitude) != 2 {
-		return errf("source %q has %d amplitudes, want 2", sg.Label, len(sg.Amplitude))
-	}
-	amps := append([]symbolic.SymbolicValue{}, sg.Amplitude...)
-	qubits.Normalize(amps)
-	if amps[0].IsZero() && amps[1].IsZero() {
-		return errf("source %q is a zero vector", sg.Label)
-	}
-	x.managers[sys.ID] = qubits.NewQubitStateManagerFrom(amps, []int32{sg.ModifierID})
 	x.isInit[sys.ID] = true
 	return nil
 }

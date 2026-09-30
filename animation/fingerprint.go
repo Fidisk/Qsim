@@ -48,11 +48,6 @@ func circuitHash(wComp []components.Component) uint64 {
 					writeSym(write, e)
 				}
 			}
-		case *components.SourceGate:
-			write("SourceGate", v.ID, v.ModifierID)
-			for _, a := range v.Amplitude {
-				writeSym(write, a)
-			}
 		case *components.QubitsSystem:
 			write("QubitsSystem", v.ID, v.Probability)
 			if v.Origin != nil {

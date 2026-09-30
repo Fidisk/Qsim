@@ -325,8 +325,6 @@ func unmarshalComponent(raw map[string]interface{}, ctx *loadCtx) components.Com
 		return unmarshalHook(raw, ctx)
 	case "InfoTable":
 		return unmarshalInfoTable(raw, ctx)
-	case "SourceGate":
-		return unmarshalSourceGate(raw, ctx)
 	case "LogicalBit":
 		return unmarshalLogicalBit(raw, ctx)
 	case "Button":
@@ -1022,47 +1020,6 @@ func unmarshalInfoTable(raw map[string]interface{}, ctx *loadCtx) *components.In
 	return it
 }
 
-func unmarshalSourceGate(raw map[string]interface{}, ctx *loadCtx) *components.SourceGate {
-	center := parseVec2(raw["center"].(map[string]interface{}))
-	radius := float32(raw["radius"].(float64))
-	color := parseColor(raw["color"].(map[string]interface{}))
-	label, _ := raw["label"].(string)
-
-	ampsRaw, ok := raw["amplitude"].([]interface{})
-	var amps []symbolic.SymbolicValue
-	if ok {
-		amps = make([]symbolic.SymbolicValue, len(ampsRaw))
-		for i, a := range ampsRaw {
-			amps[i] = parseComplex(a.(map[string]interface{}))
-		}
-	} else {
-		amps = []symbolic.SymbolicValue{symbolic.One(), symbolic.Zero()}
-	}
-
-	modID := int32(0)
-	if v, ok := raw["modifierID"]; ok {
-		modID = int32(v.(float64))
-	}
-
-	sg := components.NewSourceGateWithID(center.X, center.Y, radius, color, label, amps, modID)
-	sg.Center = center
-	sg.Color = color
-	ctx.oldToNew[int32(raw["id"].(float64))] = sg
-
-	if v, ok := raw["isFixed"]; ok {
-		sg.IsFixed = v.(bool)
-	}
-	if v, ok := raw["weight"]; ok {
-		sg.SetWeight(float32(v.(float64)))
-	}
-
-	if hookRaw, ok := raw["outHook"].(map[string]interface{}); ok {
-		unmarshalHookInto(sg.OutHook, hookRaw, ctx)
-	}
-
-	return sg
-}
-
 func unmarshalLogicalBit(raw map[string]interface{}, ctx *loadCtx) *components.LogicalBit {
 	center := parseVec2(raw["center"].(map[string]interface{}))
 	radius := float32(raw["radius"].(float64))
@@ -1168,8 +1125,6 @@ func snapshotLinks(comps []components.Component, ctx *loadCtx) {
 			for _, d := range v.QubitDeterminatorList {
 				ctx.detHook[d] = d.HookID
 			}
-		case *components.SourceGate:
-			snapHook(v.OutHook)
 		case *components.CopyGate:
 			snapHook(v.InHook)
 			snapHook(v.OutHook)
@@ -1225,8 +1180,6 @@ func remapReferences(comps []components.Component, ctx *loadCtx) {
 			remapCollapseGateRefs(v, ctx)
 		case *components.InfoTable:
 			remapInfoTableRefs(v, ctx)
-		case *components.SourceGate:
-			remapSourceGateRefs(v, ctx)
 		case *components.CopyGate:
 			remapCopyGateRefs(v, ctx)
 		case *components.CompareGate:
@@ -1378,28 +1331,6 @@ func remapM4GateRefs(g *components.M4Gate, ctx *loadCtx) {
 
 func remapInfoTableRefs(it *components.InfoTable, ctx *loadCtx) {
 	h := it.Hook
-	if h == nil {
-		return
-	}
-	if target := oldTarget(ctx, h); target != 0 {
-		if newObj, found := ctx.oldToNew[target]; found {
-			if qs, ok := newObj.(*components.QubitsSystem); ok {
-				qs.InfoHookID = 0
-				qs.Center = h.Center
-				h.IsHooked = true
-				h.TargetID = qs.ID
-				qs.InfoHookID = h.ID
-				qs.SetWeight(0)
-			}
-		} else {
-			h.TargetID = 0
-			h.IsHooked = false
-		}
-	}
-}
-
-func remapSourceGateRefs(sg *components.SourceGate, ctx *loadCtx) {
-	h := sg.OutHook
 	if h == nil {
 		return
 	}

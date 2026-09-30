@@ -33,13 +33,11 @@ type QubitsSystem struct {
 	orderPopupHeld        bool
 	orderPopupPointerX    float32
 
-	// Inline amplitude editor (right-click on a raw single-qubit system,
-	// same interaction as SourceGate: Tab switches field, Enter applies).
+	// Inline amplitude editor (right-click on a raw single-qubit system).
+	// Each field holds a full symbolic expression parsed by symbolic.Parse
+	// (e.g. "0.5", "0.5+0.3i", "a", "0.5*c", "1/sqrt2").
 	ampEditing    bool
-	ampReal0Str   string
-	ampImag0Str   string
-	ampReal1Str   string
-	ampImag1Str   string
+	ampStr        [2]string // index 0 = |0⟩, index 1 = |1⟩
 	ampEditField  int
 	ampCursorBlink float32
 	ampCursorShow  bool
@@ -331,6 +329,11 @@ func (c *QubitsSystem) cycleState() {
 	if c.Origin == nil || c.Origin.Size != 1 || c.HookID != 0 {
 		return // only normal qubits, not source/gate outputs
 	}
+	for _, a := range c.Origin.Amptitude {
+		if !a.IsClosed() {
+			return // never clobber a symbolic state with a plain click
+		}
+	}
 	next := nextQubitState(c.Origin.Amptitude)
 	copy(c.Origin.Amptitude, next)
 }
@@ -346,22 +349,29 @@ func (c *QubitsSystem) isRawSingleQubit() bool {
 	return c.Origin != nil && c.Origin.Size == 1 && len(c.Origin.Amptitude) == 2 && c.HookID == 0
 }
 
-// openAmpEditor starts inline amplitude editing, mirroring SourceGate's
-// editor: four real fields (Tab switches, Enter applies + normalizes).
+// openAmpEditor starts inline amplitude editing: one symbolic expression
+// per amplitude (Tab switches, Enter applies + normalizes when plain).
 func (c *QubitsSystem) openAmpEditor(isCursorAvailable *bool) {
 	if !c.isRawSingleQubit() {
 		return
 	}
 	c.ampEditing = true
-	c.ampReal0Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[0].Real())
-	c.ampImag0Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[0].Imag())
-	c.ampReal1Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[1].Real())
-	c.ampImag1Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[1].Imag())
+	c.ampStr[0] = ampFieldText(c.Origin.Amptitude[0])
+	c.ampStr[1] = ampFieldText(c.Origin.Amptitude[1])
 	c.ampEditField = 0
 	c.ampCursorBlink = 0
 	c.ampCursorShow = true
 	c.holdingCursor = true
 	*isCursorAvailable = false
+}
+
+// ampFieldText renders an amplitude for the editor: compact "re,im" for
+// plain numbers (reparses exactly), the expression string otherwise.
+func ampFieldText(a symbolic.SymbolicValue) string {
+	if a.IsClosed() {
+		return a.Format()
+	}
+	return a.String()
 }
 
 func (c *QubitsSystem) closeAmpEditor(isCursorAvailable *bool) {
@@ -370,10 +380,11 @@ func (c *QubitsSystem) closeAmpEditor(isCursorAvailable *bool) {
 	*isCursorAvailable = true
 }
 
-// processAmpEditing handles the inline amplitude editor: type digits, Tab to
-// switch field, Enter applies (normalizing so probabilities sum to 1),
-// Escape cancels. Amplitudes are updated in place so the modifier ID, the
-// determinators and any hooked wiring survive the change.
+// processAmpEditing handles the inline amplitude editor: type an expression,
+// Tab to switch amplitude, Enter applies, Escape cancels. A field that does
+// not parse keeps the editor open so typos can be fixed. Normalization
+// (scaling) runs only when both values are plain numbers: a symbolic value
+// has no numeric norm, and scaling it would destroy its exact form.
 func (c *QubitsSystem) processAmpEditing(isCursorAvailable *bool) {
 	c.ampCursorBlink += rl.GetFrameTime()
 	if c.ampCursorBlink > 0.5 {
@@ -382,56 +393,30 @@ func (c *QubitsSystem) processAmpEditing(isCursorAvailable *bool) {
 	}
 
 	if rl.IsKeyPressed(rl.KeyTab) {
-		c.ampEditField = (c.ampEditField + 1) % 4
+		c.ampEditField = (c.ampEditField + 1) % 2
 	}
 
 	key := rl.GetCharPressed()
 	for key > 0 {
-		if strings.ContainsRune("0123456789.-", key) {
-			ch := string(rune(key))
-			switch c.ampEditField {
-			case 0:
-				c.ampReal0Str += ch
-			case 1:
-				c.ampImag0Str += ch
-			case 2:
-				c.ampReal1Str += ch
-			case 3:
-				c.ampImag1Str += ch
-			}
+		if strings.ContainsRune("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-*/(), ", key) {
+			c.ampStr[c.ampEditField] += string(rune(key))
 		}
 		key = rl.GetCharPressed()
 	}
 
-	if rl.IsKeyPressed(rl.KeyBackspace) {
-		switch c.ampEditField {
-		case 0:
-			if len(c.ampReal0Str) > 0 {
-				c.ampReal0Str = c.ampReal0Str[:len(c.ampReal0Str)-1]
-			}
-		case 1:
-			if len(c.ampImag0Str) > 0 {
-				c.ampImag0Str = c.ampImag0Str[:len(c.ampImag0Str)-1]
-			}
-		case 2:
-			if len(c.ampReal1Str) > 0 {
-				c.ampReal1Str = c.ampReal1Str[:len(c.ampReal1Str)-1]
-			}
-		case 3:
-			if len(c.ampImag1Str) > 0 {
-				c.ampImag1Str = c.ampImag1Str[:len(c.ampImag1Str)-1]
-			}
-		}
+	if utils.DeletePressed() && len(c.ampStr[c.ampEditField]) > 0 {
+		c.ampStr[c.ampEditField] = c.ampStr[c.ampEditField][:len(c.ampStr[c.ampEditField])-1]
 	}
 
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
-		if c.isRawSingleQubit() {
-			r0, _ := strconv.ParseFloat(c.ampReal0Str, 64)
-			i0, _ := strconv.ParseFloat(c.ampImag0Str, 64)
-			r1, _ := strconv.ParseFloat(c.ampReal1Str, 64)
-			i1, _ := strconv.ParseFloat(c.ampImag1Str, 64)
-			c.Origin.Amptitude[0] = symbolic.New(float32(r0), float32(i0))
-			c.Origin.Amptitude[1] = symbolic.New(float32(r1), float32(i1))
+		v0, err0 := symbolic.Parse(c.ampStr[0])
+		v1, err1 := symbolic.Parse(c.ampStr[1])
+		if err0 != nil || err1 != nil || !c.isRawSingleQubit() {
+			return
+		}
+		c.Origin.Amptitude[0] = v0
+		c.Origin.Amptitude[1] = v1
+		if v0.IsClosed() && v1.IsClosed() {
 			qub.Normalize(c.Origin.Amptitude)
 		}
 		c.closeAmpEditor(isCursorAvailable)
@@ -629,37 +614,10 @@ func formatCellAmplitude(v symbolic.SymbolicValue) string {
 	return re + " " + sign + " " + im + "i"
 }
 
-// drawAmplitude renders an amplitude string left-to-right from (x, y),
-// coloring every '+' sign green (e.g. 0.7 + 0.3i, 1 - i, -0.5i). The rest,
-// including the minus sign, keeps the given base color.
+// drawAmplitude renders an amplitude string left-to-right from (x, y) in
+// the given base color.
 func drawAmplitude(x, y int32, s string, fontSize int32, base rl.Color) {
-	type seg struct {
-		text string
-		col  rl.Color
-	}
-	var segs []seg
-	var buf strings.Builder
-	flush := func() {
-		if buf.Len() > 0 {
-			segs = append(segs, seg{buf.String(), base})
-			buf.Reset()
-		}
-	}
-	for _, r := range s {
-		switch r {
-		case '+':
-			flush()
-			segs = append(segs, seg{"+", rl.Green})
-		default:
-			buf.WriteRune(r)
-		}
-	}
-	flush()
-	sx := x
-	for _, g := range segs {
-		rl.DrawText(g.text, sx, y, fontSize, g.col)
-		sx += rl.MeasureText(g.text, fontSize)
-	}
+	rl.DrawText(s, x, y, fontSize, base)
 }
 
 func (c *QubitsSystem) Draw() {
@@ -872,34 +830,22 @@ func (c *QubitsSystem) Draw() {
 		box := rl.NewRectangle(c.Center.X-boxW/2, c.startY-boxH-6, boxW, boxH)
 		rl.DrawRectangleRounded(box, 0.2, 4, rl.NewColor(30, 30, 30, 255))
 		rl.DrawRectangleRoundedLinesEx(box, 0.2, 4, 1.5, rl.SkyBlue)
-		row1Y := box.Y + 6
-		row2Y := box.Y + 6 + rowH
-		rl.DrawText("|0> Re:", int32(box.X)+5, int32(row1Y), editFontSize, rl.White)
-		rl.DrawText(c.ampReal0Str, int32(box.X)+70, int32(row1Y), editFontSize, rl.White)
-		rl.DrawText("Im:", int32(box.X)+130, int32(row1Y), editFontSize, rl.White)
-		rl.DrawText(c.ampImag0Str, int32(box.X)+160, int32(row1Y), editFontSize, rl.White)
-		rl.DrawText("|1> Re:", int32(box.X)+5, int32(row2Y), editFontSize, rl.White)
-		rl.DrawText(c.ampReal1Str, int32(box.X)+70, int32(row2Y), editFontSize, rl.White)
-		rl.DrawText("Im:", int32(box.X)+130, int32(row2Y), editFontSize, rl.White)
-		rl.DrawText(c.ampImag1Str, int32(box.X)+160, int32(row2Y), editFontSize, rl.White)
+		row0Y := box.Y + 6
+		row1Y := box.Y + 6 + rowH
+		rl.DrawText("|0>:", int32(box.X)+5, int32(row0Y), editFontSize, rl.White)
+		rl.DrawText(c.ampStr[0], int32(box.X)+52, int32(row0Y), editFontSize, rl.White)
+		rl.DrawText("|1>:", int32(box.X)+5, int32(row1Y), editFontSize, rl.White)
+		rl.DrawText(c.ampStr[1], int32(box.X)+52, int32(row1Y), editFontSize, rl.White)
 		rl.DrawText("Tab: field   Enter: apply   Esc: cancel", int32(box.X)+8, int32(box.Y+boxH)-hintSize-6, hintSize, rl.LightGray)
 
 		if c.ampCursorShow {
-			var cx, cy int32
-			switch c.ampEditField {
-			case 0:
-				cx = int32(box.X) + 70 + rl.MeasureText(c.ampReal0Str, editFontSize)
+			cy := int32(row0Y)
+			fieldStr := c.ampStr[0]
+			if c.ampEditField == 1 {
 				cy = int32(row1Y)
-			case 1:
-				cx = int32(box.X) + 160 + rl.MeasureText(c.ampImag0Str, editFontSize)
-				cy = int32(row1Y)
-			case 2:
-				cx = int32(box.X) + 70 + rl.MeasureText(c.ampReal1Str, editFontSize)
-				cy = int32(row2Y)
-			case 3:
-				cx = int32(box.X) + 160 + rl.MeasureText(c.ampImag1Str, editFontSize)
-				cy = int32(row2Y)
+				fieldStr = c.ampStr[1]
 			}
+			cx := int32(box.X) + 52 + rl.MeasureText(fieldStr, editFontSize)
 			rl.DrawText("|", cx, cy, editFontSize, rl.Red)
 		}
 	}
@@ -1092,12 +1038,6 @@ func (c *QubitsSystem) zipToHook() {
 		case *CopyGate:
 			tmp := v.InHook
 			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && tmp.AllowQubitSystem && !tmp.AllowLogicalBit {
-				gotHooked = true
-				tmp.ConnectInfo(c)
-			}
-		case *SourceGate:
-			tmp := v.OutHook
-			if utils.Dist(tmp.Center, c.Center) <= glob.HookDist && (!tmp.IsHooked || tmp.TargetID == c.ID) && !gotHooked && tmp.AllowQubitSystem && !tmp.AllowLogicalBit {
 				gotHooked = true
 				tmp.ConnectInfo(c)
 			}

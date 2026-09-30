@@ -333,8 +333,6 @@ func main() {
 	}
 	for _, c := range rlw.WComp {
 		switch v := c.(type) {
-		case *components.SourceGate:
-			check("source", v.OutHook)
 		case *components.Gate:
 			for _, hk := range v.HookList {
 				check("gate "+v.Label, hk)

@@ -465,7 +465,7 @@ func main() {
 	butByState[glob.Measure2].Tooltip = "Collapse measurement: outputs the outcome as a logical bit plus the remaining state; click to force 0/1"
 	butByState[glob.Measure3].Tooltip = "M3 measurement: like M2, outputs the collapsed qubit and the remaining state"
 	butByState[glob.Info].Tooltip = "Info table: amplitudes of a hooked system"
-	butByState[glob.GQubit].Tooltip = "Source gate: continuously emits a custom qubit state"
+	butByState[glob.GQubit].Tooltip = "Qubit preset to |1>: a raw single-qubit input (right-click to edit amplitudes)"
 	butByState[glob.Copy].Tooltip = "Copy gate: create a copy of a hooked qubit system"
 	butByState[glob.Compare].Tooltip = "Compare gate: outputs 1 if two qubit systems are equal, 0 otherwise"
 	dupBtn.Tooltip = "Duplicate the last clicked universal gate (matrix carried over)"

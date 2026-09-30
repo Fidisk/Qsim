@@ -1,6 +1,6 @@
 package globals
 
-const SaveVersion = "0.8.2"
+const SaveVersion = "0.9.0"
 
 var CursorLock bool = false
 var HookDist float32 = 80

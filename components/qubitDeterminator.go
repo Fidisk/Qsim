@@ -93,7 +93,7 @@ func (c *QubitDeterminator) processEditing(isCursorAvailable *bool) {
 		}
 		key = rl.GetCharPressed()
 	}
-	if rl.IsKeyPressed(rl.KeyBackspace) && len(c.editStr) > 0 {
+	if utils.DeletePressed() && len(c.editStr) > 0 {
 		c.editStr = c.editStr[:len(c.editStr)-1]
 	}
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {

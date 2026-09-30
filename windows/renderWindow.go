@@ -487,12 +487,12 @@ func (rw *RenderWindow) Update() {
 			}
 			key = rl.GetCharPressed()
 		}
-		if rl.IsKeyPressed(rl.KeyBackspace) && len(rw.titleEditBuffer) > 0 {
-			rw.titleEditBuffer = rw.titleEditBuffer[:len(rw.titleEditBuffer)-1]
-		}
 		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
 			rw.isEditingTitle = false
 			rw.Name = rw.titleEditBuffer
+		}
+		if utils.DeletePressed() && len(rw.titleEditBuffer) > 0 {
+			rw.titleEditBuffer = rw.titleEditBuffer[:len(rw.titleEditBuffer)-1]
 		}
 		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) && !rl.CheckCollisionPointRec(mousePos, titleRect) {
 			rw.isEditingTitle = false
@@ -681,8 +681,17 @@ func (rw *RenderWindow) SpawnObject(snapped rl.Vector2) {
 		t1 := components.NewInfoTable(snapped.X, snapped.Y, 260, 40, config.ColorBg, []components.InfoRow{})
 		rw.PushComponent(t1)
 	case utils.IsSpawnState(glob.GQubit):
-		testSource := components.NewSourceGate(snapped.X, snapped.Y, 100, config.GateColor, "Test", []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()})
-		rw.PushComponent(testSource)
+		q := components.NewQubitsSystem(snapped.X, snapped.Y, glob.QubitSystemRadius, config.QubitSystemColor)
+
+		// The GQ button spawns the |1> preset (the Q button spawns |0>);
+		// right-click the system to edit exact amplitudes.
+		qState := qubits.NewQubitStateManager([]symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, 1)
+
+		q.Assign(qState)
+
+		rw.PushComponent(q)
+		// A determinator spawned on top of a hook auto-connects.
+		q.ZipDeterminatorsToHooks()
 	case utils.IsSpawnState(glob.TextBox):
 		tb := components.NewTextBox(snapped.X, snapped.Y, 200, 30, 16)
 		rw.PushComponent(tb)
@@ -752,7 +761,12 @@ func (rw *RenderWindow) makeSpawnPreview(state glob.SpawnType) components.Compon
 	case state&glob.Info != 0:
 		return components.NewInfoTable(0, 0, 260, 40, config.ColorBg, []components.InfoRow{})
 	case state&glob.GQubit != 0:
-		return components.NewSourceGate(0, 0, 100, config.GateColor, "Test", []symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()})
+		q := components.NewQubitsSystem(0, 0, glob.QubitSystemRadius, config.QubitSystemColor)
+		if previewModID < 0 {
+			previewModID = attributes.GenerateQubitModifierID()
+		}
+		q.Assign(qubits.NewQubitStateManagerFrom([]symbolic.SymbolicValue{symbolic.Zero(), symbolic.One()}, []int32{previewModID}))
+		return q
 	case state&glob.TextBox != 0:
 		return components.NewTextBox(0, 0, 200, 30, 16)
 	case state&glob.LineDraw != 0:

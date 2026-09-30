@@ -17,7 +17,7 @@
 // File layout is the interface: Go never invokes Python and Python never
 // invokes Go.
 //
-// Supported canvas subset (v1): SourceGate and standalone 1-qubit inputs,
+// Supported canvas subset (v1): standalone 1-qubit inputs,
 // unitary Gate matrices of any size (incl. editable universal gates),
 // CopyGate, and classically-controlled gates whose control is unhooked
 // (identity passthrough). Terminal M1/M2/M3 measurements are stripped (the

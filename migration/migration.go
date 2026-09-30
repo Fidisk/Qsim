@@ -14,6 +14,7 @@ package migration
 
 import (
 	"encoding/json"
+	"math"
 	"strconv"
 	"strings"
 
@@ -120,6 +121,155 @@ var steps = []Step{
 			}
 		},
 	},
+	{
+		To: "0.9.0",
+		Apply: func(w map[string]interface{}) {
+			if w["type"] != "RenderWindow" {
+				return
+			}
+			w["saveVersion"] = "0.9.0"
+			comps, ok := w["components"].([]interface{})
+			if !ok {
+				return
+			}
+			byID := map[float64]map[string]interface{}{}
+			maxID := float64(0)
+			for _, c := range comps {
+				cm, ok := c.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if id, ok := cm["id"].(float64); ok {
+					byID[id] = cm
+					if id > maxID {
+						maxID = id
+					}
+				}
+			}
+			kept := make([]interface{}, 0, len(comps))
+			var added []interface{}
+			for _, c := range comps {
+				cm, ok := c.(map[string]interface{})
+				if !ok || cm["type"] != "SourceGate" {
+					kept = append(kept, c)
+					continue
+				}
+				if sys := convertSourceGate(cm, byID, &maxID); sys != nil {
+					added = append(added, sys)
+				}
+			}
+			w["components"] = append(kept, added...)
+		},
+	},
+}
+
+// sourceGateAmps returns the engine steady-state amplitude for a saved
+// source: plain numeric pairs rescaled so probabilities sum to 1 (mirroring
+// qubits.Normalize, which the source applied every frame), symbolic {expr}
+// entries and zero vectors passing through untouched.
+func sourceGateAmps(raw interface{}) []interface{} {
+	list, ok := raw.([]interface{})
+	if !ok || len(list) != 2 {
+		return []interface{}{
+			map[string]interface{}{"real": float64(1), "imag": float64(0)},
+			map[string]interface{}{"real": float64(0), "imag": float64(0)},
+		}
+	}
+	re := make([]float64, 2)
+	im := make([]float64, 2)
+	for i, a := range list {
+		m, ok := a.(map[string]interface{})
+		if !ok {
+			return append([]interface{}{}, list...)
+		}
+		if _, hasExpr := m["expr"]; hasExpr {
+			return append([]interface{}{}, list...)
+		}
+		re[i], _ = m["real"].(float64)
+		im[i], _ = m["imag"].(float64)
+	}
+	sum := 0.0
+	for i := range re {
+		sum += re[i]*re[i] + im[i]*im[i]
+	}
+	if sum == 0 {
+		return append([]interface{}{}, list...)
+	}
+	inv := 1 / math.Sqrt(sum)
+	out := make([]interface{}, 2)
+	for i := range re {
+		out[i] = map[string]interface{}{"real": re[i] * inv, "imag": im[i] * inv}
+	}
+	return out
+}
+
+func clearHookLink(obj map[string]interface{}, key string, hookID float64) {
+	if v, ok := obj[key].(float64); ok && v == hookID {
+		obj[key] = float64(0)
+	}
+}
+
+// convertSourceGate replaces a saved SourceGate with a standalone raw qubit:
+// the system fed by the source output keeps its wiring and determinators and
+// takes over the (normalized) source amplitude, detached from the removed
+// hook. When no output system exists in the file, a minimal standalone
+// system is synthesized at the source position instead. Returns the
+// synthesized system, or nil when the existing output system was reused.
+func convertSourceGate(src map[string]interface{}, byID map[float64]map[string]interface{}, maxID *float64) map[string]interface{} {
+	amps := sourceGateAmps(src["amplitude"])
+	mod := float64(0)
+	if v, ok := src["modifierID"].(float64); ok {
+		mod = v
+	}
+	var outID, targetID float64
+	if oh, ok := src["outHook"].(map[string]interface{}); ok && oh != nil {
+		outID, _ = oh["id"].(float64)
+		if hooked, _ := oh["isHooked"].(bool); hooked {
+			targetID, _ = oh["targetID"].(float64)
+		}
+	}
+	if target, ok := byID[targetID]; ok && targetID != 0 && target["type"] == "QubitsSystem" {
+		if origin, ok := target["origin"].(map[string]interface{}); ok && origin != nil {
+			origin["amplitudes"] = amps
+			origin["modifierIDs"] = []interface{}{mod}
+			origin["size"] = float64(1)
+		} else {
+			target["origin"] = map[string]interface{}{
+				"amplitudes":  amps,
+				"modifierIDs": []interface{}{mod},
+				"size":        float64(1),
+			}
+		}
+		if outID != 0 {
+			for _, c := range byID {
+				if c["type"] != "QubitsSystem" {
+					continue
+				}
+				clearHookLink(c, "hookID", outID)
+				clearHookLink(c, "infoHookID", outID)
+			}
+		}
+		return nil
+	}
+	*maxID++
+	center := map[string]interface{}{"x": float64(0), "y": float64(0)}
+	if c, ok := src["center"].(map[string]interface{}); ok && c != nil {
+		center = c
+	}
+	return map[string]interface{}{
+		"type": "QubitsSystem", "id": *maxID,
+		"center": center, "radius": float64(30),
+		"color": map[string]interface{}{"r": float64(0), "g": float64(121), "b": float64(241), "a": float64(255)},
+		"isFixed": false, "hookID": float64(0), "infoHookID": float64(0),
+		"isLogical": false, "probability": float64(1),
+		"origin": map[string]interface{}{
+			"amplitudes":  amps,
+			"modifierIDs": []interface{}{mod},
+			"size":        float64(1),
+		},
+		"qubitDeterminators": []interface{}{},
+		"qubitPerm":          []interface{}{float64(0)},
+	}
 }
 
 // parseVersion splits "major.minor.patch" into a comparable value; missing

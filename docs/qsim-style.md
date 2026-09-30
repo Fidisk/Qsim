@@ -41,9 +41,8 @@ object.
 
 - **Position**: everything sits on the 100px grid
   (`config.SnapToGridInterval`). Gate bodies are radius 30; input hooks sit
-  at `x−300` (offset `±50` per input), the output hook at `x+300`, a source
-  table's output hook at `x+400`. A `QubitsSystem` connected to an output
-  hook snaps its center onto the hook.
+  at `x−300` (offset `±50` per input), the output hook at `x+300`.
+  A `QubitsSystem` connected to an output hook snaps its center onto the hook.
 - **Respect the state grid**: a qubit system's drawn grid is
   `2^ceil(n/2) × 2^floor(n/2)` cells of 100px, **centered on the system**
   (so a 4-qubit system covers 400×400). The hook distances above are sized
@@ -63,10 +62,11 @@ object.
 - **MSB on top**: `origin.modifierIDs[0]` is the most significant bit and
   the top row of every gate matrix (see format doc §6). The topmost lane is
   therefore `modifierIDs[0]`, the next `modifierIDs[1]`, etc.
-- **Inputs are normal qubits, not sources**: a single-qubit input can be a
-  normal `QubitsSystem` (click to cycle `|0> |1> |+> |-> |i> |-i>`), which
-  stays interactive. Only use a `SourceGate` when fine-grained or
-  entangled initialization is required (Bell pairs, QFT inputs, ...).
+- **Inputs are normal qubits**: a single-qubit input is a normal
+  `QubitsSystem` (click to cycle `|0> |1> |+> |-> |i> |-i>`, right-click to
+  edit exact amplitudes), which stays interactive. There is no source
+  component: precise or entangled inputs are authored directly as
+  `QubitsSystem` origins (Bell pairs, QFT inputs, ...).
 - **Built-in components keep their built-in colors**: never tint a `Light`
   (or other stock component) with a custom color — the save must look like
   the app's own palette (`config.GateColor` etc.).
@@ -422,14 +422,14 @@ bit.
 ## 7. Applying the convention: Telepor2.qsim, restyled
 
 Telepor2.qsim implements the teleportation protocol with 31 components:
-3 sources (message `|ψ>` and a Bell pair), `H`/`CX`/`M2` on the quantum
+3 input qubits (message `|ψ>` and a Bell pair), `H`/`CX`/`M2` on the quantum
 side, `ControlledGate` corrections, and the copy/compare/light verification
 chain. The restyle:
 
 | Aspect              | Current `Telepor2.qsim`                | Styled version                                       |
 |---------------------|----------------------------------------|------------------------------------------------------|
 | Lanes               | qubits wander (`-1400`, `-1200`, `-1000`, systems snap to hooks mid-air) | 3 lanes at `y=-1400/-1200/-1000`, pitch 200, never change Y |
-| MSB on top          | `modifierID` 2 is top lane              | keep `modifierID 2` on top; label sources `|psi> A`, `|0> B`, `|0> C` |
+| MSB on top          | `modifierID` 2 is top lane              | keep `modifierID 2` on top; label inputs `|psi> A`, `|0> B`, `|0> C` |
 | Steps               | none — one long row                    | 5 stages, 200px gaps, `TextBox` headers, `LineDraw` separators |
 | Explanatory text    | none                                   | one `TextBox` per step describing the idea (see table in §3) |
 | `U` gates           | none present                           | (rule applies whenever a `U` appears: rename + one caption per type, §4) |
@@ -439,9 +439,9 @@ chain. The restyle:
 The resulting save reads as:
 
 ```
- |psi>  ─ S ────────────────────────CX──H──M2 ──► bit m1 ──────────────┐
- |0> B  ─ S ──────H──CX ────────────┘   └────M2 ──► bit m2 ── Corrections
- |0> C  ─ S ─────────┘ └───────────────...───────────────────────────► |psi'>
+ |psi>  ────────────────────────────CX──H──M2 ──► bit m1 ──────────────┐
+ |0> B  ────────H──CX ────────────┘   └────M2 ──► bit m2 ── Corrections
+ |0> C  ────────────┘ └───────────────...───────────────────────────► |psi'>
            Step 1        Step 2          Step 3   Step 4      Step 5
           Bell pair     entangle       measure  correct    verify:
           prepare        Alice                     └── CopyGate → CompareGate → (Light)
@@ -454,7 +454,7 @@ The resulting save reads as:
 Before calling a save "styled":
 
 - [ ] Every qubit has its own horizontal lane; MSB on top; no crossing wires.
-- [ ] Sources at the left, measurement/classical output at the right.
+- [ ] Inputs at the left, measurement/classical output at the right.
 - [ ] All centers on the 100px grid (gates/hooks/systems).
 - [ ] Every system grid fits its group: calculate the `2^ceil(n/2)` by
       `2^floor(n/2)` footprint before placing the next component; no gate,
@@ -470,8 +470,9 @@ Before calling a save "styled":
 - [ ] Every distinct `U`-gate type is renamed and annotated at least once.
 - [ ] Every custom matrix gate has `editable:true` and a nearby TextBox note.
 - [ ] No text is drawn outside a `TextBox` (no bare labels on the canvas).
-- [ ] Use normal qubits for ordinary `0/1/+/-/i/-i` inputs; reserve sources
-      for precise or entangled initialization.
+- [ ] Use normal qubits for all inputs (click to cycle `0/1/+/-/i/-i`,
+  right-click for exact amplitudes); author precise entangled inputs
+  directly as `QubitsSystem` origins.
 - [ ] Use M1/M2/M3/M4 according to the measurement purpose in §5; chain `R`
       when the remainder must continue or a grid must stay small.
 - [ ] Measured bits become `LogicalBit`s shown on `Light`s; protocols that

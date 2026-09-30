@@ -101,3 +101,28 @@ func RectEdgePoint(center, target rl.Vector2, halfW, halfH float32) rl.Vector2 {
 	}
 	return rl.Vector2Add(center, rl.Vector2Scale(dir, t))
 }
+
+var keyRepeatAt = map[int32]float64{}
+
+const keyRepeatDelay = 0.45
+const keyRepeatInterval = 1.0 / 30
+
+func KeyRepeatPressed(key int32) bool {
+	if rl.IsKeyPressed(key) {
+		keyRepeatAt[key] = rl.GetTime() + keyRepeatDelay
+		return true
+	}
+	if rl.IsKeyDown(key) {
+		if now := rl.GetTime(); now >= keyRepeatAt[key] {
+			keyRepeatAt[key] = now + keyRepeatInterval
+			return true
+		}
+		return false
+	}
+	delete(keyRepeatAt, key)
+	return false
+}
+
+func DeletePressed() bool {
+	return KeyRepeatPressed(rl.KeyBackspace) || KeyRepeatPressed(rl.KeyDelete)
+}

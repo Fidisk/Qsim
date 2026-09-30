@@ -140,7 +140,7 @@ func (m *M4Gate) processEditing(isCursorAvailable *bool) {
 		}
 		key = rl.GetCharPressed()
 	}
-	if rl.IsKeyPressed(rl.KeyBackspace) && len(m.editBuffer) > 0 {
+	if utils.DeletePressed() && len(m.editBuffer) > 0 {
 		m.editBuffer = m.editBuffer[:len(m.editBuffer)-1]
 	}
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
