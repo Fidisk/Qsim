@@ -33,6 +33,17 @@ type QubitsSystem struct {
 	orderPopupHeld        bool
 	orderPopupPointerX    float32
 
+	// Inline amplitude editor (right-click on a raw single-qubit system,
+	// same interaction as SourceGate: Tab switches field, Enter applies).
+	ampEditing    bool
+	ampReal0Str   string
+	ampImag0Str   string
+	ampReal1Str   string
+	ampImag1Str   string
+	ampEditField  int
+	ampCursorBlink float32
+	ampCursorShow  bool
+
 	Probability float64
 	rows        int32
 	cols        int32
@@ -68,6 +79,9 @@ func (c *QubitsSystem) GetID() int32 {
 }
 
 func (c *QubitsSystem) IsEditing() bool {
+	if c.ampEditing {
+		return true
+	}
 	for _, d := range c.QubitDeterminatorList {
 		if d != nil && d.IsEditing() {
 			return true
@@ -325,6 +339,109 @@ func complexAbs(z symbolic.SymbolicValue) float64 {
 	return z.Abs()
 }
 
+// isRawSingleQubit reports whether this system is a raw single-qubit input:
+// a standalone 1-qubit state that was not produced by a gate or source
+// (HookID == 0). Only these support the inline amplitude editor.
+func (c *QubitsSystem) isRawSingleQubit() bool {
+	return c.Origin != nil && c.Origin.Size == 1 && len(c.Origin.Amptitude) == 2 && c.HookID == 0
+}
+
+// openAmpEditor starts inline amplitude editing, mirroring SourceGate's
+// editor: four real fields (Tab switches, Enter applies + normalizes).
+func (c *QubitsSystem) openAmpEditor(isCursorAvailable *bool) {
+	if !c.isRawSingleQubit() {
+		return
+	}
+	c.ampEditing = true
+	c.ampReal0Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[0].Real())
+	c.ampImag0Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[0].Imag())
+	c.ampReal1Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[1].Real())
+	c.ampImag1Str = fmt.Sprintf("%.4f", c.Origin.Amptitude[1].Imag())
+	c.ampEditField = 0
+	c.ampCursorBlink = 0
+	c.ampCursorShow = true
+	c.holdingCursor = true
+	*isCursorAvailable = false
+}
+
+func (c *QubitsSystem) closeAmpEditor(isCursorAvailable *bool) {
+	c.ampEditing = false
+	c.holdingCursor = false
+	*isCursorAvailable = true
+}
+
+// processAmpEditing handles the inline amplitude editor: type digits, Tab to
+// switch field, Enter applies (normalizing so probabilities sum to 1),
+// Escape cancels. Amplitudes are updated in place so the modifier ID, the
+// determinators and any hooked wiring survive the change.
+func (c *QubitsSystem) processAmpEditing(isCursorAvailable *bool) {
+	c.ampCursorBlink += rl.GetFrameTime()
+	if c.ampCursorBlink > 0.5 {
+		c.ampCursorShow = !c.ampCursorShow
+		c.ampCursorBlink = 0
+	}
+
+	if rl.IsKeyPressed(rl.KeyTab) {
+		c.ampEditField = (c.ampEditField + 1) % 4
+	}
+
+	key := rl.GetCharPressed()
+	for key > 0 {
+		if strings.ContainsRune("0123456789.-", key) {
+			ch := string(rune(key))
+			switch c.ampEditField {
+			case 0:
+				c.ampReal0Str += ch
+			case 1:
+				c.ampImag0Str += ch
+			case 2:
+				c.ampReal1Str += ch
+			case 3:
+				c.ampImag1Str += ch
+			}
+		}
+		key = rl.GetCharPressed()
+	}
+
+	if rl.IsKeyPressed(rl.KeyBackspace) {
+		switch c.ampEditField {
+		case 0:
+			if len(c.ampReal0Str) > 0 {
+				c.ampReal0Str = c.ampReal0Str[:len(c.ampReal0Str)-1]
+			}
+		case 1:
+			if len(c.ampImag0Str) > 0 {
+				c.ampImag0Str = c.ampImag0Str[:len(c.ampImag0Str)-1]
+			}
+		case 2:
+			if len(c.ampReal1Str) > 0 {
+				c.ampReal1Str = c.ampReal1Str[:len(c.ampReal1Str)-1]
+			}
+		case 3:
+			if len(c.ampImag1Str) > 0 {
+				c.ampImag1Str = c.ampImag1Str[:len(c.ampImag1Str)-1]
+			}
+		}
+	}
+
+	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyKpEnter) {
+		if c.isRawSingleQubit() {
+			r0, _ := strconv.ParseFloat(c.ampReal0Str, 64)
+			i0, _ := strconv.ParseFloat(c.ampImag0Str, 64)
+			r1, _ := strconv.ParseFloat(c.ampReal1Str, 64)
+			i1, _ := strconv.ParseFloat(c.ampImag1Str, 64)
+			c.Origin.Amptitude[0] = symbolic.New(float32(r0), float32(i0))
+			c.Origin.Amptitude[1] = symbolic.New(float32(r1), float32(i1))
+			qub.Normalize(c.Origin.Amptitude)
+		}
+		c.closeAmpEditor(isCursorAvailable)
+	}
+
+	if rl.IsKeyPressed(rl.KeyEscape) {
+		c.closeAmpEditor(isCursorAvailable)
+	}
+}
+
 // enforceSingleGate implements the "one gate at a time" rule: a qubit system
 // feeds exactly one gate. Once any of its determinators sits in a gate that
 // is filled (all inputs hooked), every other determinator is hidden, and any
@@ -357,6 +474,10 @@ func (c *QubitsSystem) enforceSingleGate() {
 }
 
 func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCursorAvailable *bool) {
+	if c.ampEditing {
+		c.processAmpEditing(isCursorAvailable)
+		return
+	}
 	if c.orderPopupOpen {
 		c.updateOrderPopup(worldMouse, holdingCursor, isCursorAvailable)
 		return
@@ -376,7 +497,11 @@ func (c *QubitsSystem) Update(worldMouse rl.Vector2, holdingCursor bool, isCurso
 			c.onClick(worldMouse, isCursorAvailable)
 		}
 		if !c.dragging && rl.IsMouseButtonPressed(rl.MouseButtonRight) && holdingCursor && (c.holdingCursor || *isCursorAvailable) {
-			c.openOrderPopup()
+			if c.isRawSingleQubit() {
+				c.openAmpEditor(isCursorAvailable)
+			} else {
+				c.openOrderPopup()
+			}
 		}
 	}
 	if rl.IsMouseButtonReleased(rl.MouseButtonLeft) && c.holdingCursor {
@@ -735,6 +860,48 @@ func (c *QubitsSystem) Draw() {
 		hintSize := int32(12)
 		hint := "Enter: apply   Esc: cancel"
 		rl.DrawText(hint, int32(x)+8, int32(y+h)-hintSize-6, hintSize, rl.LightGray)
+	}
+
+	if c.ampEditing {
+		const editFontSize = 12
+		hintSize := int32(12)
+		boxW := float32(236)
+		rowH := float32(20)
+		hintH := float32(18)
+		boxH := rowH*2 + hintH + 12
+		box := rl.NewRectangle(c.Center.X-boxW/2, c.startY-boxH-6, boxW, boxH)
+		rl.DrawRectangleRounded(box, 0.2, 4, rl.NewColor(30, 30, 30, 255))
+		rl.DrawRectangleRoundedLinesEx(box, 0.2, 4, 1.5, rl.SkyBlue)
+		row1Y := box.Y + 6
+		row2Y := box.Y + 6 + rowH
+		rl.DrawText("|0> Re:", int32(box.X)+5, int32(row1Y), editFontSize, rl.White)
+		rl.DrawText(c.ampReal0Str, int32(box.X)+70, int32(row1Y), editFontSize, rl.White)
+		rl.DrawText("Im:", int32(box.X)+130, int32(row1Y), editFontSize, rl.White)
+		rl.DrawText(c.ampImag0Str, int32(box.X)+160, int32(row1Y), editFontSize, rl.White)
+		rl.DrawText("|1> Re:", int32(box.X)+5, int32(row2Y), editFontSize, rl.White)
+		rl.DrawText(c.ampReal1Str, int32(box.X)+70, int32(row2Y), editFontSize, rl.White)
+		rl.DrawText("Im:", int32(box.X)+130, int32(row2Y), editFontSize, rl.White)
+		rl.DrawText(c.ampImag1Str, int32(box.X)+160, int32(row2Y), editFontSize, rl.White)
+		rl.DrawText("Tab: field   Enter: apply   Esc: cancel", int32(box.X)+8, int32(box.Y+boxH)-hintSize-6, hintSize, rl.LightGray)
+
+		if c.ampCursorShow {
+			var cx, cy int32
+			switch c.ampEditField {
+			case 0:
+				cx = int32(box.X) + 70 + rl.MeasureText(c.ampReal0Str, editFontSize)
+				cy = int32(row1Y)
+			case 1:
+				cx = int32(box.X) + 160 + rl.MeasureText(c.ampImag0Str, editFontSize)
+				cy = int32(row1Y)
+			case 2:
+				cx = int32(box.X) + 70 + rl.MeasureText(c.ampReal1Str, editFontSize)
+				cy = int32(row2Y)
+			case 3:
+				cx = int32(box.X) + 160 + rl.MeasureText(c.ampImag1Str, editFontSize)
+				cy = int32(row2Y)
+			}
+			rl.DrawText("|", cx, cy, editFontSize, rl.Red)
+		}
 	}
 
 	// (Commented‑out old drawing code remains unchanged)
