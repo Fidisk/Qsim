@@ -112,14 +112,18 @@ func KeyRepeatPressed(key int32) bool {
 		keyRepeatAt[key] = rl.GetTime() + keyRepeatDelay
 		return true
 	}
-	if rl.IsKeyDown(key) {
-		if now := rl.GetTime(); now >= keyRepeatAt[key] {
-			keyRepeatAt[key] = now + keyRepeatInterval
-			return true
-		}
+	if !rl.IsKeyDown(key) {
+		delete(keyRepeatAt, key)
 		return false
 	}
-	delete(keyRepeatAt, key)
+	next, armed := keyRepeatAt[key]
+	if !armed {
+		return false
+	}
+	if now := rl.GetTime(); now >= next {
+		keyRepeatAt[key] = now + keyRepeatInterval
+		return true
+	}
 	return false
 }
 

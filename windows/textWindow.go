@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	glob "qsim/globals"
+	"qsim/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -99,15 +100,9 @@ func (tw *TextWindow) Update() {
 		key = rl.GetCharPressed()
 	}
 
-	if rl.IsKeyPressed(rl.KeyBackspace) {
+	if utils.DeletePressed() {
 		if len(tw.TextBuffer) > 0 {
 			tw.TextBuffer = tw.TextBuffer[:len(tw.TextBuffer)-1]
-		}
-	} else if rl.IsKeyDown(rl.KeyBackspace) {
-		if tw.frameCounter%6 == 0 {
-			if len(tw.TextBuffer) > 0 {
-				tw.TextBuffer = tw.TextBuffer[:len(tw.TextBuffer)-1]
-			}
 		}
 	}
 

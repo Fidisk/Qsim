@@ -270,7 +270,7 @@ func main() {
 	}
 
 	// Spawn buttons, laid out in two columns and grouped by kind: quantum
-	// sources, quantum gates, measurement, system tools, classical logic,
+	// inputs, quantum gates, measurement, system tools, classical logic,
 	// then drawing tools. Groups are separated by a small gap.
 	spawnBtns := []components.Component{}
 	row := float32(-370)
@@ -285,7 +285,7 @@ func main() {
 	}
 	gap := func() { row += 10 }
 
-	// Quantum sources
+	// Quantum inputs
 	addRow(spawnBut("Q", 40, glob.Qubit), spawnBut("GQ", 30, glob.GQubit))
 	gap()
 

@@ -96,6 +96,34 @@ func compsByType(t *testing.T, w map[string]interface{}) map[string][]map[string
 	return out
 }
 
+func assertUniqueIDs(t *testing.T, w map[string]interface{}) {
+	t.Helper()
+	seen := map[float64]string{}
+	var walk func(v interface{}, where string)
+	walk = func(v interface{}, where string) {
+		switch n := v.(type) {
+		case map[string]interface{}:
+			for k, x := range n {
+				if k == "id" {
+					if id, ok := x.(float64); ok {
+						if prev, dup := seen[id]; dup {
+							t.Fatalf("duplicate id %v at %s (first at %s)", id, where, prev)
+						}
+						seen[id] = where
+					}
+					continue
+				}
+				walk(x, where)
+			}
+		case []interface{}:
+			for _, x := range n {
+				walk(x, where)
+			}
+		}
+	}
+	walk(w, "window")
+}
+
 func TestMigrateSourceGateHooked(t *testing.T) {
 	var w map[string]interface{}
 	if err := json.Unmarshal([]byte(Migrate(sourceSave(t, true))), &w); err != nil {
@@ -108,6 +136,7 @@ func TestMigrateSourceGateHooked(t *testing.T) {
 	if len(byType["QubitsSystem"]) != 1 {
 		t.Fatalf("QubitsSystem count = %d, want 1", len(byType["QubitsSystem"]))
 	}
+	assertUniqueIDs(t, w)
 	qs := byType["QubitsSystem"][0]
 	if qs["hookID"] != float64(0) || qs["infoHookID"] != float64(0) {
 		t.Fatalf("system still linked to removed hook: hookID=%v infoHookID=%v", qs["hookID"], qs["infoHookID"])
@@ -160,6 +189,11 @@ func TestMigrateSourceGateUnhooked(t *testing.T) {
 	if synth == nil {
 		t.Fatal("synthesized system missing")
 	}
+	// Fixture ids run to 15 (determinator); the synth system must clear them.
+	if synth["id"] != float64(16) {
+		t.Fatalf("synth id = %v, want 16", synth["id"])
+	}
+	assertUniqueIDs(t, w)
 	origin := synth["origin"].(map[string]interface{})
 	amps := origin["amplitudes"].([]interface{})
 	a0 := amps[0].(map[string]interface{})
@@ -200,6 +234,7 @@ func TestMigrateRealSavesDropSources(t *testing.T) {
 			if err := json.Unmarshal([]byte(line), &w); err != nil {
 				t.Fatalf("%s migrated line is not valid JSON: %v", name, err)
 			}
+			assertUniqueIDs(t, w)
 		}
 	}
 }

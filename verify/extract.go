@@ -264,7 +264,7 @@ func (x *extractor) sortedSystems() []*components.QubitsSystem {
 }
 
 // producers classifies how each hooked system gets its state and seeds the
-// replay managers for source-fed and standalone inputs.
+// replay managers for gate-fed and standalone inputs.
 func (x *extractor) producers() error {
 	for _, sys := range x.sortedSystems() {
 		h, err := x.producerHook(sys)
@@ -729,7 +729,7 @@ func (x *extractor) distinctGates(sys int32) int {
 	return len(seen)
 }
 
-// assignQubits maps every source modifier to a QASM index in save order and
+// assignQubits maps every input modifier to a QASM index in save order and
 // emits the initialization ops.
 func (x *extractor) assignQubits() error {
 	var sources []*components.QubitsSystem
@@ -739,12 +739,12 @@ func (x *extractor) assignQubits() error {
 		}
 	}
 	if len(sources) == 0 {
-		return errf("no source or standalone input systems found")
+		return errf("no standalone input systems found")
 	}
 	for _, sys := range sources {
 		m := x.managers[sys.ID]
-		// Init managers are always single-qubit (seedStandalone/seedSource
-		// enforce it), so ModifierID has one entry and Amptitude two.
+		// Init managers are always single-qubit (seedStandalone
+		// enforces it), so ModifierID has one entry and Amptitude two.
 		if len(m.ModifierID) != 1 || len(m.Amptitude) != 2 {
 			return errf("input system (id %d) is not a single qubit", sys.ID)
 		}
@@ -1403,7 +1403,7 @@ func replayGate(inputs []*qubits.QubitStateManager, mods []int32, op [][]symboli
 // multiply), used for unhooked controlled-U and constant-0 passthrough.
 
 // assemble builds Expected in Qiskit order (index bit i = QASM qubit i)
-// from the version map: every source modifier has exactly one current
+// from the version map: every input modifier has exactly one current
 // holder by construction (SSA style, see ver).
 func (x *extractor) assemble() error {
 	type carrier struct {

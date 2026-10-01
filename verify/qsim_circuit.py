@@ -6,8 +6,9 @@ numpy, mirroring the engine (Merge = Kronecker first-operand-high,
 SwapColumn brings gate qubits front in hook order, Multiply = U on the
 leading qubits). The checker diffs every replay step against Qiskit.
 
-Supported subset: SourceGate and standalone 1-qubit inputs, unitary Gate
-matrices of any size, CopyGate, classically-controlled gates whose control
+Supported subset: standalone 1-qubit inputs (SourceGate entries are still
+handled for pre-0.9.0 saves, which this tool reads raw without migration),
+unitary Gate matrices of any size, CopyGate, classically-controlled gates whose control
 is unhooked (passthrough), constant (button-driven: applied or skipped) or
 measurement-driven, and terminal/strippable measurements. Anything else on
 the quantum path is an error.

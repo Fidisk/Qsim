@@ -289,6 +289,11 @@ var ih = symbolic.New(0, float32(1/math.Sqrt(2))) // i/√2
 // qubitStateName returns the cycle name of the given single-qubit state, or
 // "" when it is not one of the six cycle states.
 func qubitStateName(amps []symbolic.SymbolicValue) string {
+	for _, a := range amps {
+		if !a.IsClosed() {
+			return ""
+		}
+	}
 	for _, s := range qubitCycle {
 		ok := len(amps) == len(s.amps)
 		for i := range s.amps {
@@ -322,12 +327,12 @@ func nextQubitState(amps []symbolic.SymbolicValue) []symbolic.SymbolicValue {
 
 // cycleState advances a standalone single-qubit system to the next state in
 // the cycle. Fresh qubits stay cyclable even when their determinator is
-// plugged into a gate; systems emitted by a source or a gate (HookID != 0)
+// plugged into a gate; systems emitted by a gate (HookID != 0)
 // are not. The amplitudes are updated in place so the modifier ID, the
 // determinators and any hooked wiring survive the change.
 func (c *QubitsSystem) cycleState() {
 	if c.Origin == nil || c.Origin.Size != 1 || c.HookID != 0 {
-		return // only normal qubits, not source/gate outputs
+		return // only normal qubits, not gate outputs
 	}
 	for _, a := range c.Origin.Amptitude {
 		if !a.IsClosed() {
@@ -343,7 +348,7 @@ func complexAbs(z symbolic.SymbolicValue) float64 {
 }
 
 // isRawSingleQubit reports whether this system is a raw single-qubit input:
-// a standalone 1-qubit state that was not produced by a gate or source
+// a standalone 1-qubit state that was not produced by a gate
 // (HookID == 0). Only these support the inline amplitude editor.
 func (c *QubitsSystem) isRawSingleQubit() bool {
 	return c.Origin != nil && c.Origin.Size == 1 && len(c.Origin.Amptitude) == 2 && c.HookID == 0
@@ -586,9 +591,12 @@ func trimFloat(f float64) string {
 
 // formatCellAmplitude renders one state-grid amplitude compactly, dropping
 // the part that is zero: 1+0i -> "1", 0+1i -> "i", 0 -> "0",
-// 0.7+0.3i -> "0.7 + 0.3i", 1-i -> "1 - i". The sign is spaced so it reads
-// as a separate element (and gets its own color in drawAmplitude).
+// 0.7+0.3i -> "0.7 + 0.3i", 1-i -> "1 - i". Open (symbolic) values render
+// as their expression string.
 func formatCellAmplitude(v symbolic.SymbolicValue) string {
+	if !v.IsClosed() {
+		return v.String()
+	}
 	re := trimFloat(float64(v.Real()))
 	im := trimFloat(float64(v.Imag()))
 	if im == "0" {
@@ -998,7 +1006,7 @@ func (c *QubitsSystem) zipToHook() {
 			}
 		case *CompareGate:
 			// Compare inputs only read the state: attach via InfoHookID so the
-			// system's source connection (HookID) survives, like InfoTable and
+			// system's producer connection (HookID) survives, like InfoTable and
 			// CopyGate. Pick the closest available input hook.
 			var closest *Hook
 			closestDist := float32(math.MaxFloat32)
@@ -1048,7 +1056,7 @@ func (c *QubitsSystem) zipToHook() {
 		}
 	}
 	if !gotHooked && c.HookID != 0 {
-		// Dragging away from an output hook (gate/source) only repositions
+		// Dragging away from an output hook (gate) only repositions
 		// the system — the link must survive, otherwise the gate sees a free
 		// output hook and respawns a duplicate system. Standalone hooks
 		// release normally.

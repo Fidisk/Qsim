@@ -83,7 +83,9 @@ zero/absent), so hand-written unnumbered saves still load.
 
 - **Colors** are `{"r","g","b","a"}` with `uint8` values 0–255.
 - **Vectors** are `{"x":0.0,"y":0.0}`.
-- **Complex numbers** are `{"real":0.70710677,"imag":0}`.
+- **Complex numbers** are `{"real":0.70710677,"imag":0}`, or symbolically
+  as `{"expr":"0.5*c+2"}` (parsed by the in-app expression grammar; used
+  for amplitudes holding unbound variables).
 - **IDs**: every referenceable component has an integer `"id"`; annotation
   components such as `TextBox`/`LineDraw` may omit one. Reference IDs must be
   unique and stable within the file; they are the references used by hooks

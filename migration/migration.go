@@ -133,7 +133,6 @@ var steps = []Step{
 				return
 			}
 			byID := map[float64]map[string]interface{}{}
-			maxID := float64(0)
 			for _, c := range comps {
 				cm, ok := c.(map[string]interface{})
 				if !ok {
@@ -141,11 +140,9 @@ var steps = []Step{
 				}
 				if id, ok := cm["id"].(float64); ok {
 					byID[id] = cm
-					if id > maxID {
-						maxID = id
-					}
 				}
 			}
+			maxID := maxNestedID(w)
 			kept := make([]interface{}, 0, len(comps))
 			var added []interface{}
 			for _, c := range comps {
@@ -207,6 +204,34 @@ func clearHookLink(obj map[string]interface{}, key string, hookID float64) {
 	if v, ok := obj[key].(float64); ok && v == hookID {
 		obj[key] = float64(0)
 	}
+}
+
+// maxNestedID returns the largest numeric "id" anywhere in the window object,
+// including nested hooks and determinators: synthesized components must not
+// collide with those (component-level ids alone routinely undercount).
+func maxNestedID(w map[string]interface{}) float64 {
+	maxID := float64(0)
+	var walk func(v interface{})
+	walk = func(v interface{}) {
+		switch t := v.(type) {
+		case map[string]interface{}:
+			for k, x := range t {
+				if k == "id" {
+					if id, ok := x.(float64); ok && id > maxID {
+						maxID = id
+					}
+					continue
+				}
+				walk(x)
+			}
+		case []interface{}:
+			for _, x := range t {
+				walk(x)
+			}
+		}
+	}
+	walk(w)
+	return maxID
 }
 
 // convertSourceGate replaces a saved SourceGate with a standalone raw qubit:

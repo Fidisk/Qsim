@@ -27,7 +27,7 @@ func writeSym(write func(...interface{}), a symbolic.SymbolicValue) {
 }
 
 // circuitHash hashes the computation-relevant state of a circuit: component
-// types/IDs, gate matrices and labels, source amplitudes, qubit-system
+// types/IDs, gate matrices and labels, input amplitudes, qubit-system
 // states, measurement settings, and every hook's wiring (targetIDs).
 // Cosmetic movement (positions, drags, determinator drift) is intentionally
 // excluded so rearranging the layout does not reset the animation.

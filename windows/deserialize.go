@@ -1414,7 +1414,7 @@ func remapCompareGateRefs(cg *components.CompareGate, ctx *loadCtx) {
 			switch t := newObj.(type) {
 			case *components.QubitsSystem:
 				// Compare inputs are read-only: they attach through
-				// InfoHookID so the system's source link (HookID) survives.
+				// InfoHookID so the system's producer link (HookID) survives.
 				if isInput {
 					t.InfoHookID = 0
 					t.Center = h.Center
